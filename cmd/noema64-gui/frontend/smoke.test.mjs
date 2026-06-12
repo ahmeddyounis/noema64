@@ -62,6 +62,7 @@ test("settings surface covers MVP and profile controls", () => {
     "settingRawResponses",
     "healthBtn",
     "benchBtn",
+    "modeBenchBtn",
   ]) {
     expectMarkupID(id);
   }
@@ -78,6 +79,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "ExportPGN",
     "ImportPGN",
     "RunRandomBenchmark",
+    "RunModeBenchmark",
+    "renderBenchmarkSummary",
     "populateProviderProfiles",
     "applySelectedProviderProfile",
     "search_score",

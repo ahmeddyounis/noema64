@@ -482,6 +482,18 @@ function gameRecordFields(record) {
   return { gameID, savedAt, snapshot };
 }
 
+function renderBenchmarkSummary(summary) {
+  if (!summary) return "No benchmark result.";
+  if (summary.results?.length && summary.results[0]?.summary) {
+    const rows = summary.results.map((result) => {
+      const s = result.summary || {};
+      return `${result.mode}: ${s.games_completed || 0}/${s.games_requested || summary.games_per_mode || 0} games · ${s.total_plies || 0} plies · ${s.fallbacks_used || 0} fallbacks · ${s.engine_errors || 0} errors`;
+    });
+    return `Mode benchmark · ${summary.games_per_mode || 0} games/mode · seed ${summary.seed || 64}\n${rows.join("\n")}`;
+  }
+  return `Random benchmark · ${summary.games_completed || 0}/${summary.games_requested || 0} games · ${summary.total_plies || 0} plies · ${summary.fallbacks_used || 0} fallbacks · ${summary.engine_errors || 0} errors`;
+}
+
 function renderRecentGames(records) {
   const list = document.querySelector("#recentList");
   list.innerHTML = "";
@@ -628,7 +640,15 @@ document.querySelector("#healthBtn").addEventListener("click", async () => {
 document.querySelector("#benchBtn").addEventListener("click", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = "Running benchmark...";
-    document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("RunRandomBenchmark", 100, 64), null, 2);
+    document.querySelector("#settingsOutput").textContent = renderBenchmarkSummary(await call("RunRandomBenchmark", 100, 64));
+  } catch (err) {
+    showError(err, "#settingsOutput");
+  }
+});
+document.querySelector("#modeBenchBtn").addEventListener("click", async () => {
+  try {
+    document.querySelector("#settingsOutput").textContent = "Running mode benchmark...";
+    document.querySelector("#settingsOutput").textContent = renderBenchmarkSummary(await call("RunModeBenchmark", 10, 64));
   } catch (err) {
     showError(err, "#settingsOutput");
   }
