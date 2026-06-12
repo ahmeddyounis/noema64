@@ -12,6 +12,7 @@ let activeTab = "summary";
 let settings = null;
 let playerSide = "white";
 let autoReply = true;
+let pendingPromotion = null;
 
 const api = () => window.go?.appsvc?.Application;
 
@@ -107,14 +108,38 @@ async function squareClicked(sq) {
     renderBoard();
     return;
   }
-  const legal = state.snapshot.legal_moves.find((m) => m.from === selected && m.to === sq);
-  if (!legal) {
+  const matches = state.snapshot.legal_moves.filter((m) => m.from === selected && m.to === sq);
+  if (!matches.length) {
     selected = state.snapshot.board[sq] ? sq : null;
     renderBoard();
     return;
   }
+  let legal = matches[0];
+  if (matches.length > 1) {
+    legal = await choosePromotion(matches);
+    if (!legal) {
+      renderBoard();
+      return;
+    }
+  }
   selected = null;
   await makeMove(legal.uci);
+}
+
+function choosePromotion(moves) {
+  const dialog = document.querySelector("#promotionDialog");
+  return new Promise((resolve) => {
+    pendingPromotion = { moves, resolve };
+    dialog.showModal();
+  });
+}
+
+function finishPromotion(promotion) {
+  if (!pendingPromotion) return;
+  const { moves, resolve } = pendingPromotion;
+  pendingPromotion = null;
+  document.querySelector("#promotionDialog").close();
+  resolve(moves.find((m) => m.promotion === promotion) || null);
 }
 
 function renderMoves() {
@@ -314,6 +339,15 @@ document.querySelector("#runImportBtn").addEventListener("click", async () => {
   } catch (err) {
     document.querySelector("#importOutput").textContent = String(err);
   }
+});
+document.querySelectorAll("#promotionDialog [data-promotion]").forEach((btn) => {
+  btn.addEventListener("click", () => finishPromotion(btn.dataset.promotion));
+});
+document.querySelector("#promotionDialog").addEventListener("close", () => {
+  if (!pendingPromotion) return;
+  const { resolve } = pendingPromotion;
+  pendingPromotion = null;
+  resolve(null);
 });
 document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
 document.querySelector("#healthBtn").addEventListener("click", async () => {

@@ -294,6 +294,20 @@ dialog h2 {
   gap: 4px;
 }
 
+.promotion-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 64px);
+  gap: 10px;
+  justify-content: center;
+  padding: 18px;
+}
+
+.promotion-grid button {
+  width: 64px;
+  height: 64px;
+  font-size: 34px;
+}
+
 .settings menu {
   display: flex;
   gap: 8px;
