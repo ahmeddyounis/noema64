@@ -10,6 +10,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/security"
+	"github.com/ahmedyounis/noema64/internal/strategy"
 )
 
 type TraceStore struct {
@@ -40,13 +41,7 @@ func (s *TraceStore) AppendDecision(ctx context.Context, trace *decision.MoveDec
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	record := map[string]any{
-		"schema_version": "1.0",
-		"event_type":     "move_decision",
-		"timestamp":      time.Now().UTC().Format(time.RFC3339Nano),
-		"engine_version": "0.1.0",
-		"trace":          trace,
-	}
+	record := decisionTraceRecord(trace)
 	b, err := json.Marshal(record)
 	if err != nil {
 		return err
@@ -68,4 +63,44 @@ func (s *TraceStore) AppendDecision(ctx context.Context, trace *decision.MoveDec
 	defer f.Close()
 	_, err = f.Write(b)
 	return err
+}
+
+func decisionTraceRecord(trace *decision.MoveDecision) map[string]any {
+	promptVersion := trace.Provider.PromptVersion
+	if promptVersion == "" {
+		promptVersion = strategy.PromptVersion
+	}
+	return map[string]any{
+		"schema_version":    "1.0",
+		"event_type":        "move_decision",
+		"timestamp":         time.Now().UTC().Format(time.RFC3339Nano),
+		"engine_version":    "0.1.0",
+		"game_id":           trace.GameID,
+		"ply":               trace.Ply,
+		"fen_before":        trace.FENBefore,
+		"legal_moves_count": trace.LegalMovesCount,
+		"mode":              trace.Mode,
+		"provider":          trace.Provider.Name,
+		"model":             trace.Provider.Model,
+		"prompt_version":    promptVersion,
+		"llm_raw_available": trace.Provider.RawAvailable,
+		"llm_parse_status":  trace.Provider.ParseStatus,
+		"selected_move":     trace.SelectedMove.UCI,
+		"fallback_used":     trace.FallbackUsed,
+		"candidate_moves":   trace.CandidateMoves,
+		"verifier_result":   trace.VerifierTrace,
+		"strategy_before":   trace.StrategyBefore,
+		"strategy_after":    trace.StrategyAfter,
+		"timing_ms":         traceTimingRecord(trace.Timing),
+		"trace":             trace,
+	}
+}
+
+func traceTimingRecord(timing decision.Timing) map[string]int64 {
+	return map[string]int64{
+		"total":    timing.TotalMS,
+		"llm":      timing.ProviderMS,
+		"verifier": timing.VerifierMS,
+		"other":    timing.OtherMS,
+	}
 }

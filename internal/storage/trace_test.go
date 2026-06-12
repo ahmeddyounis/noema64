@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"github.com/ahmedyounis/noema64/internal/verifier"
@@ -16,15 +17,23 @@ import (
 func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "trace.jsonl")
 	trace := &decision.MoveDecision{
-		SchemaVersion: "decision-trace.v1",
-		DecisionID:    "dec_test",
-		GameID:        "game_test",
-		Mode:          strategy.ModeBlunderguard,
+		SchemaVersion:   "decision-trace.v1",
+		DecisionID:      "dec_test",
+		GameID:          "game_test",
+		Ply:             7,
+		Mode:            strategy.ModeBlunderguard,
+		SelectedMove:    chesscore.LegalMove{UCI: "g1f3"},
+		FENBefore:       "startpos",
+		LegalMovesCount: 20,
 		Provider: decision.ProviderTrace{
-			Name:  "mock",
-			Model: "mock-balanced",
-			Error: "api_key: abc123",
+			Name:          "mock",
+			Model:         "mock-balanced",
+			PromptVersion: strategy.PromptVersion,
+			ParseStatus:   "ok",
+			RawAvailable:  false,
+			Error:         "api_key: abc123",
 		},
+		Timing:        decision.Timing{TotalMS: 10, ProviderMS: 6, VerifierMS: 3, OtherMS: 1},
 		VerifierTrace: &verifier.Result{Enabled: true, Used: true, Name: "static_safety"},
 		Assistance: decision.AssistanceTrace{
 			Mode:         strategy.ModeBlunderguard,
@@ -45,9 +54,26 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 
 	var record struct {
-		SchemaVersion string `json:"schema_version"`
-		EventType     string `json:"event_type"`
-		Trace         struct {
+		SchemaVersion   string              `json:"schema_version"`
+		EventType       string              `json:"event_type"`
+		EngineVersion   string              `json:"engine_version"`
+		GameID          string              `json:"game_id"`
+		Ply             int                 `json:"ply"`
+		FENBefore       string              `json:"fen_before"`
+		LegalMovesCount int                 `json:"legal_moves_count"`
+		Mode            strategy.EngineMode `json:"mode"`
+		Provider        string              `json:"provider"`
+		Model           string              `json:"model"`
+		PromptVersion   string              `json:"prompt_version"`
+		LLMParseStatus  string              `json:"llm_parse_status"`
+		SelectedMove    string              `json:"selected_move"`
+		FallbackUsed    bool                `json:"fallback_used"`
+		TimingMS        map[string]int64    `json:"timing_ms"`
+		VerifierResult  struct {
+			Used bool   `json:"used"`
+			Name string `json:"name"`
+		} `json:"verifier_result"`
+		Trace struct {
 			SchemaVersion string `json:"schema_version"`
 			Assistance    struct {
 				VerifierUsed bool   `json:"verifier_used"`
@@ -64,6 +90,21 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 	if record.SchemaVersion == "" || record.EventType != "move_decision" {
 		t.Fatalf("missing record metadata: %+v", record)
+	}
+	if record.EngineVersion != "0.1.0" || record.GameID != "game_test" || record.Ply != 7 {
+		t.Fatalf("missing top-level trace identity fields: %+v", record)
+	}
+	if record.FENBefore != "startpos" || record.LegalMovesCount != 20 || record.SelectedMove != "g1f3" {
+		t.Fatalf("missing top-level position fields: %+v", record)
+	}
+	if record.Mode != strategy.ModeBlunderguard || record.Provider != "mock" || record.Model != "mock-balanced" || record.PromptVersion != strategy.PromptVersion {
+		t.Fatalf("missing DATA-005 provider metadata: %+v", record)
+	}
+	if record.LLMParseStatus != "ok" || record.TimingMS["llm"] != 6 || record.TimingMS["verifier"] != 3 {
+		t.Fatalf("missing top-level LLM/timing fields: %+v", record)
+	}
+	if !record.VerifierResult.Used || record.VerifierResult.Name != "static_safety" {
+		t.Fatalf("missing top-level verifier disclosure: %+v", record.VerifierResult)
 	}
 	if record.Trace.SchemaVersion != "decision-trace.v1" {
 		t.Fatalf("trace schema version = %q", record.Trace.SchemaVersion)
