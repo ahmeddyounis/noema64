@@ -132,19 +132,20 @@ func LoadSettings(path string) (Settings, error) {
 	if err != nil {
 		return Settings{}, err
 	}
-	var settings Settings
+	settings := DefaultSettings()
 	if err := yaml.Unmarshal(b, &settings); err != nil {
 		return Settings{}, err
 	}
-	if settings.SchemaVersion == "" {
-		return Settings{}, errors.New("settings schema_version is required")
+	if err := validateSettings(settings); err != nil {
+		return Settings{}, err
 	}
 	return settings, nil
 }
 
 func SaveSettings(path string, settings Settings) error {
-	if settings.SchemaVersion == "" {
-		settings.SchemaVersion = "1.0"
+	settings = normalizeSettings(settings)
+	if err := validateSettings(settings); err != nil {
+		return err
 	}
 	if settings.CreatedAt == "" {
 		settings.CreatedAt = time.Now().UTC().Format(time.RFC3339)
@@ -164,4 +165,80 @@ func SaveSettings(path string, settings Settings) error {
 		return err
 	}
 	return os.WriteFile(path, b, 0o600)
+}
+
+func normalizeSettings(settings Settings) Settings {
+	defaults := DefaultSettings()
+	if settings.SchemaVersion == "" {
+		settings.SchemaVersion = defaults.SchemaVersion
+	}
+	if settings.AppVersion == "" {
+		settings.AppVersion = defaults.AppVersion
+	}
+	if settings.Engine.DefaultMode == "" {
+		settings.Engine.DefaultMode = defaults.Engine.DefaultMode
+	}
+	if settings.Engine.Personality == "" {
+		settings.Engine.Personality = defaults.Engine.Personality
+	}
+	if settings.Engine.MaxCandidates <= 0 {
+		settings.Engine.MaxCandidates = defaults.Engine.MaxCandidates
+	}
+	if settings.Engine.FallbackPolicy == "" {
+		settings.Engine.FallbackPolicy = defaults.Engine.FallbackPolicy
+	}
+	if settings.LLM.Provider == "" {
+		settings.LLM.Provider = defaults.LLM.Provider
+	}
+	if settings.LLM.Model == "" {
+		settings.LLM.Model = defaults.LLM.Model
+	}
+	if settings.LLM.MaxTokens <= 0 {
+		settings.LLM.MaxTokens = defaults.LLM.MaxTokens
+	}
+	if settings.LLM.TimeoutMS <= 0 {
+		settings.LLM.TimeoutMS = defaults.LLM.TimeoutMS
+	}
+	if settings.Verifier.Kind == "" {
+		settings.Verifier.Kind = defaults.Verifier.Kind
+	}
+	if settings.Verifier.MoveTimeMS <= 0 {
+		settings.Verifier.MoveTimeMS = defaults.Verifier.MoveTimeMS
+	}
+	if settings.Verifier.Depth <= 0 {
+		settings.Verifier.Depth = defaults.Verifier.Depth
+	}
+	if settings.Verifier.MaxCentipawnLoss <= 0 {
+		settings.Verifier.MaxCentipawnLoss = defaults.Verifier.MaxCentipawnLoss
+	}
+	if settings.GUI.Theme == "" {
+		settings.GUI.Theme = defaults.GUI.Theme
+	}
+	if settings.Logging.OutputDir == "" {
+		settings.Logging.OutputDir = defaults.Logging.OutputDir
+	}
+	return settings
+}
+
+func validateSettings(settings Settings) error {
+	if settings.SchemaVersion == "" {
+		return errors.New("settings schema_version is required")
+	}
+	switch settings.Engine.DefaultMode {
+	case "pure", "blunderguard", "hybrid", "coach":
+	default:
+		return errors.New("settings engine.default_mode is invalid")
+	}
+	switch settings.LLM.Provider {
+	case "mock", "openai_compatible":
+	default:
+		return errors.New("settings llm.provider is invalid")
+	}
+	if settings.LLM.Provider == "openai_compatible" && settings.LLM.Endpoint == "" {
+		return errors.New("settings llm.endpoint is required for openai_compatible provider")
+	}
+	if settings.Engine.MaxCandidates < 1 || settings.Engine.MaxCandidates > 10 {
+		return errors.New("settings engine.max_candidates must be between 1 and 10")
+	}
+	return nil
 }
