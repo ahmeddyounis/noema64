@@ -265,7 +265,7 @@ func (s *Server) goCommand(ctx context.Context, args []string) error {
 		defer cancel()
 		dec, _, err := s.engine.ChooseMove(searchCtx)
 		if err != nil {
-			s.bestmove("0000")
+			s.bestmove(s.bestKnownMove())
 			s.clearSearch(done)
 			return
 		}
@@ -277,6 +277,14 @@ func (s *Server) goCommand(ctx context.Context, args []string) error {
 		s.clearSearch(done)
 	}()
 	return nil
+}
+
+func (s *Server) bestKnownMove() string {
+	moves, err := s.engine.LegalMoves(context.Background())
+	if err != nil || len(moves) == 0 {
+		return "0000"
+	}
+	return moves[0].UCI
 }
 
 func (s *Server) stop() {

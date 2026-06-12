@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/storage"
@@ -128,6 +129,39 @@ func TestUCIReadyAndStopDuringActiveSearch(t *testing.T) {
 	}
 }
 
+func TestUCIStopAfterCancelledSearchReturnsLegalFallback(t *testing.T) {
+	input := strings.Join([]string{
+		"uci",
+		"position startpos",
+		"go movetime 1000",
+		"stop",
+		"quit",
+		"",
+	}, "\n")
+	var out bytes.Buffer
+	settings := storage.DefaultSettings()
+	settings.Logging.OutputDir = t.TempDir()
+	server := NewServer(strings.NewReader(input), &out, &bytes.Buffer{}, settings)
+	server.opts.Provider = cancelThenRespondProvider{}
+	server.engine.SetOptions(server.opts)
+
+	if err := server.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "bestmove ") {
+		t.Fatalf("missing bestmove:\n%s", text)
+	}
+	if strings.Contains(text, "bestmove 0000") {
+		t.Fatalf("stop returned null move despite legal moves:\n%s", text)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
+		if !validUCILine(line) {
+			t.Fatalf("non-UCI stdout line: %q\n%s", line, text)
+		}
+	}
+}
+
 func validUCILine(line string) bool {
 	for _, prefix := range []string{"id ", "option ", "uciok", "readyok", "bestmove ", "info "} {
 		if strings.HasPrefix(line, prefix) {
@@ -135,4 +169,24 @@ func validUCILine(line string) bool {
 		}
 	}
 	return false
+}
+
+type cancelThenRespondProvider struct{}
+
+func (cancelThenRespondProvider) Name() string {
+	return "cancel-then-respond"
+}
+
+func (cancelThenRespondProvider) Capabilities() providers.Capabilities {
+	return providers.MockProvider{}.Capabilities()
+}
+
+func (cancelThenRespondProvider) HealthCheck(ctx context.Context) error {
+	return nil
+}
+
+func (cancelThenRespondProvider) CompleteJSON(ctx context.Context, req providers.CompletionRequest) (*providers.CompletionResponse, error) {
+	<-ctx.Done()
+	time.Sleep(10 * time.Millisecond)
+	return providers.MockProvider{}.CompleteJSON(context.Background(), req)
 }
