@@ -10,6 +10,8 @@ let selected = null;
 let flipped = false;
 let activeTab = "summary";
 let settings = null;
+let playerSide = "white";
+let autoReply = true;
 
 const api = () => window.go?.appsvc?.Application;
 
@@ -175,6 +177,9 @@ async function makeMove(move) {
   document.querySelector("#thinkingStage").textContent = "Applying user move";
   state = await call("MakeUserMove", move);
   render();
+  if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
+    await askEngine();
+  }
 }
 
 async function askEngine() {
@@ -187,6 +192,8 @@ async function askEngine() {
 async function loadSettings() {
   settings = await call("GetSettings");
   document.querySelector("#settingMode").value = settings.engine.default_mode;
+  document.querySelector("#settingSide").value = playerSide;
+  document.querySelector("#settingAutoReply").checked = autoReply;
   document.querySelector("#settingProvider").value = settings.llm.provider;
   document.querySelector("#settingEndpoint").value = settings.llm.endpoint || "";
   document.querySelector("#settingModel").value = settings.llm.model || "";
@@ -197,6 +204,9 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  playerSide = document.querySelector("#settingSide").value;
+  if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
+  autoReply = document.querySelector("#settingAutoReply").checked;
   settings.engine.default_mode = document.querySelector("#settingMode").value;
   settings.llm.provider = document.querySelector("#settingProvider").value;
   settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
@@ -219,8 +229,12 @@ document.querySelectorAll(".tabs button").forEach((btn) => {
 });
 
 document.querySelector("#newGameBtn").addEventListener("click", async () => {
-  state = await call("NewGame", { side: "white", mode: document.querySelector("#settingMode")?.value || "blunderguard" });
+  let side = document.querySelector("#settingSide")?.value || playerSide;
+  if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
+  playerSide = side;
+  state = await call("NewGame", { side, mode: document.querySelector("#settingMode")?.value || "blunderguard" });
   render();
+  if (autoReply && side === "black") await askEngine();
 });
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#stopBtn").addEventListener("click", () => call("StopEngine"));
