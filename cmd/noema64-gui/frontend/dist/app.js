@@ -113,12 +113,16 @@ function renderBoard() {
     if (selected === sq) div.classList.add("selected");
     if (legalTargets.includes(sq)) div.classList.add("target");
     if (last && (last.uci.startsWith(sq) || last.uci.slice(2, 4) === sq)) div.classList.add("last-move");
+    div.draggable = !!state.snapshot.board[sq] && state.snapshot.outcome?.status === "ongoing";
     div.textContent = pieces[state.snapshot.board[sq]] || "";
     const coord = document.createElement("span");
     coord.className = "coord";
     coord.textContent = sq;
     div.appendChild(coord);
     div.addEventListener("click", () => squareClicked(sq));
+    div.addEventListener("dragstart", (event) => dragStarted(event, sq));
+    div.addEventListener("dragover", (event) => dragOver(event, sq));
+    div.addEventListener("drop", (event) => dropOnSquare(event, sq));
     board.appendChild(div);
   }
 }
@@ -130,9 +134,13 @@ async function squareClicked(sq) {
     renderBoard();
     return;
   }
-  const matches = state.snapshot.legal_moves.filter((m) => m.from === selected && m.to === sq);
+  await playFromTo(selected, sq);
+}
+
+async function playFromTo(from, to) {
+  const matches = state.snapshot.legal_moves.filter((m) => m.from === from && m.to === to);
   if (!matches.length) {
-    selected = state.snapshot.board[sq] ? sq : null;
+    selected = state.snapshot.board[to] ? to : null;
     renderBoard();
     return;
   }
@@ -146,6 +154,31 @@ async function squareClicked(sq) {
   }
   selected = null;
   await makeMove(legal.uci);
+}
+
+function dragStarted(event, sq) {
+  if (!state?.snapshot?.board?.[sq] || state.snapshot.outcome?.status !== "ongoing") {
+    event.preventDefault();
+    return;
+  }
+  selected = sq;
+  event.dataTransfer.setData("text/plain", sq);
+  event.dataTransfer.effectAllowed = "move";
+}
+
+function dragOver(event, sq) {
+  if (!selected) return;
+  if (state.snapshot.legal_moves.some((m) => m.from === selected && m.to === sq)) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+  }
+}
+
+async function dropOnSquare(event, sq) {
+  event.preventDefault();
+  const from = event.dataTransfer.getData("text/plain") || selected;
+  if (!from) return;
+  await playFromTo(from, sq);
 }
 
 function choosePromotion(moves) {

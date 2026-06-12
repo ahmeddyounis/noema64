@@ -4,7 +4,7 @@ The GUI entrypoint is `cmd/noema64-gui` and targets Wails v2.
 
 It exposes:
 
-- Interactive board with click source/destination moves.
+- Interactive board with drag/drop and click source/destination moves.
 - Legal move highlighting from backend data.
 - New game, time control, recent games, engine move, stop, resign, undo, flip, PGN/FEN export, and settings controls.
 - Settings for mode, personality, provider, API endpoint/key, cloud-provider acknowledgement, verifier path/timing, trace logging, raw logging flags, and log output directory.

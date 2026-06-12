@@ -130,6 +130,7 @@ button:hover {
   justify-content: center;
   font-size: clamp(28px, 5.8vh, 54px);
   line-height: 1;
+  touch-action: manipulation;
 }
 
 .light {
