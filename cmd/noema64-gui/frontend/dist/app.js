@@ -251,7 +251,7 @@ function renderDecision() {
     detail.append(document.createTextNode(c.purpose || ""));
     detail.append(document.createElement("br"));
     const meta = document.createElement("small");
-    meta.textContent = `confidence ${formatScore(c.confidence)} · plan ${formatScore(c.plan_alignment_score)} · verifier ${c.verifier_score?.status || "not_checked"}`;
+    meta.textContent = `confidence ${formatScore(c.confidence)} · plan ${formatScore(c.plan_alignment_score)} · search ${formatScore(c.search_score)} · verifier ${c.verifier_score?.status || "not_checked"}`;
     detail.append(meta);
     if (c.risk) {
       detail.append(document.createElement("br"));

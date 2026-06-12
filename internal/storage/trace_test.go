@@ -33,12 +33,14 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 			RawAvailable:  false,
 			Error:         "api_key: abc123",
 		},
-		Timing:        decision.Timing{TotalMS: 10, ProviderMS: 6, VerifierMS: 3, OtherMS: 1},
+		Timing:        decision.Timing{TotalMS: 10, ProviderMS: 6, VerifierMS: 3, SearchMS: 1},
 		VerifierTrace: &verifier.Result{Enabled: true, Used: true, Name: "static_safety"},
 		Assistance: decision.AssistanceTrace{
 			Mode:         strategy.ModeBlunderguard,
 			VerifierUsed: true,
 			VerifierName: "static_safety",
+			SearchUsed:   true,
+			SearchName:   "deterministic_2ply_material",
 		},
 	}
 
@@ -78,6 +80,8 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 			Assistance    struct {
 				VerifierUsed bool   `json:"verifier_used"`
 				VerifierName string `json:"verifier_name"`
+				SearchUsed   bool   `json:"search_used"`
+				SearchName   string `json:"search_name"`
 			} `json:"assistance"`
 			VerifierTrace struct {
 				Used bool   `json:"used"`
@@ -100,7 +104,7 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	if record.Mode != strategy.ModeBlunderguard || record.Provider != "mock" || record.Model != "mock-balanced" || record.PromptVersion != strategy.PromptVersion {
 		t.Fatalf("missing DATA-005 provider metadata: %+v", record)
 	}
-	if record.LLMParseStatus != "ok" || record.TimingMS["llm"] != 6 || record.TimingMS["verifier"] != 3 {
+	if record.LLMParseStatus != "ok" || record.TimingMS["llm"] != 6 || record.TimingMS["verifier"] != 3 || record.TimingMS["search"] != 1 {
 		t.Fatalf("missing top-level LLM/timing fields: %+v", record)
 	}
 	if !record.VerifierResult.Used || record.VerifierResult.Name != "static_safety" {
@@ -111,6 +115,9 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 	if !record.Trace.Assistance.VerifierUsed || record.Trace.Assistance.VerifierName != "static_safety" {
 		t.Fatalf("missing assistance disclosure: %+v", record.Trace.Assistance)
+	}
+	if !record.Trace.Assistance.SearchUsed || record.Trace.Assistance.SearchName != "deterministic_2ply_material" {
+		t.Fatalf("missing search disclosure: %+v", record.Trace.Assistance)
 	}
 	if !record.Trace.VerifierTrace.Used || record.Trace.VerifierTrace.Name != "static_safety" {
 		t.Fatalf("missing verifier trace disclosure: %+v", record.Trace.VerifierTrace)

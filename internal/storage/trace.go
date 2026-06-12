@@ -101,6 +101,7 @@ func traceTimingRecord(timing decision.Timing) map[string]int64 {
 		"total":    timing.TotalMS,
 		"llm":      timing.ProviderMS,
 		"verifier": timing.VerifierMS,
+		"search":   timing.SearchMS,
 		"other":    timing.OtherMS,
 	}
 }

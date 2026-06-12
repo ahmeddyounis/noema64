@@ -61,6 +61,7 @@ type Timing struct {
 	TotalMS    int64 `json:"total_ms"`
 	ProviderMS int64 `json:"provider_ms"`
 	VerifierMS int64 `json:"verifier_ms"`
+	SearchMS   int64 `json:"search_ms"`
 	OtherMS    int64 `json:"other_ms"`
 }
 
@@ -68,4 +69,6 @@ type AssistanceTrace struct {
 	Mode         strategy.EngineMode `json:"mode"`
 	VerifierUsed bool                `json:"verifier_used"`
 	VerifierName string              `json:"verifier_name,omitempty"`
+	SearchUsed   bool                `json:"search_used"`
+	SearchName   string              `json:"search_name,omitempty"`
 }

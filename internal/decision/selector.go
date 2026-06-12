@@ -122,6 +122,9 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		verifyResult = &verifier.Result{Enabled: req.Mode != strategy.ModePure, Used: false, Name: req.Verifier.Name(), Error: err.Error()}
 	}
 	applyVerifierScores(candidates, verifyResult)
+	searchStart := time.Now()
+	searchUsed, searchName := applySearchScores(ctx, req.Game, candidates, req.Mode)
+	searchMS := time.Since(searchStart).Milliseconds()
 	scoreCandidates(candidates, req.Memory, req.Mode)
 	chosen, ok := selectCandidate(candidates, req.Mode)
 	if !ok {
@@ -153,12 +156,15 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 			TotalMS:    totalMS,
 			ProviderMS: providerMS,
 			VerifierMS: verifierMS,
-			OtherMS:    totalMS - providerMS - verifierMS,
+			SearchMS:   searchMS,
+			OtherMS:    remainingTimingMS(totalMS, providerMS, verifierMS, searchMS),
 		},
 		Assistance: AssistanceTrace{
 			Mode:         req.Mode,
 			VerifierUsed: verifyResult != nil && verifyResult.Used,
 			VerifierName: verifierName(verifyResult),
+			SearchUsed:   searchUsed,
+			SearchName:   searchName,
 		},
 		FENBefore:       snapshot.FEN,
 		LegalMovesCount: len(legal),
@@ -278,7 +284,7 @@ func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyM
 		llm := candidates[i].LLMConfidence
 		switch mode {
 		case strategy.ModeHybrid:
-			candidates[i].FinalScore = 0.20*llm + 0.20*plan + 0.35*tactical
+			candidates[i].FinalScore = 0.20*llm + 0.20*plan + 0.20*tactical + 0.35*candidates[i].SearchScore
 		case strategy.ModeBlunderguard:
 			candidates[i].FinalScore = 0.35*llm + 0.25*plan + 0.30*tactical
 		default:
@@ -344,4 +350,15 @@ func verifierName(v *verifier.Result) string {
 		return ""
 	}
 	return v.Name
+}
+
+func remainingTimingMS(total int64, parts ...int64) int64 {
+	remaining := total
+	for _, part := range parts {
+		remaining -= part
+	}
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
 }
