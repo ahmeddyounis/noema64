@@ -12,3 +12,4 @@ Relevant areas:
 
 Noema64 is local-first. It does not upload games, prompts, or telemetry by default.
 
+Imported FEN is capped at 512 bytes and imported PGN is capped at 1 MiB in the MVP app service. Imported chess text is treated as untrusted prompt context.

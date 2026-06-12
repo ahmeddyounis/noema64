@@ -20,6 +20,11 @@ type Application struct {
 	traces       *storage.TraceStore
 }
 
+const (
+	maxFENImportBytes = 512
+	maxPGNImportBytes = 1 << 20
+)
+
 func NewApplication(settingsPath string) *Application {
 	settings, err := storage.LoadSettings(settingsPath)
 	if err != nil {
@@ -122,6 +127,9 @@ func (a *Application) ImportFEN(fen string) (*engine.GameState, error) {
 	if fen == "" {
 		return nil, &AppError{Code: "ERR_IMPORT_INVALID_FEN", Message: "FEN is required", Recoverable: true}
 	}
+	if len(fen) > maxFENImportBytes {
+		return nil, &AppError{Code: "ERR_IMPORT_TOO_LARGE", Message: "FEN import is too large", Recoverable: true}
+	}
 	state, err := a.engine.NewGame(context.Background(), engine.NewGameOptions{
 		Side:        "auto",
 		FEN:         fen,
@@ -132,8 +140,12 @@ func (a *Application) ImportFEN(fen string) (*engine.GameState, error) {
 }
 
 func (a *Application) ImportPGN(pgn string) (*engine.GameState, error) {
-	if strings.TrimSpace(pgn) == "" {
+	pgn = strings.TrimSpace(pgn)
+	if pgn == "" {
 		return nil, &AppError{Code: "ERR_IMPORT_INVALID_PGN", Message: "PGN is required", Recoverable: true}
+	}
+	if len(pgn) > maxPGNImportBytes {
+		return nil, &AppError{Code: "ERR_IMPORT_TOO_LARGE", Message: "PGN import is too large", Recoverable: true}
 	}
 	state, err := a.engine.LoadPGN(context.Background(), pgn)
 	return state, appErr("ERR_IMPORT_INVALID_PGN", err, true)

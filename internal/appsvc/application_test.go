@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/ahmedyounis/noema64/internal/storage"
@@ -41,6 +42,16 @@ func TestImportFENAndPGN(t *testing.T) {
 	}
 	if len(pgnState.Snapshot.MoveHistory) != 4 {
 		t.Fatalf("history length = %d, want 4", len(pgnState.Snapshot.MoveHistory))
+	}
+}
+
+func TestImportRejectsOversizedInput(t *testing.T) {
+	app := NewApplication("")
+	if _, err := app.ImportFEN(strings.Repeat("8/", maxFENImportBytes)); err == nil {
+		t.Fatal("expected oversized FEN to fail")
+	}
+	if _, err := app.ImportPGN(strings.Repeat("1. e4 e5 ", maxPGNImportBytes/9+2)); err == nil {
+		t.Fatal("expected oversized PGN to fail")
 	}
 }
 
