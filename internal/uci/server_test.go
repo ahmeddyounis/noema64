@@ -11,6 +11,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/storage"
+	"github.com/ahmedyounis/noema64/internal/verifier"
 )
 
 func TestUCISmoke(t *testing.T) {
@@ -109,6 +110,35 @@ func TestUCIOptionRangesMatchHandshake(t *testing.T) {
 	}
 	if server.opts.MaxCandidates != 10 {
 		t.Fatalf("max candidates = %d, want 10", server.opts.MaxCandidates)
+	}
+}
+
+func TestUCIVerifierEnabledControlsExternalPath(t *testing.T) {
+	server := NewServer(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, storage.DefaultSettings())
+	if err := server.setOption("setoption name VerifierPath value /usr/bin/stockfish"); err != nil {
+		t.Fatalf("set verifier path: %v", err)
+	}
+	if _, ok := server.opts.Verifier.(verifier.ExternalUCI); ok {
+		t.Fatal("verifier path enabled external verifier without VerifierEnabled=true")
+	}
+	if err := server.setOption("setoption name VerifierEnabled value true"); err != nil {
+		t.Fatalf("enable verifier: %v", err)
+	}
+	if _, ok := server.opts.Verifier.(verifier.ExternalUCI); !ok {
+		t.Fatalf("enabled verifier with path = %T, want ExternalUCI", server.opts.Verifier)
+	}
+	if err := server.setOption("setoption name VerifierEnabled value false"); err != nil {
+		t.Fatalf("disable verifier: %v", err)
+	}
+	if err := server.setOption("setoption name VerifierMoveTime value 250"); err != nil {
+		t.Fatalf("set verifier movetime: %v", err)
+	}
+	if _, ok := server.opts.Verifier.(verifier.ExternalUCI); ok {
+		t.Fatal("verifier timing update re-enabled disabled external verifier")
+	}
+	static, ok := server.opts.Verifier.(verifier.StaticVerifier)
+	if !ok || static.Enabled {
+		t.Fatalf("disabled verifier = %#v, want disabled static verifier", server.opts.Verifier)
 	}
 }
 

@@ -33,6 +33,7 @@ type Server struct {
 	providerKind     string
 	endpoint         string
 	apiKey           string
+	verifierEnabled  bool
 	verifierPath     string
 	verifierMoveTime int
 	verifierMaxLoss  int
@@ -57,6 +58,7 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		providerKind:     settings.LLM.Provider,
 		endpoint:         settings.LLM.Endpoint,
 		apiKey:           settings.LLM.APIKey,
+		verifierEnabled:  settings.Verifier.Enabled,
 		verifierPath:     settings.Verifier.Path,
 		verifierMoveTime: settings.Verifier.MoveTimeMS,
 		verifierMaxLoss:  settings.Verifier.MaxCentipawnLoss,
@@ -154,25 +156,22 @@ func (s *Server) setOption(line string) error {
 			s.opts.MaxCandidates = clampInt(n, 1, 10)
 		}
 	case "verifierenabled":
-		if strings.EqualFold(value, "true") {
-			s.refreshVerifierLocked(true)
-		} else {
-			s.opts.Verifier = verifier.StaticVerifier{Enabled: false}
-		}
+		s.verifierEnabled = strings.EqualFold(value, "true")
+		s.refreshVerifierLocked(s.verifierEnabled)
 	case "verifierpath":
 		s.verifierPath = value
-		s.refreshVerifierLocked(value != "")
+		s.refreshVerifierLocked(s.verifierEnabled)
 	case "verifiermovetime":
 		n, err := strconv.Atoi(value)
 		if err == nil && n > 0 {
 			s.verifierMoveTime = n
-			s.refreshVerifierLocked(s.verifierPath != "")
+			s.refreshVerifierLocked(s.verifierEnabled)
 		}
 	case "verifiermaxcentipawnloss":
 		n, err := strconv.Atoi(value)
 		if err == nil && n >= 0 {
 			s.verifierMaxLoss = n
-			s.refreshVerifierLocked(s.verifierPath != "")
+			s.refreshVerifierLocked(s.verifierEnabled)
 		}
 	case "tracefile":
 		if value != "" {
