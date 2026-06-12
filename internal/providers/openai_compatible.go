@@ -1,0 +1,108 @@
+package providers
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+)
+
+type OpenAICompatible struct {
+	BaseURL string
+	APIKey  string
+	Client  *http.Client
+}
+
+func (p OpenAICompatible) Name() string {
+	return "openai_compatible"
+}
+
+func (p OpenAICompatible) Capabilities() Capabilities {
+	return Capabilities{
+		SupportsJSONMode:     true,
+		SupportsCancellation: true,
+		MaxContextTokens:     128000,
+		RecommendedMaxOutput: 1600,
+	}
+}
+
+func (p OpenAICompatible) HealthCheck(ctx context.Context) error {
+	req := CompletionRequest{
+		Model:       "health-check",
+		System:      "Return JSON.",
+		User:        `{"ok":true}`,
+		MaxTokens:   16,
+		Temperature: 0,
+	}
+	if _, err := p.CompleteJSON(ctx, req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p OpenAICompatible) CompleteJSON(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+	start := time.Now()
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	baseURL := strings.TrimRight(p.BaseURL, "/")
+	if baseURL == "" {
+		return nil, fmt.Errorf("provider endpoint is empty")
+	}
+	body := map[string]any{
+		"model": req.Model,
+		"messages": []map[string]string{
+			{"role": "system", "content": req.System},
+			{"role": "user", "content": req.User},
+		},
+		"temperature": req.Temperature,
+		"max_tokens":  req.MaxTokens,
+		"response_format": map[string]string{
+			"type": "json_object",
+		},
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	if p.APIKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+p.APIKey)
+	}
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("provider returned HTTP %d", resp.StatusCode)
+	}
+	var decoded struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+		return nil, err
+	}
+	if len(decoded.Choices) == 0 {
+		return nil, fmt.Errorf("provider returned no choices")
+	}
+	return &CompletionResponse{
+		Text:         decoded.Choices[0].Message.Content,
+		Provider:     p.Name(),
+		Model:        req.Model,
+		Latency:      time.Since(start),
+		RawAvailable: true,
+	}, nil
+}

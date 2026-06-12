@@ -1,0 +1,16 @@
+.DS_Store
+
+# Go build/test output
+/bin/
+/dist/
+*.test
+coverage.out
+
+# Local runtime data
+/logs/
+/runs/
+/.tmp/
+
+# Frontend dependencies
+node_modules/
+
