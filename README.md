@@ -12,10 +12,10 @@ Implemented in this repository:
 - Strategy memory v1.2 structs, diffing, prompt builder, strict JSON parsing, candidate repair, and schema validation.
 - Mock provider that works offline and an OpenAI-compatible HTTP adapter shape.
 - Deterministic fallback ladder that always chooses a legal move when legal moves exist.
-- Static blunderguard verifier plus optional external UCI verifier path support.
+- Static blunderguard verifier plus optional external UCI verifier and external tablebase probe path support.
 - UCI binary with `uci`, `isready`, `ucinewgame`, `position`, `go`, `stop`, `quit`, and `setoption`.
 - Wails v2 GUI entrypoint with embedded board, time controls, recent games, settings, strategy, candidates, trace, resignation, PGN/FEN export, and benchmark controls.
-- CLI and benchmark commands.
+- CLI and benchmark commands with JSON or CSV benchmark output.
 - Local YAML settings, JSONL decision traces, redacted game snapshots with strategy memory, tests, prompts, configs, and docs.
 
 ## Requirements
@@ -24,7 +24,7 @@ Implemented in this repository:
 - Node.js for frontend syntax and GUI smoke checks.
 - Wails v2 CLI for packaged desktop builds.
 - Optional: a local OpenAI-compatible LLM endpoint or cloud endpoint.
-- Optional: a user-supplied UCI verifier such as Stockfish. No verifier binary is bundled.
+- Optional: a user-supplied UCI verifier such as Stockfish or an external tablebase probe. No verifier or tablebase binary is bundled.
 
 ## Quick Start
 
@@ -34,6 +34,7 @@ npm --prefix cmd/noema64-gui/frontend test
 go run ./cmd/noema64 -cmd state
 go run ./cmd/noema64 -cmd engine
 go run ./cmd/noema64-bench -games 100
+go run ./cmd/noema64-bench -games 100 -format csv > benchmark.csv
 ```
 
 UCI smoke:
@@ -86,6 +87,15 @@ verifier:
 ```
 
 Noema64 does not bundle Stockfish in the MVP. When configured, the external UCI verifier analyzes LLM candidate moves with `searchmoves`, compares centipawn loss against the best candidate, and records verifier decisions in the trace.
+
+External tablebase probing is also optional. Configure a probe executable that reads `{ "fen": "...", "candidates": ["e2e4"] }` JSON from stdin and returns exact tablebase JSON on stdout:
+
+```yaml
+verifier:
+  tablebase_enabled: true
+  tablebase_path: /usr/local/bin/noema64-tablebase
+  tablebase_timeout_ms: 1000
+```
 
 ## UCI Example
 
