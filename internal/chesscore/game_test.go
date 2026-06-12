@@ -1,0 +1,51 @@
+package chesscore
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestStartPositionLegalMovesAndApply(t *testing.T) {
+	game := NewGame()
+	moves := game.LegalMoves()
+	if len(moves) != 20 {
+		t.Fatalf("start position legal moves = %d, want 20", len(moves))
+	}
+	if _, err := game.ApplyUCI("e2e4"); err != nil {
+		t.Fatalf("apply e2e4: %v", err)
+	}
+	if game.SideToMove() != "black" {
+		t.Fatalf("side to move = %s, want black", game.SideToMove())
+	}
+	if _, err := game.ApplyUCI("e2e5"); err == nil {
+		t.Fatal("expected illegal move to fail")
+	}
+}
+
+func TestFENAndPGN(t *testing.T) {
+	game, err := FromFEN("8/P7/8/8/8/8/8/4k2K w - - 0 1")
+	if err != nil {
+		t.Fatalf("fen: %v", err)
+	}
+	foundPromotion := false
+	for _, mv := range game.LegalMoves() {
+		if mv.UCI == "a7a8q" {
+			foundPromotion = true
+		}
+	}
+	if !foundPromotion {
+		t.Fatal("expected queen promotion legal move")
+	}
+
+	pgn := "1. e4 e5 2. Nf3 Nc6 *"
+	loaded, err := FromPGN(strings.NewReader(pgn))
+	if err != nil {
+		t.Fatalf("pgn import: %v", err)
+	}
+	if len(loaded.MoveHistory()) != 4 {
+		t.Fatalf("history length = %d, want 4", len(loaded.MoveHistory()))
+	}
+	if !strings.Contains(loaded.PGN(), "Nf3") {
+		t.Fatalf("exported PGN missing Nf3: %s", loaded.PGN())
+	}
+}

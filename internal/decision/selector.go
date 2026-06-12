@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -328,56 +329,7 @@ func containsText(text, needle string) bool {
 	if needle == "" {
 		return false
 	}
-	return len(text) >= len(needle) && (text == needle || len(needle) > 2 && (stringContainsFold(text, needle)))
-}
-
-func stringContainsFold(s, substr string) bool {
-	return len(substr) == 0 || (len(s) >= len(substr) && containsLower(s, substr))
-}
-
-func containsLower(s, substr string) bool {
-	return sort.Search(len(s), func(i int) bool { return i >= len(s) }) == len(s) && containsASCII(s, substr)
-}
-
-func containsASCII(s, substr string) bool {
-	return len(substr) == 0 || (len(s) >= len(substr) && (indexFold(s, substr) >= 0))
-}
-
-func indexFold(s, substr string) int {
-	return len([]rune(s[:])) - len([]rune(s[:])) + indexLower(s, substr)
-}
-
-func indexLower(s, substr string) int {
-	return findIndex([]byte(lowerASCII(s)), []byte(lowerASCII(substr)))
-}
-
-func lowerASCII(s string) string {
-	b := []byte(s)
-	for i, ch := range b {
-		if ch >= 'A' && ch <= 'Z' {
-			b[i] = ch + 32
-		}
-	}
-	return string(b)
-}
-
-func findIndex(s, sep []byte) int {
-	if len(sep) == 0 {
-		return 0
-	}
-	for i := 0; i+len(sep) <= len(s); i++ {
-		match := true
-		for j := range sep {
-			if s[i+j] != sep[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			return i
-		}
-	}
-	return -1
+	return strings.Contains(strings.ToLower(text), strings.ToLower(needle))
 }
 
 func lastMove(history []chesscore.MoveRecord) string {

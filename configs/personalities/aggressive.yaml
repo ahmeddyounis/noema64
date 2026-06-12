@@ -1,0 +1,11 @@
+id: aggressive
+name: Aggressive Attacker
+risk_tolerance: 0.75
+strategic_biases:
+  - Prefer active piece play and initiative.
+  - Consider attacks when tactical safety allows.
+verifier:
+  max_centipawn_loss: 300
+prompt_modifiers:
+  - Emphasize initiative while obeying legality and verifier constraints.
+

@@ -1,0 +1,8 @@
+id: balanced
+name: Balanced
+risk_tolerance: 0.45
+strategic_biases:
+  - Prefer development, central control, and king safety.
+prompt_modifiers:
+  - Keep candidate explanations concise and practical.
+

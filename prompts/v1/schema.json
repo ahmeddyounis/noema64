@@ -1,0 +1,35 @@
+{
+  "schema_version": "decision-output.v1.2",
+  "previous_plan_status": "continue|modify|abandon",
+  "position_summary": "string",
+  "strategy_update": {
+    "plan_summary": "string",
+    "phase": "opening|middlegame|endgame|tactical|unknown",
+    "main_targets": ["string"],
+    "piece_improvement": ["string"],
+    "pawn_breaks": ["string"],
+    "opponent_plan_guess": "string",
+    "commitments": ["string"],
+    "refutation_triggers": ["string"],
+    "tactical_warnings": ["string"],
+    "confidence": 0.5,
+    "last_update_summary": "string"
+  },
+  "candidate_moves": [
+    {
+      "uci": "e2e4",
+      "san": "e4",
+      "purpose": "string",
+      "expected_reply": "string",
+      "risk": "string",
+      "confidence": 0.7
+    }
+  ],
+  "do_not_play": [
+    {
+      "uci_or_pattern": "string",
+      "reason": "string"
+    }
+  ]
+}
+

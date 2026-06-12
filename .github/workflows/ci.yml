@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - run: gofmt -w ./cmd ./internal
+      - run: git diff --exit-code
+      - run: go test ./...
+      - run: printf 'uci\nisready\nucinewgame\nposition startpos moves e2e4 e7e5 g1f3\ngo movetime 100\nquit\n' | go run ./cmd/noema64-uci
+      - run: go run ./cmd/noema64-bench -games 100
+

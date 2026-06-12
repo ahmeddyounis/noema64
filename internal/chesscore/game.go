@@ -85,6 +85,9 @@ func (g *Game) ApplyUCI(moveUCI string) (MoveRecord, error) {
 	}
 	san := chess.AlgebraicNotation{}.Encode(pos, move)
 	uci := chess.UCINotation{}.Encode(pos, move)
+	if !g.isLegalUCIAtPosition(uci) {
+		return MoveRecord{}, fmt.Errorf("illegal move %s", moveUCI)
+	}
 	if err := g.g.Move(move, nil); err != nil {
 		return MoveRecord{}, err
 	}
@@ -97,6 +100,10 @@ func (g *Game) ApplyUCI(moveUCI string) (MoveRecord, error) {
 }
 
 func (g *Game) IsLegalUCI(moveUCI string) bool {
+	return g.isLegalUCIAtPosition(moveUCI)
+}
+
+func (g *Game) isLegalUCIAtPosition(moveUCI string) bool {
 	for _, mv := range g.LegalMoves() {
 		if mv.UCI == moveUCI {
 			return true

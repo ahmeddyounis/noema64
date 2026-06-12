@@ -1,0 +1,8 @@
+id: positional
+name: Positional
+risk_tolerance: 0.3
+strategic_biases:
+  - Prefer structure, prophylaxis, and long-term weaknesses.
+prompt_modifiers:
+  - Explain plans through squares, pawn structure, and piece improvement.
+

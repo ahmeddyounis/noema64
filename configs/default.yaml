@@ -1,0 +1,36 @@
+schema_version: "1.0"
+app_version: "0.1.0"
+engine:
+  default_mode: blunderguard
+  personality: balanced
+  max_candidates: 5
+  fallback_policy: safe_heuristic
+  trace_enabled: true
+llm:
+  provider: mock
+  endpoint: ""
+  model: mock-balanced
+  temperature: 0.2
+  max_tokens: 1600
+  timeout_ms: 12000
+  retries: 1
+verifier:
+  enabled: false
+  kind: static
+  path: ""
+  depth: 8
+  movetime_ms: 100
+  max_centipawn_loss: 180
+gui:
+  theme: system
+  show_raw_json: false
+  show_verifier_eval: true
+  board_coordinates: true
+privacy:
+  log_raw_prompts: false
+  log_raw_llm_responses: false
+  redact_api_keys: true
+  cloud_provider_warning_acknowledged: false
+logging:
+  output_dir: logs
+
