@@ -22,6 +22,23 @@ func TestStartPositionLegalMovesAndApply(t *testing.T) {
 	}
 }
 
+func TestStartPositionPerft(t *testing.T) {
+	game := NewGame()
+	tests := []struct {
+		depth int
+		nodes int
+	}{
+		{depth: 1, nodes: 20},
+		{depth: 2, nodes: 400},
+		{depth: 3, nodes: 8902},
+	}
+	for _, tt := range tests {
+		if nodes := perft(game, tt.depth); nodes != tt.nodes {
+			t.Fatalf("perft(%d) = %d, want %d", tt.depth, nodes, tt.nodes)
+		}
+	}
+}
+
 func TestFENAndPGN(t *testing.T) {
 	game, err := FromFEN("8/P7/8/8/8/8/8/4k2K w - - 0 1")
 	if err != nil {
@@ -73,4 +90,19 @@ func TestUndoTruncatesHistoryAndAllowsNewLine(t *testing.T) {
 	if len(history) != 2 || history[1].UCI != "c7c5" {
 		t.Fatalf("unexpected history after new line: %+v", history)
 	}
+}
+
+func perft(game *Game, depth int) int {
+	if depth == 0 {
+		return 1
+	}
+	nodes := 0
+	for _, move := range game.LegalMoves() {
+		next := game.Clone()
+		if _, err := next.ApplyUCI(move.UCI); err != nil {
+			panic(err)
+		}
+		nodes += perft(next, depth-1)
+	}
+	return nodes
 }
