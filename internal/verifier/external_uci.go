@@ -19,6 +19,8 @@ type ExternalUCI struct {
 	MaxCentipawnLoss int
 }
 
+const externalUCICleanupTimeout = 500 * time.Millisecond
+
 func (v ExternalUCI) Name() string {
 	if v.Path == "" {
 		return "external_uci"
@@ -44,10 +46,7 @@ func (v ExternalUCI) HealthCheck(ctx context.Context) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	defer func() {
-		_, _ = io.WriteString(stdin, "quit\n")
-		_ = cmd.Wait()
-	}()
+	defer stopUCIProcess(cmd, stdin)
 	reader := bufio.NewReader(stdout)
 	if _, err := io.WriteString(stdin, "uci\n"); err != nil {
 		return err
@@ -89,10 +88,7 @@ func (v ExternalUCI) VerifyCandidates(ctx context.Context, req Request) (*Result
 		return nil, err
 	}
 	reader := bufio.NewReader(stdout)
-	defer func() {
-		_, _ = io.WriteString(stdin, "quit\n")
-		_ = cmd.Wait()
-	}()
+	defer stopUCIProcess(cmd, stdin)
 	if _, err := io.WriteString(stdin, "uci\n"); err != nil {
 		return nil, err
 	}
@@ -188,6 +184,25 @@ func (v ExternalUCI) analyzeCandidate(ctx context.Context, stdin io.Writer, read
 			}
 			return score, nil
 		}
+	}
+}
+
+func stopUCIProcess(cmd *exec.Cmd, stdin io.Writer) {
+	if stdin != nil {
+		_, _ = io.WriteString(stdin, "quit\n")
+	}
+	done := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(externalUCICleanupTimeout):
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+		<-done
 	}
 }
 

@@ -40,6 +40,40 @@ done
 	}
 }
 
+func TestExternalUCIHealthCheckDoesNotHangWhenEngineIgnoresQuit(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses a POSIX shell wrapper")
+	}
+	enginePath := filepath.Join(t.TempDir(), "fake-uci-ignore-quit")
+	script := `#!/bin/sh
+while IFS= read -r line; do
+	case "$line" in
+		uci)
+			printf 'id name fake-uci\n'
+			printf 'uciok\n'
+			;;
+		isready)
+			printf 'readyok\n'
+			;;
+		quit)
+			;;
+	esac
+done
+`
+	if err := os.WriteFile(enginePath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write fake engine: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	start := time.Now()
+	if err := (ExternalUCI{Path: enginePath}).HealthCheck(ctx); err != nil {
+		t.Fatalf("HealthCheck() error = %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
+		t.Fatalf("HealthCheck cleanup took %s, want bounded cleanup", elapsed)
+	}
+}
+
 func TestParseUCIScore(t *testing.T) {
 	tests := []struct {
 		line string
