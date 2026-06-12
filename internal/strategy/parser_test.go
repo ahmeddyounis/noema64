@@ -1,6 +1,8 @@
 package strategy
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -58,5 +60,65 @@ func TestBuildPromptBoundsUntrustedPGN(t *testing.T) {
 	}
 	if len(user) > 16000 {
 		t.Fatalf("prompt length = %d, want <= 16000", len(user))
+	}
+}
+
+func TestBuildPromptUsesEditableTemplateDirectory(t *testing.T) {
+	dir := t.TempDir()
+	writePromptFile(t, dir, "system.md", "custom system")
+	writePromptFile(t, dir, "move_decision.md", "FEN={{fen}}\nMOVES={{legal_moves_json}}\nSCHEMA={{schema_json}}\n")
+	writePromptFile(t, dir, "schema.json", `{"schema_version":"custom"}`)
+	t.Setenv(PromptTemplateDirEnv, dir)
+
+	game := chesscore.NewGame()
+	system, user, err := BuildPrompt(StrategyRequest{
+		GameID:         game.ID(),
+		FEN:            game.FEN(),
+		PGN:            game.PGN(),
+		SideToMove:     game.SideToMove(),
+		MoveNumber:     1,
+		LegalMoves:     game.LegalMoves(),
+		Features:       game.Features(),
+		PreviousMemory: NewMemory(game.ID(), game.SideToMove()),
+		Mode:           ModePure,
+		Personality:    PersonalityBalanced,
+	})
+	if err != nil {
+		t.Fatalf("build prompt: %v", err)
+	}
+	if system != "custom system" {
+		t.Fatalf("system = %q, want custom system", system)
+	}
+	if !strings.Contains(user, "SCHEMA={\"schema_version\":\"custom\"}") || !strings.Contains(user, "FEN="+game.FEN()) {
+		t.Fatalf("custom template was not rendered:\n%s", user)
+	}
+}
+
+func TestBuildPromptRejectsUnknownTemplatePlaceholder(t *testing.T) {
+	game := chesscore.NewGame()
+	_, _, err := BuildPromptWithTemplates(StrategyRequest{
+		GameID:         game.ID(),
+		FEN:            game.FEN(),
+		SideToMove:     game.SideToMove(),
+		MoveNumber:     1,
+		LegalMoves:     game.LegalMoves(),
+		Features:       game.Features(),
+		PreviousMemory: NewMemory(game.ID(), game.SideToMove()),
+		Mode:           ModePure,
+		Personality:    PersonalityBalanced,
+	}, PromptTemplates{
+		System: "system",
+		User:   "known {{fen}} unknown {{missing}}",
+		Schema: "{}",
+	})
+	if err == nil {
+		t.Fatal("expected unknown placeholder to fail")
+	}
+}
+
+func writePromptFile(t *testing.T, dir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+		t.Fatalf("write prompt file %s: %v", name, err)
 	}
 }

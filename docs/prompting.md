@@ -12,3 +12,10 @@ Prompt protocol v1 keeps layers explicit:
 
 Imported PGN/comments are treated as untrusted chess data, not instructions.
 
+Versioned editable templates live under `prompts/v1`:
+
+- `system.md`
+- `move_decision.md`
+- `schema.json`
+
+At runtime, set `NOEMA64_PROMPT_DIR=/path/to/templates` to use an edited template set without changing code. The directory must contain all three files, and unknown `{{placeholder}}` tokens are rejected.

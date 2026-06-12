@@ -3,6 +3,8 @@ package strategy
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -22,7 +24,82 @@ Your job:
 
 Do not provide hidden chain-of-thought. Provide concise reasons only.`
 
+const UserPromptTemplate = `POSITION
+FEN: {{fen}}
+PGN: {{pgn}}
+Side to move: {{side_to_move}}
+Move number: {{move_number}}
+Last opponent move: {{last_opponent_move}}
+
+LEGAL_MOVES
+{{legal_moves_json}}
+
+DETERMINISTIC_FEATURES
+{{features_json}}
+
+PREVIOUS_STRATEGY_MEMORY
+{{strategy_memory_json}}
+
+ENGINE_MODE
+{{mode}}
+
+PERSONALITY
+{{personality_json}}
+
+OUTPUT_SCHEMA
+{{schema_json}}
+`
+
+const PromptTemplateDirEnv = "NOEMA64_PROMPT_DIR"
+
+type PromptTemplates struct {
+	System string
+	User   string
+	Schema string
+}
+
 func BuildPrompt(req StrategyRequest) (system string, user string, err error) {
+	templates := DefaultPromptTemplates()
+	if dir := strings.TrimSpace(os.Getenv(PromptTemplateDirEnv)); dir != "" {
+		loaded, err := LoadPromptTemplates(dir)
+		if err != nil {
+			return "", "", err
+		}
+		templates = loaded
+	}
+	return BuildPromptWithTemplates(req, templates)
+}
+
+func DefaultPromptTemplates() PromptTemplates {
+	schema, _ := json.MarshalIndent(ExampleSchema(), "", "  ")
+	return PromptTemplates{
+		System: SystemPrompt,
+		User:   UserPromptTemplate,
+		Schema: string(schema),
+	}
+}
+
+func LoadPromptTemplates(dir string) (PromptTemplates, error) {
+	system, err := os.ReadFile(filepath.Join(dir, "system.md"))
+	if err != nil {
+		return PromptTemplates{}, err
+	}
+	user, err := os.ReadFile(filepath.Join(dir, "move_decision.md"))
+	if err != nil {
+		return PromptTemplates{}, err
+	}
+	schema, err := os.ReadFile(filepath.Join(dir, "schema.json"))
+	if err != nil {
+		return PromptTemplates{}, err
+	}
+	return PromptTemplates{
+		System: strings.TrimRight(string(system), "\n"),
+		User:   strings.TrimRight(string(user), "\n") + "\n",
+		Schema: strings.TrimSpace(string(schema)),
+	}, nil
+}
+
+func BuildPromptWithTemplates(req StrategyRequest, templates PromptTemplates) (system string, user string, err error) {
 	legal, err := json.MarshalIndent(req.LegalMoves, "", "  ")
 	if err != nil {
 		return "", "", err
@@ -35,33 +112,42 @@ func BuildPrompt(req StrategyRequest) (system string, user string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	schema, _ := json.MarshalIndent(ExampleSchema(), "", "  ")
-	user = fmt.Sprintf(`POSITION
-FEN: %s
-PGN: %s
-Side to move: %s
-Move number: %d
-Last opponent move: %s
+	if templates.System == "" || templates.User == "" {
+		return "", "", fmt.Errorf("prompt templates must include system and user templates")
+	}
+	if templates.Schema == "" {
+		schema, _ := json.MarshalIndent(ExampleSchema(), "", "  ")
+		templates.Schema = string(schema)
+	}
+	personality, _ := json.MarshalIndent(req.Personality, "", "  ")
+	user, err = renderPromptTemplate(templates.User, map[string]string{
+		"fen":                  req.FEN,
+		"pgn":                  redactUntrusted(req.PGN),
+		"side_to_move":         req.SideToMove,
+		"move_number":          fmt.Sprintf("%d", req.MoveNumber),
+		"last_opponent_move":   redactUntrusted(req.LastOpponentMove),
+		"legal_moves_json":     string(legal),
+		"features_json":        string(features),
+		"strategy_memory_json": string(memory),
+		"mode":                 string(req.Mode),
+		"personality_json":     string(personality),
+		"schema_json":          templates.Schema,
+	})
+	if err != nil {
+		return "", "", err
+	}
+	return templates.System, user, nil
+}
 
-LEGAL_MOVES
-%s
-
-DETERMINISTIC_FEATURES
-%s
-
-PREVIOUS_STRATEGY_MEMORY
-%s
-
-ENGINE_MODE
-%s
-
-PERSONALITY
-%s
-
-OUTPUT_SCHEMA
-%s
-`, req.FEN, redactUntrusted(req.PGN), req.SideToMove, req.MoveNumber, redactUntrusted(req.LastOpponentMove), legal, features, memory, req.Mode, req.Personality, schema)
-	return SystemPrompt, user, nil
+func renderPromptTemplate(template string, values map[string]string) (string, error) {
+	out := template
+	for key, value := range values {
+		out = strings.ReplaceAll(out, "{{"+key+"}}", value)
+	}
+	if strings.Contains(out, "{{") || strings.Contains(out, "}}") {
+		return "", fmt.Errorf("prompt template contains unknown placeholder")
+	}
+	return out, nil
 }
 
 func LegalMoveCSV(req StrategyRequest) string {
