@@ -1,8 +1,8 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -15,11 +15,10 @@ func main() {
 	move := flag.String("move", "", "UCI move for -cmd move")
 	flag.Parse()
 
-	ctx := context.Background()
 	app := appsvc.NewApplication("")
 	switch *cmd {
 	case "state":
-		state, err := app.GetGame(ctx)
+		state, err := app.GetGame()
 		exitOnAppErr(err)
 		printJSON(state)
 	case "move":
@@ -27,19 +26,19 @@ func main() {
 			fmt.Fprintln(os.Stderr, "-move is required")
 			os.Exit(2)
 		}
-		state, err := app.MakeUserMove(ctx, *move)
+		state, err := app.MakeUserMove(*move)
 		exitOnAppErr(err)
 		printJSON(state)
 	case "engine":
-		result, err := app.RequestEngineMove(ctx)
+		result, err := app.RequestEngineMove()
 		exitOnAppErr(err)
 		printJSON(result)
 	case "pgn":
-		pgn, err := app.ExportPGN(ctx)
+		pgn, err := app.ExportPGN()
 		exitOnAppErr(err)
 		fmt.Println(pgn)
 	case "fen":
-		fen, err := app.ExportFEN(ctx)
+		fen, err := app.ExportFEN()
 		exitOnAppErr(err)
 		fmt.Println(fen)
 	default:
@@ -53,9 +52,14 @@ func printJSON(v any) {
 	fmt.Println(string(b))
 }
 
-func exitOnAppErr(err *appsvc.AppError) {
+func exitOnAppErr(err error) {
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Message)
+		var appErr *appsvc.AppError
+		if errors.As(err, &appErr) {
+			fmt.Fprintln(os.Stderr, appErr.Message)
+			os.Exit(1)
+		}
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

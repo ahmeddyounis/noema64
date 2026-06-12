@@ -64,65 +64,65 @@ func (a *Application) engineOptions() engine.Options {
 	}
 }
 
-func (a *Application) NewGame(ctx context.Context, opts engine.NewGameOptions) (*engine.GameState, *AppError) {
+func (a *Application) NewGame(opts engine.NewGameOptions) (*engine.GameState, error) {
 	if opts.Mode == "" {
 		opts.Mode = a.settings.Engine.DefaultMode
 	}
 	if opts.Personality == "" {
 		opts.Personality = a.settings.Engine.Personality
 	}
-	state, err := a.engine.NewGame(ctx, opts)
+	state, err := a.engine.NewGame(context.Background(), opts)
 	return state, appErr("ERR_NEW_GAME", err, true)
 }
 
-func (a *Application) GetGame(ctx context.Context) (*engine.GameState, *AppError) {
-	state, err := a.engine.State(ctx)
+func (a *Application) GetGame() (*engine.GameState, error) {
+	state, err := a.engine.State(context.Background())
 	return state, appErr("ERR_GAME_STATE", err, true)
 }
 
-func (a *Application) LegalMoves(ctx context.Context) (any, *AppError) {
-	moves, err := a.engine.LegalMoves(ctx)
+func (a *Application) LegalMoves() (any, error) {
+	moves, err := a.engine.LegalMoves(context.Background())
 	return moves, appErr("ERR_LEGAL_MOVES", err, true)
 }
 
-func (a *Application) MakeUserMove(ctx context.Context, moveUCI string) (*engine.GameState, *AppError) {
-	state, err := a.engine.ApplyUserMove(ctx, moveUCI)
+func (a *Application) MakeUserMove(moveUCI string) (*engine.GameState, error) {
+	state, err := a.engine.ApplyUserMove(context.Background(), moveUCI)
 	return state, appErr("ERR_INVALID_MOVE", err, true)
 }
 
-func (a *Application) RequestEngineMove(ctx context.Context) (any, *AppError) {
-	dec, state, err := a.engine.ChooseMove(ctx)
+func (a *Application) RequestEngineMove() (any, error) {
+	dec, state, err := a.engine.ChooseMove(context.Background())
 	if err == nil && a.settings.Engine.TraceEnabled {
 		_ = a.traces.AppendDecision(context.Background(), dec)
 	}
 	return map[string]any{"decision": dec, "state": state}, appErr("ERR_ENGINE_MOVE", err, true)
 }
 
-func (a *Application) StopEngine(ctx context.Context) *AppError {
-	return appErr("ERR_CANCELLED", a.engine.Stop(ctx), true)
+func (a *Application) StopEngine() error {
+	return appErr("ERR_CANCELLED", a.engine.Stop(context.Background()), true)
 }
 
-func (a *Application) Undo(ctx context.Context, plies int) (*engine.GameState, *AppError) {
-	state, err := a.engine.Undo(ctx, plies)
+func (a *Application) Undo(plies int) (*engine.GameState, error) {
+	state, err := a.engine.Undo(context.Background(), plies)
 	return state, appErr("ERR_UNDO", err, true)
 }
 
-func (a *Application) ExportPGN(ctx context.Context) (string, *AppError) {
-	pgn, err := a.engine.ExportPGN(ctx)
+func (a *Application) ExportPGN() (string, error) {
+	pgn, err := a.engine.ExportPGN(context.Background())
 	return pgn, appErr("ERR_EXPORT_PGN", err, true)
 }
 
-func (a *Application) ExportFEN(ctx context.Context) (string, *AppError) {
-	fen, err := a.engine.ExportFEN(ctx)
+func (a *Application) ExportFEN() (string, error) {
+	fen, err := a.engine.ExportFEN(context.Background())
 	return fen, appErr("ERR_EXPORT_FEN", err, true)
 }
 
-func (a *Application) ImportFEN(ctx context.Context, fen string) (*engine.GameState, *AppError) {
+func (a *Application) ImportFEN(fen string) (*engine.GameState, error) {
 	fen = strings.TrimSpace(fen)
 	if fen == "" {
 		return nil, &AppError{Code: "ERR_IMPORT_INVALID_FEN", Message: "FEN is required", Recoverable: true}
 	}
-	state, err := a.engine.NewGame(ctx, engine.NewGameOptions{
+	state, err := a.engine.NewGame(context.Background(), engine.NewGameOptions{
 		Side:        "auto",
 		FEN:         fen,
 		Mode:        a.settings.Engine.DefaultMode,
@@ -131,15 +131,15 @@ func (a *Application) ImportFEN(ctx context.Context, fen string) (*engine.GameSt
 	return state, appErr("ERR_IMPORT_INVALID_FEN", err, true)
 }
 
-func (a *Application) ImportPGN(ctx context.Context, pgn string) (*engine.GameState, *AppError) {
+func (a *Application) ImportPGN(pgn string) (*engine.GameState, error) {
 	if strings.TrimSpace(pgn) == "" {
 		return nil, &AppError{Code: "ERR_IMPORT_INVALID_PGN", Message: "PGN is required", Recoverable: true}
 	}
-	state, err := a.engine.LoadPGN(ctx, pgn)
+	state, err := a.engine.LoadPGN(context.Background(), pgn)
 	return state, appErr("ERR_IMPORT_INVALID_PGN", err, true)
 }
 
-func (a *Application) GetSettings(ctx context.Context) (storage.Settings, *AppError) {
+func (a *Application) GetSettings() (storage.Settings, error) {
 	settings := a.settings
 	if settings.LLM.APIKey != "" {
 		settings.LLM.APIKey = "[REDACTED]"
@@ -147,7 +147,7 @@ func (a *Application) GetSettings(ctx context.Context) (storage.Settings, *AppEr
 	return settings, nil
 }
 
-func (a *Application) SaveSettings(ctx context.Context, settings storage.Settings) *AppError {
+func (a *Application) SaveSettings(settings storage.Settings) error {
 	if settings.LLM.APIKey == "[REDACTED]" {
 		settings.LLM.APIKey = a.settings.LLM.APIKey
 	}
@@ -161,9 +161,9 @@ func (a *Application) SaveSettings(ctx context.Context, settings storage.Setting
 	return nil
 }
 
-func (a *Application) HealthCheckProvider(ctx context.Context) (map[string]any, *AppError) {
+func (a *Application) HealthCheckProvider() (map[string]any, error) {
 	provider := a.engineOptions().Provider
-	healthCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	healthCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	err := provider.HealthCheck(healthCtx)
 	return map[string]any{
@@ -173,7 +173,7 @@ func (a *Application) HealthCheckProvider(ctx context.Context) (map[string]any, 
 	}, appErr("ERR_PROVIDER_HEALTH", err, true)
 }
 
-func (a *Application) RunRandomBenchmark(ctx context.Context, games int, seed int64) (experiments.Summary, *AppError) {
+func (a *Application) RunRandomBenchmark(games int, seed int64) (experiments.Summary, error) {
 	if games <= 0 {
 		games = 100
 	}
@@ -181,10 +181,10 @@ func (a *Application) RunRandomBenchmark(ctx context.Context, games int, seed in
 	opts.Mode = strategy.ModePure
 	opts.Verifier = verifier.LegalOnlyVerifier{}
 	runner := experiments.Runner{Options: opts}
-	summary, err := runner.RandomLegalBenchmark(ctx, games, seed)
+	summary, err := runner.RandomLegalBenchmark(context.Background(), games, seed)
 	return summary, appErr("ERR_EXPERIMENT", err, true)
 }
 
-func (a *Application) Modes(ctx context.Context) []strategy.EngineMode {
+func (a *Application) Modes() []strategy.EngineMode {
 	return []strategy.EngineMode{strategy.ModePure, strategy.ModeBlunderguard, strategy.ModeHybrid, strategy.ModeCoach}
 }

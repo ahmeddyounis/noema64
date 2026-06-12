@@ -15,7 +15,7 @@ func (e *AppError) Error() string {
 	return e.Message
 }
 
-func appErr(code string, err error, recoverable bool) *AppError {
+func appErr(code string, err error, recoverable bool) error {
 	if err == nil {
 		return nil
 	}
