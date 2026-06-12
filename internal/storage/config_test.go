@@ -40,6 +40,62 @@ func TestLoadSettingsMergesDefaults(t *testing.T) {
 	if loaded.GUI.TimeControl != "untimed" || loaded.GUI.ClockInitialMS == 0 {
 		t.Fatalf("gui clock defaults not merged: %+v", loaded.GUI)
 	}
+	if loaded.LLM.ProfileID != "mock-fast" || len(loaded.LLM.Profiles) < 3 {
+		t.Fatalf("provider profiles not merged: %+v", loaded.LLM)
+	}
+}
+
+func TestSaveSettingsStoresSelectedProviderProfile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	settings := DefaultSettings()
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.ProfileID = "local-test"
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.LLM.Model = "llama3.1"
+	settings.LLM.Temperature = 0.4
+	settings.LLM.MaxTokens = 1200
+	settings.LLM.TimeoutMS = 9000
+	settings.LLM.Retries = 2
+	settings.LLM.Profiles = []ProviderProfile{{
+		ID:          "local-test",
+		Provider:    "openai_compatible",
+		Endpoint:    "http://localhost:11434/v1",
+		Model:       "llama3.1",
+		Temperature: 0.4,
+		MaxTokens:   1200,
+		TimeoutMS:   9000,
+		Retries:     2,
+	}}
+
+	if err := SaveSettings(path, settings); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	loaded, err := LoadSettings(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.LLM.ProfileID != "local-test" {
+		t.Fatalf("profile id = %q, want local-test", loaded.LLM.ProfileID)
+	}
+	if loaded.LLM.Provider != "openai_compatible" || loaded.LLM.Endpoint != "http://localhost:11434/v1" || loaded.LLM.Model != "llama3.1" {
+		t.Fatalf("selected provider settings not stored: %+v", loaded.LLM)
+	}
+	if loaded.LLM.Temperature != 0.4 || loaded.LLM.MaxTokens != 1200 || loaded.LLM.TimeoutMS != 9000 || loaded.LLM.Retries != 2 {
+		t.Fatalf("selected runtime settings not stored: %+v", loaded.LLM)
+	}
+}
+
+func TestSaveSettingsValidatesProviderProfiles(t *testing.T) {
+	settings := DefaultSettings()
+	settings.LLM.ProfileID = "custom"
+	settings.LLM.Profiles = []ProviderProfile{
+		{ID: "dupe", Provider: "mock", Model: "mock-balanced", MaxTokens: 100, TimeoutMS: 1000},
+		{ID: "dupe", Provider: "mock", Model: "mock-balanced", MaxTokens: 100, TimeoutMS: 1000},
+	}
+	if err := SaveSettings(filepath.Join(t.TempDir(), "config.yaml"), settings); err == nil {
+		t.Fatal("expected duplicate provider profile ids to fail")
+	}
 }
 
 func TestSaveSettingsValidatesProvider(t *testing.T) {

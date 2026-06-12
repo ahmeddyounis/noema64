@@ -13,6 +13,7 @@ let settings = null;
 let playerSide = "white";
 let autoReply = true;
 let pendingPromotion = null;
+let applyingProviderProfile = false;
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -324,6 +325,7 @@ async function resignGame() {
 
 async function loadSettings() {
   settings = await call("GetSettings");
+  populateProviderProfiles(settings.llm?.profiles || []);
   document.querySelector("#settingMode").value = settings.engine.default_mode;
   document.querySelector("#settingPersonality").value = settings.engine.personality;
   document.querySelector("#settingSide").value = playerSide;
@@ -332,6 +334,7 @@ async function loadSettings() {
   document.querySelector("#settingClockIncrement").value = Math.max(0, Math.round((settings.gui?.clock_increment_ms || 0) / 1000));
   document.querySelector("#settingAutoReply").checked = autoReply;
   document.querySelector("#settingMaxCandidates").value = settings.engine.max_candidates || 5;
+  document.querySelector("#settingProfile").value = providerProfileValue(settings.llm?.profile_id);
   document.querySelector("#settingProvider").value = settings.llm.provider;
   document.querySelector("#settingEndpoint").value = settings.llm.endpoint || "";
   document.querySelector("#settingModel").value = settings.llm.model || "";
@@ -350,6 +353,50 @@ async function loadSettings() {
   syncProviderDisclosure();
 }
 
+function populateProviderProfiles(profiles) {
+  const select = document.querySelector("#settingProfile");
+  select.innerHTML = "";
+  const custom = document.createElement("option");
+  custom.value = "custom";
+  custom.textContent = "Custom";
+  select.appendChild(custom);
+  for (const profile of profiles || []) {
+    if (!profile?.id) continue;
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = profile.id;
+    select.appendChild(option);
+  }
+}
+
+function providerProfileValue(profileID) {
+  const id = profileID || "custom";
+  const exists = [...document.querySelector("#settingProfile").options].some((option) => option.value === id);
+  return exists ? id : "custom";
+}
+
+function selectedProviderProfile() {
+  const profileID = document.querySelector("#settingProfile")?.value;
+  return (settings?.llm?.profiles || []).find((profile) => profile.id === profileID) || null;
+}
+
+function applySelectedProviderProfile() {
+  const profile = selectedProviderProfile();
+  if (!profile) return;
+  applyingProviderProfile = true;
+  document.querySelector("#settingProvider").value = profile.provider || "mock";
+  document.querySelector("#settingEndpoint").value = profile.endpoint || profile.base_url || "";
+  document.querySelector("#settingModel").value = profile.model || "";
+  document.querySelector("#settingTimeout").value = profile.timeout_ms || settings?.llm?.timeout_ms || 12000;
+  applyingProviderProfile = false;
+  syncProviderDisclosure();
+}
+
+function markProviderProfileCustom() {
+  if (applyingProviderProfile) return;
+  document.querySelector("#settingProfile").value = "custom";
+}
+
 async function saveSettings() {
   try {
     playerSide = document.querySelector("#settingSide").value;
@@ -362,6 +409,7 @@ async function saveSettings() {
     settings.gui.time_control = document.querySelector("#settingTimeControl").value;
     settings.gui.clock_initial_ms = timeControl.initial_ms || Number(document.querySelector("#settingClockInitial").value) * 60000 || settings.gui.clock_initial_ms;
     settings.gui.clock_increment_ms = timeControl.increment_ms || Number(document.querySelector("#settingClockIncrement").value) * 1000 || 0;
+    settings.llm.profile_id = document.querySelector("#settingProfile").value || "custom";
     settings.llm.provider = document.querySelector("#settingProvider").value;
     settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
     settings.llm.model = document.querySelector("#settingModel").value;
@@ -507,7 +555,14 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
   }
 });
 document.querySelector("#settingTimeControl").addEventListener("change", () => syncTimeControlInputsFromPreset(true));
-document.querySelector("#settingProvider").addEventListener("change", syncProviderDisclosure);
+document.querySelector("#settingProfile").addEventListener("change", applySelectedProviderProfile);
+document.querySelector("#settingProvider").addEventListener("change", () => {
+  markProviderProfileCustom();
+  syncProviderDisclosure();
+});
+["#settingEndpoint", "#settingModel", "#settingTimeout", "#settingKey"].forEach((selector) => {
+  document.querySelector(selector).addEventListener("input", markProviderProfileCustom);
+});
 document.querySelector("#recentBtn").addEventListener("click", openRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#stopBtn").addEventListener("click", async () => {

@@ -31,14 +31,30 @@ type EngineSettings struct {
 }
 
 type LLMSettings struct {
+	Provider    string            `json:"provider" yaml:"provider"`
+	Endpoint    string            `json:"endpoint" yaml:"endpoint"`
+	Model       string            `json:"model" yaml:"model"`
+	APIKey      string            `json:"api_key,omitempty" yaml:"api_key,omitempty"`
+	Temperature float64           `json:"temperature" yaml:"temperature"`
+	MaxTokens   int               `json:"max_tokens" yaml:"max_tokens"`
+	TimeoutMS   int               `json:"timeout_ms" yaml:"timeout_ms"`
+	Retries     int               `json:"retries" yaml:"retries"`
+	ProfileID   string            `json:"profile_id" yaml:"profile_id"`
+	Profiles    []ProviderProfile `json:"profiles" yaml:"profiles"`
+}
+
+type ProviderProfile struct {
+	ID          string  `json:"id" yaml:"id"`
 	Provider    string  `json:"provider" yaml:"provider"`
-	Endpoint    string  `json:"endpoint" yaml:"endpoint"`
-	Model       string  `json:"model" yaml:"model"`
+	Mode        string  `json:"mode,omitempty" yaml:"mode,omitempty"`
+	IntendedUse string  `json:"intended_use,omitempty" yaml:"intended_use,omitempty"`
+	Endpoint    string  `json:"endpoint,omitempty" yaml:"base_url,omitempty"`
+	Model       string  `json:"model,omitempty" yaml:"model,omitempty"`
 	APIKey      string  `json:"api_key,omitempty" yaml:"api_key,omitempty"`
-	Temperature float64 `json:"temperature" yaml:"temperature"`
-	MaxTokens   int     `json:"max_tokens" yaml:"max_tokens"`
-	TimeoutMS   int     `json:"timeout_ms" yaml:"timeout_ms"`
-	Retries     int     `json:"retries" yaml:"retries"`
+	Temperature float64 `json:"temperature,omitempty" yaml:"temperature,omitempty"`
+	MaxTokens   int     `json:"max_tokens,omitempty" yaml:"max_tokens,omitempty"`
+	TimeoutMS   int     `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`
+	Retries     int     `json:"retries,omitempty" yaml:"retries,omitempty"`
 }
 
 type VerifierSettings struct {
@@ -90,6 +106,7 @@ func DefaultSettings() Settings {
 			MaxTokens:   1600,
 			TimeoutMS:   12000,
 			Retries:     1,
+			Profiles:    DefaultProviderProfiles(),
 		},
 		Verifier: VerifierSettings{
 			Enabled:          false,
@@ -132,7 +149,7 @@ func LoadSettings(path string) (Settings, error) {
 	}
 	b, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return DefaultSettings(), nil
+		return NormalizeSettings(DefaultSettings()), nil
 	}
 	if err != nil {
 		return Settings{}, err
@@ -141,10 +158,50 @@ func LoadSettings(path string) (Settings, error) {
 	if err := yaml.Unmarshal(b, &settings); err != nil {
 		return Settings{}, err
 	}
+	settings = NormalizeSettings(settings)
 	if err := validateSettings(settings); err != nil {
 		return Settings{}, err
 	}
 	return settings, nil
+}
+
+func DefaultProviderProfiles() []ProviderProfile {
+	return []ProviderProfile{
+		{
+			ID:          "mock-fast",
+			Provider:    "mock",
+			Mode:        "deterministic",
+			IntendedUse: "ci_and_demo",
+			Model:       "mock-balanced",
+			Temperature: 0.2,
+			MaxTokens:   1600,
+			TimeoutMS:   12000,
+			Retries:     1,
+		},
+		{
+			ID:          "local-balanced",
+			Provider:    "openai_compatible",
+			Mode:        "balanced",
+			IntendedUse: "local_play",
+			Endpoint:    "http://localhost:11434/v1",
+			Model:       "configurable",
+			Temperature: 0.2,
+			MaxTokens:   1600,
+			TimeoutMS:   12000,
+			Retries:     1,
+		},
+		{
+			ID:          "cloud-strong",
+			Provider:    "openai_compatible",
+			Mode:        "quality",
+			IntendedUse: "analysis_and_high_quality_strategy",
+			Model:       "user_configured",
+			Temperature: 0.2,
+			MaxTokens:   2000,
+			TimeoutMS:   20000,
+			Retries:     1,
+		},
+	}
 }
 
 func SaveSettings(path string, settings Settings) error {
@@ -198,12 +255,16 @@ func NormalizeSettings(settings Settings) Settings {
 	if settings.LLM.Model == "" {
 		settings.LLM.Model = defaults.LLM.Model
 	}
+	if len(settings.LLM.Profiles) == 0 {
+		settings.LLM.Profiles = defaults.LLM.Profiles
+	}
 	if settings.LLM.MaxTokens <= 0 {
 		settings.LLM.MaxTokens = defaults.LLM.MaxTokens
 	}
 	if settings.LLM.TimeoutMS <= 0 {
 		settings.LLM.TimeoutMS = defaults.LLM.TimeoutMS
 	}
+	settings.LLM = normalizeLLMProfileSelection(settings.LLM, defaults.LLM)
 	if settings.Verifier.Kind == "" {
 		settings.Verifier.Kind = defaults.Verifier.Kind
 	}
@@ -232,6 +293,78 @@ func NormalizeSettings(settings Settings) Settings {
 		settings.Logging.OutputDir = defaults.Logging.OutputDir
 	}
 	return settings
+}
+
+func normalizeLLMProfileSelection(llm LLMSettings, defaults LLMSettings) LLMSettings {
+	llm.Profiles = normalizeProviderProfiles(llm.Profiles, defaults)
+	if llm.ProfileID == "" {
+		llm.ProfileID = inferProviderProfileID(llm, llm.Profiles)
+		return llm
+	}
+	if llm.ProfileID == "custom" {
+		return llm
+	}
+	if _, ok := findProviderProfile(llm.Profiles, llm.ProfileID); !ok {
+		llm.ProfileID = "custom"
+	}
+	return llm
+}
+
+func normalizeProviderProfiles(profiles []ProviderProfile, defaults LLMSettings) []ProviderProfile {
+	if len(profiles) == 0 {
+		profiles = defaults.Profiles
+	}
+	out := make([]ProviderProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		if profile.Provider == "" {
+			profile.Provider = defaults.Provider
+		}
+		if profile.Model == "" {
+			profile.Model = defaults.Model
+		}
+		if profile.MaxTokens <= 0 {
+			profile.MaxTokens = defaults.MaxTokens
+		}
+		if profile.TimeoutMS <= 0 {
+			profile.TimeoutMS = defaults.TimeoutMS
+		}
+		if profile.Retries < 0 {
+			profile.Retries = defaults.Retries
+		}
+		out = append(out, profile)
+	}
+	return out
+}
+
+func inferProviderProfileID(llm LLMSettings, profiles []ProviderProfile) string {
+	for _, profile := range profiles {
+		if profileMatchesLLM(profile, llm) {
+			return profile.ID
+		}
+	}
+	return "custom"
+}
+
+func profileMatchesLLM(profile ProviderProfile, llm LLMSettings) bool {
+	if profile.ID == "" || profile.Provider != llm.Provider {
+		return false
+	}
+	if profile.Endpoint != "" && profile.Endpoint != llm.Endpoint {
+		return false
+	}
+	if profile.Model != "" && profile.Model != llm.Model {
+		return false
+	}
+	return true
+}
+
+func findProviderProfile(profiles []ProviderProfile, id string) (ProviderProfile, bool) {
+	for _, profile := range profiles {
+		if profile.ID == id {
+			return profile, true
+		}
+	}
+	return ProviderProfile{}, false
 }
 
 func validateSettings(settings Settings) error {
@@ -265,6 +398,9 @@ func validateSettings(settings Settings) error {
 	if settings.LLM.TimeoutMS < 100 || settings.LLM.TimeoutMS > 120000 {
 		return errors.New("settings llm.timeout_ms must be between 100 and 120000")
 	}
+	if err := validateProviderProfiles(settings.LLM.Profiles); err != nil {
+		return err
+	}
 	if settings.Verifier.MoveTimeMS < 10 || settings.Verifier.MoveTimeMS > 5000 {
 		return errors.New("settings verifier.movetime_ms must be between 10 and 5000")
 	}
@@ -275,6 +411,34 @@ func validateSettings(settings Settings) error {
 	case "untimed", "bullet", "blitz", "rapid", "classical", "custom":
 	default:
 		return errors.New("settings gui.time_control is invalid")
+	}
+	return nil
+}
+
+func validateProviderProfiles(profiles []ProviderProfile) error {
+	seen := map[string]struct{}{}
+	for _, profile := range profiles {
+		if profile.ID == "" {
+			return errors.New("settings llm.profiles.id is required")
+		}
+		if _, ok := seen[profile.ID]; ok {
+			return errors.New("settings llm.profiles.id must be unique")
+		}
+		seen[profile.ID] = struct{}{}
+		switch profile.Provider {
+		case "mock", "openai_compatible":
+		default:
+			return errors.New("settings llm.profiles.provider is invalid")
+		}
+		if profile.Temperature < 0 || profile.Temperature > 2 {
+			return errors.New("settings llm.profiles.temperature must be between 0 and 2")
+		}
+		if profile.MaxTokens < 1 {
+			return errors.New("settings llm.profiles.max_tokens must be positive")
+		}
+		if profile.TimeoutMS < 100 || profile.TimeoutMS > 120000 {
+			return errors.New("settings llm.profiles.timeout_ms must be between 100 and 120000")
+		}
 	}
 	return nil
 }

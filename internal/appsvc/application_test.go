@@ -100,6 +100,90 @@ func TestSaveSettingsRequiresCloudProviderAcknowledgement(t *testing.T) {
 	}
 }
 
+func TestSaveSettingsStoresSelectedProviderProfile(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.ProfileID = "local-test"
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.LLM.Model = "llama3.1"
+	settings.LLM.Temperature = 0.3
+	settings.LLM.MaxTokens = 1000
+	settings.LLM.TimeoutMS = 8000
+	settings.LLM.Retries = 1
+	settings.LLM.Profiles = []storage.ProviderProfile{{
+		ID:          "local-test",
+		Provider:    "openai_compatible",
+		Endpoint:    "http://localhost:11434/v1",
+		Model:       "llama3.1",
+		Temperature: 0.3,
+		MaxTokens:   1000,
+		TimeoutMS:   8000,
+		Retries:     1,
+	}}
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save profile settings: %v", err)
+	}
+	if app.settings.LLM.ProfileID != "local-test" {
+		t.Fatalf("profile id = %q, want local-test", app.settings.LLM.ProfileID)
+	}
+	if app.settings.LLM.Provider != "openai_compatible" || app.settings.LLM.Endpoint != "http://localhost:11434/v1" || app.settings.LLM.Model != "llama3.1" {
+		t.Fatalf("selected provider profile not stored: %+v", app.settings.LLM)
+	}
+}
+
+func TestSaveSettingsRequiresCloudAcknowledgementForSelectedProfile(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = false
+	settings.LLM.ProfileID = "local-test"
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.LLM.Model = "llama3.1"
+	settings.LLM.MaxTokens = 1000
+	settings.LLM.TimeoutMS = 8000
+	settings.LLM.Profiles = []storage.ProviderProfile{{
+		ID:        "local-test",
+		Provider:  "openai_compatible",
+		Endpoint:  "http://localhost:11434/v1",
+		Model:     "llama3.1",
+		MaxTokens: 1000,
+		TimeoutMS: 8000,
+	}}
+	if err := app.SaveSettings(settings); err == nil {
+		t.Fatal("expected selected cloud-compatible provider profile without acknowledgement to fail")
+	}
+}
+
+func TestGetSettingsRedactsProviderProfileKeys(t *testing.T) {
+	app, _ := newTestApplication(t)
+	app.settings.LLM.Profiles = []storage.ProviderProfile{{
+		ID:        "cloud",
+		Provider:  "openai_compatible",
+		Endpoint:  "https://api.example.test/v1",
+		Model:     "model",
+		APIKey:    "profile-secret",
+		MaxTokens: 1000,
+		TimeoutMS: 8000,
+	}}
+	settings, err := app.GetSettings()
+	if err != nil {
+		t.Fatalf("get settings: %v", err)
+	}
+	if settings.LLM.Profiles[0].APIKey != "[REDACTED]" {
+		t.Fatalf("profile api key was not redacted: %+v", settings.LLM.Profiles[0])
+	}
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.ProfileID = "custom"
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save redacted profile settings: %v", err)
+	}
+	if app.settings.LLM.Profiles[0].APIKey != "profile-secret" {
+		t.Fatalf("profile api key was not preserved: %+v", app.settings.LLM.Profiles[0])
+	}
+}
+
 func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
 	app, traceDir := newTestApplication(t)
 	app.settings.Engine.TraceEnabled = false

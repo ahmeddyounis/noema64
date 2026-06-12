@@ -186,6 +186,12 @@ func (a *Application) GetSettings() (storage.Settings, error) {
 	if settings.LLM.APIKey != "" {
 		settings.LLM.APIKey = "[REDACTED]"
 	}
+	settings.LLM.Profiles = append([]storage.ProviderProfile(nil), settings.LLM.Profiles...)
+	for i := range settings.LLM.Profiles {
+		if settings.LLM.Profiles[i].APIKey != "" {
+			settings.LLM.Profiles[i].APIKey = "[REDACTED]"
+		}
+	}
 	return settings, nil
 }
 
@@ -193,6 +199,8 @@ func (a *Application) SaveSettings(settings storage.Settings) error {
 	if settings.LLM.APIKey == "[REDACTED]" {
 		settings.LLM.APIKey = a.settings.LLM.APIKey
 	}
+	preserveRedactedProfileKeys(&settings, a.settings)
+	settings = storage.NormalizeSettings(settings)
 	if settings.LLM.Provider == "openai_compatible" && !settings.Privacy.CloudProviderWarningAcknowledged {
 		return &AppError{Code: "ERR_PRIVACY_ACK_REQUIRED", Message: "Cloud provider data sharing must be acknowledged before saving this provider.", Recoverable: true}
 	}
@@ -209,6 +217,20 @@ func (a *Application) SaveSettings(settings storage.Settings) error {
 		return appErr("ERR_GAME_STATE", err, true)
 	}
 	return appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
+}
+
+func preserveRedactedProfileKeys(settings *storage.Settings, previous storage.Settings) {
+	previousKeys := map[string]string{}
+	for _, profile := range previous.LLM.Profiles {
+		if profile.APIKey != "" {
+			previousKeys[profile.ID] = profile.APIKey
+		}
+	}
+	for i := range settings.LLM.Profiles {
+		if settings.LLM.Profiles[i].APIKey == "[REDACTED]" {
+			settings.LLM.Profiles[i].APIKey = previousKeys[settings.LLM.Profiles[i].ID]
+		}
+	}
 }
 
 func (a *Application) RecentGames(limit int) ([]storage.GameRecord, error) {
