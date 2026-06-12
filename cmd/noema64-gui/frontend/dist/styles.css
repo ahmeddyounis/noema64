@@ -289,9 +289,18 @@ dialog h2 {
   padding: 12px;
 }
 
-.import-controls label {
+.import-controls label,
+.export-controls label {
   display: grid;
   gap: 4px;
+}
+
+.export-controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  padding: 12px;
+  align-items: end;
 }
 
 .promotion-grid {

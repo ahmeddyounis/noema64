@@ -245,15 +245,23 @@ async function askEngine() {
 async function loadSettings() {
   settings = await call("GetSettings");
   document.querySelector("#settingMode").value = settings.engine.default_mode;
+  document.querySelector("#settingPersonality").value = settings.engine.personality;
   document.querySelector("#settingSide").value = playerSide;
   document.querySelector("#settingAutoReply").checked = autoReply;
+  document.querySelector("#settingMaxCandidates").value = settings.engine.max_candidates || 5;
   document.querySelector("#settingProvider").value = settings.llm.provider;
   document.querySelector("#settingEndpoint").value = settings.llm.endpoint || "";
   document.querySelector("#settingModel").value = settings.llm.model || "";
+  document.querySelector("#settingTimeout").value = settings.llm.timeout_ms || 12000;
   document.querySelector("#settingKey").value = settings.llm.api_key || "";
   document.querySelector("#settingVerifier").checked = !!settings.verifier.enabled;
   document.querySelector("#settingVerifierPath").value = settings.verifier.path || "";
+  document.querySelector("#settingVerifierMoveTime").value = settings.verifier.movetime_ms || 100;
+  document.querySelector("#settingVerifierMaxLoss").value = settings.verifier.max_centipawn_loss || 180;
+  document.querySelector("#settingTraceEnabled").checked = !!settings.engine.trace_enabled;
+  document.querySelector("#settingLogDir").value = settings.logging.output_dir || "logs";
   document.querySelector("#settingRaw").checked = !!settings.privacy.log_raw_prompts;
+  document.querySelector("#settingRawResponses").checked = !!settings.privacy.log_raw_llm_responses;
 }
 
 async function saveSettings() {
@@ -262,13 +270,21 @@ async function saveSettings() {
     if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
     autoReply = document.querySelector("#settingAutoReply").checked;
     settings.engine.default_mode = document.querySelector("#settingMode").value;
+    settings.engine.personality = document.querySelector("#settingPersonality").value;
+    settings.engine.max_candidates = Number(document.querySelector("#settingMaxCandidates").value) || settings.engine.max_candidates;
     settings.llm.provider = document.querySelector("#settingProvider").value;
     settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
     settings.llm.model = document.querySelector("#settingModel").value;
+    settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
     settings.llm.api_key = document.querySelector("#settingKey").value;
     settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
     settings.verifier.path = document.querySelector("#settingVerifierPath").value;
+    settings.verifier.movetime_ms = Number(document.querySelector("#settingVerifierMoveTime").value) || settings.verifier.movetime_ms;
+    settings.verifier.max_centipawn_loss = Number(document.querySelector("#settingVerifierMaxLoss").value) || settings.verifier.max_centipawn_loss;
+    settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
+    settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
     settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
+    settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
     await call("SaveSettings", settings);
     document.querySelector("#settingsOutput").textContent = "Settings saved.";
   } catch (err) {
@@ -290,7 +306,11 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
     let side = document.querySelector("#settingSide")?.value || playerSide;
     if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
     playerSide = side;
-    state = await call("NewGame", { side, mode: document.querySelector("#settingMode")?.value || "blunderguard" });
+    state = await call("NewGame", {
+      side,
+      mode: document.querySelector("#settingMode")?.value || "blunderguard",
+      personality: document.querySelector("#settingPersonality")?.value || "balanced"
+    });
     render();
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
@@ -365,9 +385,28 @@ document.querySelector("#benchBtn").addEventListener("click", async () => {
     showError(err, "#settingsOutput");
   }
 });
+async function refreshExport() {
+  const type = document.querySelector("#exportType").value;
+  document.querySelector("#exportText").value = type === "fen" ? await call("ExportFEN") : await call("ExportPGN");
+}
+
+document.querySelector("#refreshExportBtn").addEventListener("click", async () => {
+  try {
+    await refreshExport();
+  } catch (err) {
+    showError(err);
+  }
+});
+document.querySelector("#exportType").addEventListener("change", async () => {
+  try {
+    await refreshExport();
+  } catch (err) {
+    showError(err);
+  }
+});
 document.querySelector("#exportBtn").addEventListener("click", async () => {
   try {
-    document.querySelector("#exportText").value = await call("ExportPGN");
+    await refreshExport();
     document.querySelector("#exportDialog").showModal();
   } catch (err) {
     showError(err);
