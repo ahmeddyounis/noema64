@@ -18,6 +18,7 @@ type Summary struct {
 	SchemaVersion     string        `json:"schema_version"`
 	GamesRequested    int           `json:"games_requested"`
 	GamesCompleted    int           `json:"games_completed"`
+	AdjudicatedGames  int           `json:"adjudicated_games"`
 	IllegalFinalMoves int           `json:"illegal_final_moves"`
 	EngineErrors      int           `json:"engine_errors"`
 	FallbacksUsed     int           `json:"fallbacks_used"`
@@ -30,6 +31,7 @@ type GameSummary struct {
 	GameIndex     int    `json:"game_index"`
 	Plies         int    `json:"plies"`
 	Outcome       string `json:"outcome"`
+	Adjudicated   bool   `json:"adjudicated"`
 	FallbacksUsed int    `json:"fallbacks_used"`
 	EngineError   string `json:"engine_error,omitempty"`
 }
@@ -49,6 +51,9 @@ func (r Runner) RandomLegalBenchmark(ctx context.Context, games int, seed int64)
 		}
 		if result.EngineError == "" {
 			summary.GamesCompleted++
+		}
+		if result.Adjudicated {
+			summary.AdjudicatedGames++
 		}
 		summary.FallbacksUsed += result.FallbacksUsed
 		summary.TotalPlies += result.Plies
@@ -102,5 +107,9 @@ func (r Runner) playOne(ctx context.Context, index int, rng *rand.Rand) (GameSum
 	}
 	result.Plies = state.Snapshot.Ply
 	result.Outcome = state.Snapshot.Outcome.Status
+	if result.Outcome == "ongoing" {
+		result.Outcome = "adjudicated_draw"
+		result.Adjudicated = true
+	}
 	return result, nil
 }
