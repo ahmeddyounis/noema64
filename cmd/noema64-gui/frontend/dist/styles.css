@@ -300,6 +300,21 @@ dialog h2 {
   padding: 0 12px;
 }
 
+.settings .provider-warning {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 8px;
+  margin: 0 12px;
+  padding: 10px;
+  border: 1px solid #d8bd62;
+  border-radius: 6px;
+  background: #fff8df;
+}
+
+.settings .provider-warning.hidden {
+  display: none;
+}
+
 .time-control-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

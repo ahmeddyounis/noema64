@@ -193,6 +193,9 @@ func (a *Application) SaveSettings(settings storage.Settings) error {
 	if settings.LLM.APIKey == "[REDACTED]" {
 		settings.LLM.APIKey = a.settings.LLM.APIKey
 	}
+	if settings.LLM.Provider == "openai_compatible" && !settings.Privacy.CloudProviderWarningAcknowledged {
+		return &AppError{Code: "ERR_PRIVACY_ACK_REQUIRED", Message: "Cloud provider data sharing must be acknowledged before saving this provider.", Recoverable: true}
+	}
 	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
 		return appErr("ERR_SETTINGS_INVALID", err, true)
 	}

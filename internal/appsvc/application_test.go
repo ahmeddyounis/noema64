@@ -84,6 +84,21 @@ func TestSaveSettingsKeepsNormalizedRuntimeSettings(t *testing.T) {
 	}
 }
 
+func TestSaveSettingsRequiresCloudProviderAcknowledgement(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.Privacy.CloudProviderWarningAcknowledged = false
+	if err := app.SaveSettings(settings); err == nil {
+		t.Fatal("expected cloud provider settings without acknowledgement to fail")
+	}
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save acknowledged cloud provider settings: %v", err)
+	}
+}
+
 func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
 	app, traceDir := newTestApplication(t)
 	app.settings.Engine.TraceEnabled = false

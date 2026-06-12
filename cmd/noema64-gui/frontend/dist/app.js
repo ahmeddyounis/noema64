@@ -304,6 +304,7 @@ async function loadSettings() {
   document.querySelector("#settingModel").value = settings.llm.model || "";
   document.querySelector("#settingTimeout").value = settings.llm.timeout_ms || 12000;
   document.querySelector("#settingKey").value = settings.llm.api_key || "";
+  document.querySelector("#settingCloudAck").checked = !!settings.privacy.cloud_provider_warning_acknowledged;
   document.querySelector("#settingVerifier").checked = !!settings.verifier.enabled;
   document.querySelector("#settingVerifierPath").value = settings.verifier.path || "";
   document.querySelector("#settingVerifierMoveTime").value = settings.verifier.movetime_ms || 100;
@@ -313,6 +314,7 @@ async function loadSettings() {
   document.querySelector("#settingRaw").checked = !!settings.privacy.log_raw_prompts;
   document.querySelector("#settingRawResponses").checked = !!settings.privacy.log_raw_llm_responses;
   syncTimeControlInputsFromPreset(false);
+  syncProviderDisclosure();
 }
 
 async function saveSettings() {
@@ -332,6 +334,11 @@ async function saveSettings() {
     settings.llm.model = document.querySelector("#settingModel").value;
     settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
     settings.llm.api_key = document.querySelector("#settingKey").value;
+    settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
+    if (settings.llm.provider === "openai_compatible" && !settings.privacy.cloud_provider_warning_acknowledged) {
+      document.querySelector("#settingsOutput").textContent = "Acknowledge cloud provider data sharing before saving.";
+      return;
+    }
     settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
     settings.verifier.path = document.querySelector("#settingVerifierPath").value;
     settings.verifier.movetime_ms = Number(document.querySelector("#settingVerifierMoveTime").value) || settings.verifier.movetime_ms;
@@ -345,6 +352,12 @@ async function saveSettings() {
   } catch (err) {
     showError(err, "#settingsOutput");
   }
+}
+
+function syncProviderDisclosure() {
+  const warning = document.querySelector("#cloudProviderWarning");
+  const isCloud = document.querySelector("#settingProvider").value === "openai_compatible";
+  warning.classList.toggle("hidden", !isCloud);
 }
 
 function syncTimeControlInputsFromPreset(overwrite) {
@@ -461,6 +474,7 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
   }
 });
 document.querySelector("#settingTimeControl").addEventListener("change", () => syncTimeControlInputsFromPreset(true));
+document.querySelector("#settingProvider").addEventListener("change", syncProviderDisclosure);
 document.querySelector("#recentBtn").addEventListener("click", openRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#stopBtn").addEventListener("click", async () => {
