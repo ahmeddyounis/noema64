@@ -3,25 +3,50 @@ package engine
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 )
 
-func TestEngineFallbackOnInvalidProviderJSON(t *testing.T) {
-	e := New(Options{
-		Mode:     strategy.ModePure,
-		Provider: providers.MockProvider{Behavior: "invalid_json"},
-	})
-	dec, state, err := e.ChooseMove(context.Background())
-	if err != nil {
-		t.Fatalf("choose: %v", err)
+func TestEngineFallbackOnProviderFaults(t *testing.T) {
+	tests := []struct {
+		name         string
+		behavior     string
+		timeout      time.Duration
+		wantFallback bool
+	}{
+		{name: "invalid json", behavior: "invalid_json", wantFallback: true},
+		{name: "empty response", behavior: "empty", wantFallback: true},
+		{name: "provider error", behavior: "error", wantFallback: true},
+		{name: "illegal only", behavior: "illegal", wantFallback: true},
+		{name: "slow timeout", behavior: "slow", timeout: time.Millisecond, wantFallback: true},
+		{name: "mixed illegal and legal", behavior: "mixed_illegal", wantFallback: false},
 	}
-	if !dec.FallbackUsed {
-		t.Fatal("expected fallback decision")
-	}
-	if state.Snapshot.Ply != 1 {
-		t.Fatalf("ply = %d, want 1", state.Snapshot.Ply)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := Options{
+				Mode:     strategy.ModePure,
+				Provider: providers.MockProvider{Behavior: tt.behavior},
+			}
+			if tt.timeout > 0 {
+				opts.MoveTimeout = tt.timeout
+			}
+			e := New(opts)
+			dec, state, err := e.ChooseMove(context.Background())
+			if err != nil {
+				t.Fatalf("choose: %v", err)
+			}
+			if dec.FallbackUsed != tt.wantFallback {
+				t.Fatalf("fallback = %t, want %t", dec.FallbackUsed, tt.wantFallback)
+			}
+			if state.Snapshot.Ply != 1 {
+				t.Fatalf("ply = %d, want 1", state.Snapshot.Ply)
+			}
+			if state.Snapshot.MoveHistory[0].UCI == "" {
+				t.Fatalf("selected invalid UCI: %+v", state.Snapshot.MoveHistory[0])
+			}
+		})
 	}
 }
 

@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
@@ -52,8 +53,21 @@ func (p MockProvider) CompleteJSON(ctx context.Context, req CompletionRequest) (
 	if p.Behavior == "empty" {
 		return &CompletionResponse{Text: "", Provider: p.Name(), Model: req.Model, Latency: time.Since(start)}, nil
 	}
+	if p.Behavior == "error" {
+		return nil, fmt.Errorf("mock provider error")
+	}
+	if p.Behavior == "slow" {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
 	if p.Behavior == "illegal" {
 		return p.response(req, []string{"a1a8"}), nil
+	}
+	if p.Behavior == "mixed_illegal" {
+		return p.response(req, []string{"a1a8", "g1f3"}), nil
 	}
 	legal := strings.Split(req.Metadata["legal_moves"], ",")
 	candidates := chooseMockMoves(legal, req.Metadata["max_candidates"])
