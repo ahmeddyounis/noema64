@@ -80,9 +80,10 @@ verifier:
   kind: uci
   path: /usr/local/bin/stockfish
   movetime_ms: 100
+  max_centipawn_loss: 180
 ```
 
-Noema64 does not bundle Stockfish in the MVP.
+Noema64 does not bundle Stockfish in the MVP. When configured, the external UCI verifier analyzes LLM candidate moves with `searchmoves`, compares centipawn loss against the best candidate, and records verifier decisions in the trace.
 
 ## UCI Example
 
@@ -107,4 +108,3 @@ The UCI process writes protocol output only to stdout. JSON traces are written t
 ## License
 
 Noema64 source is MIT licensed. Optional external verifier binaries retain their own licenses.
-

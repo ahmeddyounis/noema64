@@ -24,3 +24,12 @@ Supported MVP commands:
 
 UCI stdout is protocol-only. Diagnostics use `info string`; JSONL traces go to local files.
 
+Additional Noema64 options:
+
+- `LLMProvider`
+- `LLMEndpoint`
+- `LLMModel`
+- `VerifierPath`
+- `VerifierMoveTime`
+- `VerifierMaxCentipawnLoss`
+- `TraceFile`
