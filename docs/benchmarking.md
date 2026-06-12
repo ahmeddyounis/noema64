@@ -15,3 +15,10 @@ go run ./cmd/noema64-bench -modes -games 20
 ```
 
 The mode benchmark runs pure, blunderguard, and hybrid with the same seed and game count per mode so their completion, fallback, adjudication, and error metrics are directly comparable.
+
+JSON is the default output format. Use CSV for spreadsheet import or CI artifacts:
+
+```sh
+go run ./cmd/noema64-bench -games 100 -format csv > benchmark.csv
+go run ./cmd/noema64-bench -modes -games 20 -format csv > mode-benchmark.csv
+```

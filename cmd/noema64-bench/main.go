@@ -6,17 +6,25 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ahmedyounis/noema64/internal/appsvc"
+	"github.com/ahmedyounis/noema64/internal/experiments"
 )
 
 func main() {
 	games := flag.Int("games", 0, "number of games; defaults to 100 random games or 20 games per mode")
 	seed := flag.Int64("seed", 64, "random seed")
 	modes := flag.Bool("modes", false, "run pure, blunderguard, and hybrid mode benchmarks")
+	format := flag.String("format", "json", "output format: json or csv")
 	timeout := flag.Duration("timeout", 2*time.Minute, "benchmark timeout")
 	flag.Parse()
+	outputFormat := strings.ToLower(*format)
+	if outputFormat != "json" && outputFormat != "csv" {
+		fmt.Fprintln(os.Stderr, "format must be json or csv")
+		os.Exit(2)
+	}
 
 	app := appsvc.NewApplication("")
 	type result struct {
@@ -57,6 +65,27 @@ func main() {
 		fmt.Fprintln(os.Stderr, res.err)
 		os.Exit(1)
 	}
-	b, _ := json.MarshalIndent(res.summary, "", "  ")
-	fmt.Println(string(b))
+	switch outputFormat {
+	case "json":
+		b, _ := json.MarshalIndent(res.summary, "", "  ")
+		fmt.Println(string(b))
+	case "csv":
+		out, err := benchmarkCSV(res.summary)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Print(out)
+	}
+}
+
+func benchmarkCSV(summary any) (string, error) {
+	switch typed := summary.(type) {
+	case experiments.Summary:
+		return experiments.SummaryCSV(typed)
+	case experiments.ModeBenchmarkSummary:
+		return experiments.ModeBenchmarkCSV(typed)
+	default:
+		return "", fmt.Errorf("unsupported benchmark summary type %T", summary)
+	}
 }

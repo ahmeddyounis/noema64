@@ -2,6 +2,8 @@ package experiments
 
 import (
 	"context"
+	"encoding/csv"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +22,57 @@ func TestRandomBenchmarkSample(t *testing.T) {
 	}
 	if summary.IllegalFinalMoves != 0 {
 		t.Fatalf("illegal final moves = %d", summary.IllegalFinalMoves)
+	}
+}
+
+func TestBenchmarkCSVExportsRows(t *testing.T) {
+	summary := Summary{
+		SchemaVersion:     "1.0",
+		GamesRequested:    2,
+		GamesCompleted:    2,
+		IllegalFinalMoves: 0,
+		TotalPlies:        12,
+		Results: []GameSummary{
+			{GameIndex: 1, Plies: 5, Outcome: "checkmate", FallbacksUsed: 1},
+			{GameIndex: 2, Plies: 7, Outcome: "adjudicated_draw", Adjudicated: true},
+		},
+	}
+
+	out, err := SummaryCSV(summary)
+	if err != nil {
+		t.Fatalf("summary csv: %v", err)
+	}
+	rows, err := csv.NewReader(strings.NewReader(out)).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("csv rows = %d, want header + 2 results:\n%s", len(rows), out)
+	}
+	if rows[0][0] != "benchmark" || rows[1][0] != "random" || rows[1][2] != "1" || rows[2][4] != "adjudicated_draw" {
+		t.Fatalf("unexpected csv rows: %#v", rows)
+	}
+}
+
+func TestModeBenchmarkCSVExportsModeRows(t *testing.T) {
+	out, err := ModeBenchmarkCSV(ModeBenchmarkSummary{
+		SchemaVersion: "1.0",
+		GamesPerMode:  1,
+		Seed:          64,
+		Results: []ModeBenchmarkResult{
+			{Mode: strategy.ModePure, Summary: Summary{GamesRequested: 1, GamesCompleted: 1, Results: []GameSummary{{GameIndex: 1, Outcome: "draw"}}}},
+			{Mode: strategy.ModeHybrid, Summary: Summary{GamesRequested: 1, GamesCompleted: 1, Results: []GameSummary{{GameIndex: 1, Outcome: "checkmate"}}}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("mode csv: %v", err)
+	}
+	rows, err := csv.NewReader(strings.NewReader(out)).ReadAll()
+	if err != nil {
+		t.Fatalf("read csv: %v", err)
+	}
+	if len(rows) != 3 || rows[1][1] != "pure" || rows[2][1] != "hybrid" {
+		t.Fatalf("unexpected mode csv rows: %#v", rows)
 	}
 }
 
