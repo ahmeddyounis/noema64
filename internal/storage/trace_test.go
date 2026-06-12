@@ -35,6 +35,11 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		},
 		Timing:        decision.Timing{TotalMS: 10, ProviderMS: 6, VerifierMS: 3, SearchMS: 1},
 		VerifierTrace: &verifier.Result{Enabled: true, Used: true, Name: "static_safety"},
+		Stages: []decision.StageTrace{{
+			Name:       "asking_provider",
+			Status:     "completed",
+			DurationMS: 6,
+		}},
 		Assistance: decision.AssistanceTrace{
 			Mode:         strategy.ModeBlunderguard,
 			VerifierUsed: true,
@@ -71,7 +76,12 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		SelectedMove    string              `json:"selected_move"`
 		FallbackUsed    bool                `json:"fallback_used"`
 		TimingMS        map[string]int64    `json:"timing_ms"`
-		VerifierResult  struct {
+		Stages          []struct {
+			Name       string `json:"name"`
+			Status     string `json:"status"`
+			DurationMS int64  `json:"duration_ms"`
+		} `json:"stages"`
+		VerifierResult struct {
 			Used bool   `json:"used"`
 			Name string `json:"name"`
 		} `json:"verifier_result"`
@@ -106,6 +116,9 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 	if record.LLMParseStatus != "ok" || record.TimingMS["llm"] != 6 || record.TimingMS["verifier"] != 3 || record.TimingMS["search"] != 1 {
 		t.Fatalf("missing top-level LLM/timing fields: %+v", record)
+	}
+	if len(record.Stages) != 1 || record.Stages[0].Name != "asking_provider" || record.Stages[0].DurationMS != 6 {
+		t.Fatalf("missing top-level stage timing: %+v", record.Stages)
 	}
 	if !record.VerifierResult.Used || record.VerifierResult.Name != "static_safety" {
 		t.Fatalf("missing top-level verifier disclosure: %+v", record.VerifierResult)

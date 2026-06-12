@@ -134,6 +134,54 @@ func TestChooseMoveRawProviderLoggingIsOptIn(t *testing.T) {
 	}
 }
 
+func TestChooseMoveRecordsStagesAndProgressEvents(t *testing.T) {
+	game := searchTestGame(t)
+	provider := scriptedProvider{
+		moves: []strategy.CandidateMove{{UCI: "g3h4", Purpose: "Win the loose queen.", LLMConfidence: 0.7}},
+	}
+	events := []ProgressEvent{}
+
+	dec, err := ChooseMove(context.Background(), Request{
+		Game:          game,
+		Memory:        strategy.NewMemory(game.ID(), "white"),
+		Mode:          strategy.ModeHybrid,
+		Provider:      provider,
+		Verifier:      verifier.LegalOnlyVerifier{},
+		Model:         "scripted",
+		MaxCandidates: 1,
+		Timeout:       time.Second,
+		Progress: func(event ProgressEvent) {
+			events = append(events, event)
+		},
+	})
+	if err != nil {
+		t.Fatalf("ChooseMove error = %v", err)
+	}
+
+	wantStages := []string{
+		"reading_position",
+		"updating_strategy_memory",
+		"asking_provider",
+		"repairing_candidate_moves",
+		"verifying_tactics",
+		"scoring_candidates",
+		"updating_strategy_memory_after_move",
+	}
+	if got := stageNames(dec.Stages); !sameStrings(got, wantStages) {
+		t.Fatalf("stages = %v, want %v", got, wantStages)
+	}
+	if len(events) < len(wantStages)*2 {
+		t.Fatalf("progress events = %d, want at least start/finish for %d stages", len(events), len(wantStages))
+	}
+	if events[0].EventName != DecisionStageEvent || events[0].Stage != "reading_position" || events[0].Status != "started" {
+		t.Fatalf("first progress event = %+v", events[0])
+	}
+	last := events[len(events)-1]
+	if last.Stage != "updating_strategy_memory_after_move" || last.Status != "completed" || last.GameID == "" {
+		t.Fatalf("last progress event = %+v", last)
+	}
+}
+
 func searchTestGame(t *testing.T) *chesscore.Game {
 	t.Helper()
 	game, err := chesscore.FromFEN("4k3/8/8/8/7q/6P1/8/4K3 w - - 0 1")
@@ -156,6 +204,26 @@ func searchTestCandidate(t *testing.T, game *chesscore.Game, uci string, confide
 		VerifierScore: strategy.VerifierScore{Status: "accepted", Reason: "test"},
 		LegalMove:     mv,
 	}
+}
+
+func stageNames(stages []StageTrace) []string {
+	names := make([]string, 0, len(stages))
+	for _, stage := range stages {
+		names = append(names, stage.Name)
+	}
+	return names
+}
+
+func sameStrings(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
 
 type scriptedProvider struct {

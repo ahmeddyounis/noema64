@@ -18,11 +18,16 @@ import (
 )
 
 func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
+	start := time.Now()
+	decisionID := "dec_" + uuid.NewString()
+	stages := newStageRecorder(start, decisionID, req.Progress)
 	if req.Game == nil {
 		return nil, fmt.Errorf("nil game")
 	}
+	readStage := stages.begin("reading_position", "Snapshot position, legal moves, and deterministic features.")
 	legal := req.Game.LegalMoves()
 	if len(legal) == 0 {
+		readStage.finish("failed", "No legal moves are available.")
 		return nil, fmt.Errorf("no legal moves")
 	}
 	if req.Timeout <= 0 {
@@ -44,10 +49,11 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		req.Verifier = verifier.StaticVerifier{}
 	}
 
-	start := time.Now()
-	decisionID := "dec_" + uuid.NewString()
 	snapshot := req.Game.Snapshot()
+	stages.setGameID(snapshot.GameID)
+	readStage.finish("completed", fmt.Sprintf("%d legal moves found.", len(legal)))
 	memBefore := req.Memory
+	memoryStage := stages.begin("updating_strategy_memory", "Prepare current strategy memory and prompt context.")
 	stratReq := strategy.StrategyRequest{
 		GameID:           snapshot.GameID,
 		FEN:              snapshot.FEN,
@@ -63,11 +69,14 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	}
 	system, user, err := strategy.BuildPrompt(stratReq)
 	if err != nil {
-		return fallbackDecision(req, decisionID, memBefore, "prompt_build_error", start, nil), nil
+		memoryStage.finish("failed", err.Error())
+		return fallbackDecision(req, decisionID, memBefore, "prompt_build_error", start, nil, stages.snapshot()), nil
 	}
+	memoryStage.finish("completed", "Prompt context prepared.")
 
 	providerCtx, cancel := context.WithTimeout(ctx, req.Timeout)
 	defer cancel()
+	providerStage := stages.begin("asking_provider", "Request structured candidate moves from provider.")
 	providerStart := time.Now()
 	resp, err := req.Provider.CompleteJSON(providerCtx, providers.CompletionRequest{
 		Model:       req.Model,
@@ -91,9 +100,11 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		providerTrace.RawPrompt = &PromptTrace{System: system, User: user}
 	}
 	if err != nil {
+		providerStage.finish("failed", err.Error())
 		providerTrace.Error = err.Error()
-		return fallbackDecision(req, decisionID, memBefore, "provider_error", start, &providerTrace), nil
+		return fallbackDecision(req, decisionID, memBefore, "provider_error", start, &providerTrace, stages.snapshot()), nil
 	}
+	providerStage.finish("completed", fmt.Sprintf("Provider returned in %d ms.", providerMS))
 	providerTrace.RawAvailable = resp.RawAvailable
 	providerTrace.Name = resp.Provider
 	providerTrace.Model = resp.Model
@@ -101,21 +112,26 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		providerTrace.RawResponse = resp.Text
 	}
 
+	repairStage := stages.begin("repairing_candidate_moves", "Parse provider JSON and normalize candidate moves.")
 	parse := strategy.ParseDecision(resp.Text)
 	providerTrace.ParseStatus = parse.Status
 	if parse.Status != "ok" && parse.Status != "extracted_json" {
+		repairStage.finish("failed", parse.Error)
 		providerTrace.Error = parse.Error
-		return fallbackDecision(req, decisionID, memBefore, "provider_schema_invalid", start, &providerTrace), nil
+		return fallbackDecision(req, decisionID, memBefore, "provider_schema_invalid", start, &providerTrace, stages.snapshot()), nil
 	}
 
 	candidates, repairs := strategy.NormalizeCandidates(req.Game, parse.Decision.CandidateMoves)
 	if len(candidates) == 0 {
-		return fallbackDecision(req, decisionID, memBefore, "no_legal_llm_candidates", start, &providerTrace), nil
+		repairStage.finish("failed", "No legal provider candidates remained after normalization.")
+		return fallbackDecision(req, decisionID, memBefore, "no_legal_llm_candidates", start, &providerTrace, stages.snapshot()), nil
 	}
 	if len(candidates) > req.MaxCandidates {
 		candidates = candidates[:req.MaxCandidates]
 	}
+	repairStage.finish("completed", fmt.Sprintf("%d legal candidates retained.", len(candidates)))
 
+	verifyStage := stages.begin("verifying_tactics", "Run verifier or legal-only safety checks.")
 	verifierStart := time.Now()
 	verifyResult, err := req.Verifier.VerifyCandidates(ctx, verifier.Request{
 		Game:       req.Game.Clone(),
@@ -126,19 +142,27 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	verifierMS := time.Since(verifierStart).Milliseconds()
 	if err != nil {
 		verifyResult = &verifier.Result{Enabled: req.Mode != strategy.ModePure, Used: false, Name: req.Verifier.Name(), Error: err.Error()}
+		verifyStage.finish("failed", err.Error())
+	} else {
+		verifyStage.finish("completed", fmt.Sprintf("Verifier completed in %d ms.", verifierMS))
 	}
 	applyVerifierScores(candidates, verifyResult)
+	scoreStage := stages.begin("scoring_candidates", "Combine LLM, plan, tactical, and search signals.")
 	searchStart := time.Now()
 	searchUsed, searchName := applySearchScores(ctx, req.Game, candidates, req.Mode)
 	searchMS := time.Since(searchStart).Milliseconds()
 	scoreCandidates(candidates, req.Memory, req.Mode)
 	chosen, ok := selectCandidate(candidates, req.Mode)
 	if !ok {
-		return fallbackDecision(req, decisionID, memBefore, "arbiter_no_move", start, &providerTrace), nil
+		scoreStage.finish("failed", "No acceptable candidate after scoring.")
+		return fallbackDecision(req, decisionID, memBefore, "arbiter_no_move", start, &providerTrace, stages.snapshot()), nil
 	}
+	scoreStage.finish("completed", fmt.Sprintf("Selected %s.", chosen.UCI))
 
+	updateStage := stages.begin("updating_strategy_memory_after_move", "Merge provider strategy update into persistent memory.")
 	memAfter := strategy.MergeMemory(memBefore, parse.Decision.StrategyUpdate, snapshot.GameID, snapshot.SideToMove, snapshot.Ply+1, decisionID, chosen.UCI)
 	diff := strategy.DiffMemory(memBefore, memAfter)
+	updateStage.finish("completed", "Strategy memory updated.")
 	totalMS := time.Since(start).Milliseconds()
 	return &MoveDecision{
 		SchemaVersion:      "decision-trace.v1",
@@ -165,6 +189,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 			SearchMS:   searchMS,
 			OtherMS:    remainingTimingMS(totalMS, providerMS, verifierMS, searchMS),
 		},
+		Stages: stages.snapshot(),
 		Assistance: AssistanceTrace{
 			Mode:         req.Mode,
 			VerifierUsed: verifyResult != nil && verifyResult.Used,
@@ -177,7 +202,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	}, nil
 }
 
-func fallbackDecision(req Request, decisionID string, mem strategy.StrategyMemory, reason string, start time.Time, providerTrace *ProviderTrace) *MoveDecision {
+func fallbackDecision(req Request, decisionID string, mem strategy.StrategyMemory, reason string, start time.Time, providerTrace *ProviderTrace, stages []StageTrace) *MoveDecision {
 	if providerTrace == nil {
 		providerTrace = &ProviderTrace{Name: req.Provider.Name(), Model: req.Model, PromptVersion: strategy.PromptVersion}
 	}
@@ -207,6 +232,9 @@ func fallbackDecision(req Request, decisionID string, mem strategy.StrategyMemor
 		LegalMove:     mv,
 		VerifierScore: strategy.VerifierScore{Status: "not_checked", Reason: "Fallback selected before verifier ranking."},
 	}
+	fallbackStarted := time.Now()
+	fallbackFinished := fallbackStarted
+	stages = append(append([]StageTrace(nil), stages...), CompletedStage("fallback", "completed", "Fallback selected a legal move after "+reason+".", fallbackStarted, fallbackFinished))
 	return &MoveDecision{
 		SchemaVersion:      "decision-trace.v1",
 		DecisionID:         decisionID,
@@ -226,6 +254,7 @@ func fallbackDecision(req Request, decisionID string, mem strategy.StrategyMemor
 		FallbackReason:     reason,
 		Provider:           *providerTrace,
 		Timing:             Timing{TotalMS: time.Since(start).Milliseconds()},
+		Stages:             stages,
 		Assistance:         AssistanceTrace{Mode: req.Mode, VerifierUsed: false},
 		FENBefore:          snapshot.FEN,
 		LegalMovesCount:    len(snapshot.LegalMoves),

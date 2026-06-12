@@ -23,6 +23,7 @@ type Request struct {
 	Timeout        time.Duration
 	LogRawPrompts  bool
 	LogRawResponse bool
+	Progress       ProgressFunc `json:"-"`
 }
 
 type MoveDecision struct {
@@ -45,6 +46,7 @@ type MoveDecision struct {
 	FallbackReason     string                   `json:"fallback_reason,omitempty"`
 	Provider           ProviderTrace            `json:"provider"`
 	Timing             Timing                   `json:"timing"`
+	Stages             []StageTrace             `json:"stages"`
 	Assistance         AssistanceTrace          `json:"assistance"`
 	FENBefore          string                   `json:"fen_before"`
 	LegalMovesCount    int                      `json:"legal_moves_count"`

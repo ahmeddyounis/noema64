@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
@@ -224,6 +225,38 @@ func TestPrivacySettingsEnableRawProviderTrace(t *testing.T) {
 	}
 }
 
+func TestRequestEngineMoveEmitsDecisionStageEvents(t *testing.T) {
+	app, _ := newTestApplication(t)
+	events := []capturedEvent{}
+	app.SetEventSink(func(name string, payload any) {
+		events = append(events, capturedEvent{name: name, payload: payload})
+	})
+
+	_, appErr := app.RequestEngineMove()
+	if appErr != nil {
+		t.Fatalf("engine move: %v", appErr)
+	}
+	state, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get game: %v", err)
+	}
+	if len(events) == 0 {
+		t.Fatal("expected decision stage events")
+	}
+	if events[0].name != "decision.stage" {
+		t.Fatalf("event name = %s, want decision.stage", events[0].name)
+	}
+	if !hasCapturedStage(events, "playing_move") || !hasCapturedStage(events, "writing_trace") {
+		t.Fatalf("missing emitted playing/write stages: %+v", events)
+	}
+	if state.LastDecision == nil {
+		t.Fatal("missing last decision")
+	}
+	if !hasDecisionStage(state.LastDecision.Stages, "playing_move") || !hasDecisionStage(state.LastDecision.Stages, "writing_trace") {
+		t.Fatalf("missing engine/app stages: %+v", state.LastDecision.Stages)
+	}
+}
+
 func TestRunModeBenchmarkCoversCoreModes(t *testing.T) {
 	app, _ := newTestApplication(t)
 	summary, err := app.RunModeBenchmark(1, 64)
@@ -349,4 +382,28 @@ func TestApplicationRestoresLatestGameAndRecentRecords(t *testing.T) {
 	if loaded.Snapshot.GameID != before.Snapshot.GameID || len(loaded.Snapshot.MoveHistory) != len(before.Snapshot.MoveHistory) {
 		t.Fatalf("loaded game mismatch: %+v", loaded.Snapshot)
 	}
+}
+
+func hasDecisionStage(stages []decision.StageTrace, name string) bool {
+	for _, stage := range stages {
+		if stage.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+type capturedEvent struct {
+	name    string
+	payload any
+}
+
+func hasCapturedStage(events []capturedEvent, stageName string) bool {
+	for _, event := range events {
+		progress, ok := event.payload.(decision.ProgressEvent)
+		if ok && progress.Stage == stageName {
+			return true
+		}
+	}
+	return false
 }

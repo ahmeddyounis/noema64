@@ -14,6 +14,7 @@ let playerSide = "white";
 let autoReply = true;
 let pendingPromotion = null;
 let applyingProviderProfile = false;
+let lastStageEvent = null;
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -235,7 +236,7 @@ function renderStrategy() {
 
 function renderDecision() {
   const dec = state.last_decision;
-  document.querySelector("#thinkingStage").textContent = dec ? "Decision finished" : "Idle";
+  document.querySelector("#thinkingStage").textContent = dec ? stageStatusText(lastDecisionStage(dec), "Decision finished") : "Idle";
   document.querySelector("#tabContent").textContent = tabText(dec);
   const box = document.querySelector("#candidates");
   box.innerHTML = "";
@@ -280,8 +281,30 @@ function tabText(dec) {
     case "verifier": return JSON.stringify(dec.verifier_trace, null, 2);
     case "raw": return JSON.stringify(dec, null, 2);
     default:
-      return `${dec.selected_move?.san || dec.selected_move?.uci}: ${dec.explanation}\n\n${dec.position_summary}\n\nFallback used: ${dec.fallback_used}`;
+      return `${dec.selected_move?.san || dec.selected_move?.uci}: ${dec.explanation}\n\n${dec.position_summary}\n\nFallback used: ${dec.fallback_used}\n\n${stageSummary(dec)}`;
   }
+}
+
+function lastDecisionStage(dec) {
+  return dec?.stages?.length ? dec.stages[dec.stages.length - 1] : null;
+}
+
+function stageSummary(dec) {
+  if (!dec?.stages?.length) return "Stages: not recorded";
+  return `Stages:\n${dec.stages.map((stage) => `${stageLabel(stage.name)} · ${stage.status || "unknown"} · ${stage.duration_ms || 0} ms`).join("\n")}`;
+}
+
+function stageStatusText(stage, fallback = "Idle") {
+  if (!stage) return fallback;
+  return `${stageLabel(stage.stage || stage.name)}: ${stage.status || "started"}`;
+}
+
+function stageLabel(value) {
+  return String(value || "")
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ") || "Stage";
 }
 
 async function makeMove(move) {
@@ -300,6 +323,7 @@ async function makeMove(move) {
 
 async function askEngine() {
   try {
+    lastStageEvent = null;
     document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
     const result = await call("RequestEngineMove");
     state = result.state;
@@ -308,6 +332,14 @@ async function askEngine() {
     showError(err);
     document.querySelector("#thinkingStage").textContent = "Engine stopped";
   }
+}
+
+function subscribeDecisionStageEvents() {
+  if (!window.runtime?.EventsOn) return;
+  window.runtime.EventsOn("decision.stage", (event) => {
+    lastStageEvent = event;
+    document.querySelector("#thinkingStage").textContent = stageStatusText(event, "Thinking");
+  });
 }
 
 async function resignGame() {
@@ -692,6 +724,7 @@ window.addEventListener("keydown", (event) => {
 });
 
 async function init() {
+  subscribeDecisionStageEvents();
   try {
     await loadSettings();
   } catch (err) {

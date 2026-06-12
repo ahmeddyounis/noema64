@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/experiments"
 	"github.com/ahmedyounis/noema64/internal/providers"
@@ -20,12 +21,15 @@ type Application struct {
 	engine       *engine.Engine
 	traces       *storage.TraceStore
 	games        *storage.GameStore
+	eventSink    EventSink
 }
 
 const (
 	maxFENImportBytes = 512
 	maxPGNImportBytes = 1 << 20
 )
+
+type EventSink func(name string, payload any)
 
 func NewApplication(settingsPath string) *Application {
 	settings, err := storage.LoadSettings(settingsPath)
@@ -72,7 +76,20 @@ func (a *Application) engineOptions() engine.Options {
 		MoveTimeout:    timeout,
 		LogRawPrompts:  a.settings.Privacy.LogRawPrompts,
 		LogRawResponse: a.settings.Privacy.LogRawLLMResponses,
+		Progress:       a.emitDecisionProgress,
 	}
+}
+
+func (a *Application) SetEventSink(sink EventSink) {
+	a.eventSink = sink
+	a.engine.SetOptions(a.engineOptions())
+}
+
+func (a *Application) emitDecisionProgress(event decision.ProgressEvent) {
+	if a.eventSink == nil {
+		return
+	}
+	a.eventSink(decision.DecisionStageEvent, event)
 }
 
 func (a *Application) NewGame(opts engine.NewGameOptions) (*engine.GameState, error) {
@@ -110,7 +127,28 @@ func (a *Application) MakeUserMove(moveUCI string) (*engine.GameState, error) {
 func (a *Application) RequestEngineMove() (any, error) {
 	dec, state, err := a.engine.ChooseMove(context.Background())
 	if err == nil && a.settings.Engine.TraceEnabled {
+		traceStageStarted := time.Now()
+		a.emitDecisionProgress(decision.ProgressEvent{
+			EventName:  decision.DecisionStageEvent,
+			DecisionID: dec.DecisionID,
+			GameID:     dec.GameID,
+			Stage:      "writing_trace",
+			Status:     "started",
+			Message:    "Persist decision trace.",
+			Timestamp:  traceStageStarted.UTC().Format(time.RFC3339Nano),
+		})
+		dec.Stages = append(dec.Stages, decision.CompletedStage("writing_trace", "completed", "Decision trace persisted.", traceStageStarted, time.Now()))
 		_ = a.traces.AppendDecision(context.Background(), dec)
+		a.emitDecisionProgress(decision.ProgressEvent{
+			EventName:  decision.DecisionStageEvent,
+			DecisionID: dec.DecisionID,
+			GameID:     dec.GameID,
+			Stage:      "writing_trace",
+			Status:     "completed",
+			Message:    "Decision trace persisted.",
+			ElapsedMS:  time.Since(traceStageStarted).Milliseconds(),
+			Timestamp:  time.Now().UTC().Format(time.RFC3339Nano),
+		})
 	}
 	if err != nil {
 		return map[string]any{"decision": dec, "state": state}, appErr("ERR_ENGINE_MOVE", err, true)

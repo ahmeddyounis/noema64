@@ -89,6 +89,7 @@ func decisionTraceRecord(trace *decision.MoveDecision) map[string]any {
 		"fallback_used":     trace.FallbackUsed,
 		"candidate_moves":   trace.CandidateMoves,
 		"verifier_result":   trace.VerifierTrace,
+		"stages":            trace.Stages,
 		"strategy_before":   trace.StrategyBefore,
 		"strategy_after":    trace.StrategyAfter,
 		"timing_ms":         traceTimingRecord(trace.Timing),

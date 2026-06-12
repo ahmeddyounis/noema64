@@ -26,6 +26,7 @@ type Options struct {
 	MoveTimeout    time.Duration
 	LogRawPrompts  bool
 	LogRawResponse bool
+	Progress       decision.ProgressFunc
 }
 
 type NewGameOptions struct {
@@ -207,6 +208,7 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 		Timeout:        e.opts.MoveTimeout,
 		LogRawPrompts:  e.opts.LogRawPrompts,
 		LogRawResponse: e.opts.LogRawResponse,
+		Progress:       e.opts.Progress,
 	}
 	e.mu.Unlock()
 
@@ -237,9 +239,14 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	if !e.game.IsLegalUCI(dec.SelectedMove.UCI) {
 		return nil, nil, fmt.Errorf("selector returned illegal move %s", dec.SelectedMove.UCI)
 	}
+	playStarted := time.Now()
+	emitEngineProgress(e.opts.Progress, dec, "playing_move", "started", "Apply selected move to game state.", 0)
 	if _, err := e.game.ApplyUCI(dec.SelectedMove.UCI); err != nil {
+		emitEngineProgress(e.opts.Progress, dec, "playing_move", "failed", err.Error(), time.Since(playStarted).Milliseconds())
 		return nil, nil, err
 	}
+	dec.Stages = append(dec.Stages, decision.CompletedStage("playing_move", "completed", "Applied selected move to game state.", playStarted, time.Now()))
+	emitEngineProgress(e.opts.Progress, dec, "playing_move", "completed", "Applied selected move to game state.", time.Since(playStarted).Milliseconds())
 	e.game.AnnotateLastMove("Plan: " + dec.Explanation)
 	e.applyClockLocked(movingSide, time.Since(start).Milliseconds())
 	e.memory = dec.StrategyAfter
@@ -346,6 +353,22 @@ func (e *Engine) stateLocked() *GameState {
 		StrategyMemory: e.memory,
 		LastDecision:   e.lastDecision,
 	}
+}
+
+func emitEngineProgress(progress decision.ProgressFunc, dec *decision.MoveDecision, stage, status, message string, elapsedMS int64) {
+	if progress == nil || dec == nil {
+		return
+	}
+	progress(decision.ProgressEvent{
+		EventName:  decision.DecisionStageEvent,
+		DecisionID: dec.DecisionID,
+		GameID:     dec.GameID,
+		Stage:      stage,
+		Status:     status,
+		Message:    message,
+		ElapsedMS:  elapsedMS,
+		Timestamp:  time.Now().UTC().Format(time.RFC3339Nano),
+	})
 }
 
 type pgnTag struct {
