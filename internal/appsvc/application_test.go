@@ -1,6 +1,7 @@
 package appsvc
 
 import (
+	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -68,6 +69,52 @@ func TestImportRejectsOversizedInput(t *testing.T) {
 	}
 	if _, err := app.ImportPGN(strings.Repeat("1. e4 e5 ", maxPGNImportBytes/9+2)); err == nil {
 		t.Fatal("expected oversized PGN to fail")
+	}
+}
+
+func TestImportErrorsDoNotMutateCurrentGame(t *testing.T) {
+	app, _ := newTestApplication(t)
+	before, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get before: %v", err)
+	}
+	if _, err := app.ImportFEN("not a fen"); err == nil {
+		t.Fatal("expected invalid FEN import to fail")
+	}
+	afterFEN, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get after invalid fen: %v", err)
+	}
+	if afterFEN.Snapshot.GameID != before.Snapshot.GameID || afterFEN.Snapshot.FEN != before.Snapshot.FEN {
+		t.Fatalf("invalid FEN import mutated game: before=%+v after=%+v", before.Snapshot, afterFEN.Snapshot)
+	}
+	if _, err := app.ImportPGN("1. e4 e9 *"); err == nil {
+		t.Fatal("expected invalid PGN import to fail")
+	}
+	afterPGN, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get after invalid pgn: %v", err)
+	}
+	if afterPGN.Snapshot.GameID != before.Snapshot.GameID || afterPGN.Snapshot.FEN != before.Snapshot.FEN {
+		t.Fatalf("invalid PGN import mutated game: before=%+v after=%+v", before.Snapshot, afterPGN.Snapshot)
+	}
+}
+
+func TestNewApplicationRecoversFromCorruptSettings(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(configPath, []byte("llm: [not valid yaml\n"), 0o600); err != nil {
+		t.Fatalf("write corrupt config: %v", err)
+	}
+	app := NewApplication(configPath)
+	if app.settings.SchemaVersion == "" || app.settings.LLM.Provider != "mock" {
+		t.Fatalf("app did not recover with defaults: %+v", app.settings)
+	}
+	state, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get game after corrupt config recovery: %v", err)
+	}
+	if state.Snapshot.FEN == "" {
+		t.Fatalf("recovered app has empty game state: %+v", state.Snapshot)
 	}
 }
 
