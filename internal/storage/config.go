@@ -243,6 +243,11 @@ func validateSettings(settings Settings) error {
 	default:
 		return errors.New("settings engine.default_mode is invalid")
 	}
+	switch settings.Engine.Personality {
+	case "balanced", "aggressive", "positional", "beginner_coach":
+	default:
+		return errors.New("settings engine.personality is invalid")
+	}
 	switch settings.LLM.Provider {
 	case "mock", "openai_compatible":
 	default:
@@ -253,6 +258,18 @@ func validateSettings(settings Settings) error {
 	}
 	if settings.Engine.MaxCandidates < 1 || settings.Engine.MaxCandidates > 10 {
 		return errors.New("settings engine.max_candidates must be between 1 and 10")
+	}
+	if settings.LLM.Temperature < 0 || settings.LLM.Temperature > 2 {
+		return errors.New("settings llm.temperature must be between 0 and 2")
+	}
+	if settings.LLM.TimeoutMS < 100 || settings.LLM.TimeoutMS > 120000 {
+		return errors.New("settings llm.timeout_ms must be between 100 and 120000")
+	}
+	if settings.Verifier.MoveTimeMS < 10 || settings.Verifier.MoveTimeMS > 5000 {
+		return errors.New("settings verifier.movetime_ms must be between 10 and 5000")
+	}
+	if settings.Verifier.MaxCentipawnLoss < 0 || settings.Verifier.MaxCentipawnLoss > 2000 {
+		return errors.New("settings verifier.max_centipawn_loss must be between 0 and 2000")
 	}
 	switch settings.GUI.TimeControl {
 	case "untimed", "bullet", "blitz", "rapid", "classical", "custom":
