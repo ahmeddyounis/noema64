@@ -163,14 +163,14 @@ func (s *Server) setOption(line string) error {
 		s.refreshVerifierLocked(s.verifierEnabled)
 	case "verifiermovetime":
 		n, err := strconv.Atoi(value)
-		if err == nil && n > 0 {
-			s.verifierMoveTime = n
+		if err == nil {
+			s.verifierMoveTime = clampInt(n, 10, 5000)
 			s.refreshVerifierLocked(s.verifierEnabled)
 		}
 	case "verifiermaxcentipawnloss":
 		n, err := strconv.Atoi(value)
 		if err == nil && n >= 0 {
-			s.verifierMaxLoss = n
+			s.verifierMaxLoss = clampInt(n, 0, 2000)
 			s.refreshVerifierLocked(s.verifierEnabled)
 		}
 	case "tracefile":
@@ -199,7 +199,7 @@ func (s *Server) refreshVerifierLocked(enabled bool) {
 			moveTime = 100
 		}
 		maxLoss := s.verifierMaxLoss
-		if maxLoss <= 0 {
+		if maxLoss < 0 {
 			maxLoss = 180
 		}
 		s.opts.Verifier = verifier.ExternalUCI{Path: s.verifierPath, MoveTimeMS: moveTime, MaxCentipawnLoss: maxLoss}

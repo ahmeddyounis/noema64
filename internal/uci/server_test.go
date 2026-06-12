@@ -111,6 +111,43 @@ func TestUCIOptionRangesMatchHandshake(t *testing.T) {
 	if server.opts.MaxCandidates != 10 {
 		t.Fatalf("max candidates = %d, want 10", server.opts.MaxCandidates)
 	}
+	if err := server.setOption("setoption name VerifierPath value /usr/bin/stockfish"); err != nil {
+		t.Fatalf("set verifier path: %v", err)
+	}
+	if err := server.setOption("setoption name VerifierEnabled value true"); err != nil {
+		t.Fatalf("enable verifier: %v", err)
+	}
+	if err := server.setOption("setoption name VerifierMoveTime value 99999"); err != nil {
+		t.Fatalf("set verifier movetime: %v", err)
+	}
+	external, ok := server.opts.Verifier.(verifier.ExternalUCI)
+	if !ok {
+		t.Fatalf("verifier = %T, want ExternalUCI", server.opts.Verifier)
+	}
+	if external.MoveTimeMS != 5000 {
+		t.Fatalf("verifier movetime = %d, want 5000", external.MoveTimeMS)
+	}
+	if err := server.setOption("setoption name VerifierMoveTime value 1"); err != nil {
+		t.Fatalf("set verifier movetime low: %v", err)
+	}
+	external = server.opts.Verifier.(verifier.ExternalUCI)
+	if external.MoveTimeMS != 10 {
+		t.Fatalf("verifier movetime = %d, want 10", external.MoveTimeMS)
+	}
+	if err := server.setOption("setoption name VerifierMaxCentipawnLoss value 99999"); err != nil {
+		t.Fatalf("set verifier max loss: %v", err)
+	}
+	external = server.opts.Verifier.(verifier.ExternalUCI)
+	if external.MaxCentipawnLoss != 2000 {
+		t.Fatalf("verifier max loss = %d, want 2000", external.MaxCentipawnLoss)
+	}
+	if err := server.setOption("setoption name VerifierMaxCentipawnLoss value 0"); err != nil {
+		t.Fatalf("set verifier max loss zero: %v", err)
+	}
+	external = server.opts.Verifier.(verifier.ExternalUCI)
+	if external.MaxCentipawnLoss != 0 {
+		t.Fatalf("verifier max loss = %d, want 0", external.MaxCentipawnLoss)
+	}
 }
 
 func TestUCIVerifierEnabledControlsExternalPath(t *testing.T) {

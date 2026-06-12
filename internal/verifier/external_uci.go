@@ -72,7 +72,7 @@ func (v ExternalUCI) VerifyCandidates(ctx context.Context, req Request) (*Result
 		moveTime = 100
 	}
 	maxLoss := v.MaxCentipawnLoss
-	if maxLoss <= 0 {
+	if maxLoss < 0 {
 		maxLoss = 180
 	}
 	cmd := exec.CommandContext(ctx, v.Path)
