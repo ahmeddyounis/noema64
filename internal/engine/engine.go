@@ -310,7 +310,7 @@ func (e *Engine) LegalMoves(ctx context.Context) ([]chesscore.LegalMove, error) 
 func (e *Engine) ExportPGN(ctx context.Context) (string, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return e.game.PGN(), nil
+	return pgnWithMetadata(e.game.PGN(), e.opts, e.lastDecision), nil
 }
 
 func (e *Engine) ExportFEN(ctx context.Context) (string, error) {
@@ -342,6 +342,100 @@ func (e *Engine) stateLocked() *GameState {
 		StrategyMemory: e.memory,
 		LastDecision:   e.lastDecision,
 	}
+}
+
+type pgnTag struct {
+	Name  string
+	Value string
+}
+
+func pgnWithMetadata(pgn string, opts Options, dec *decision.MoveDecision) string {
+	body := strings.TrimSpace(pgn)
+	if body == "" {
+		body = "*"
+	}
+	added := []string{}
+	for _, tag := range noemaPGNTags(opts, dec) {
+		if hasPGNTag(body, tag.Name) {
+			continue
+		}
+		added = append(added, fmt.Sprintf("[%s \"%s\"]", tag.Name, pgnTagValue(tag.Value)))
+	}
+	if len(added) == 0 {
+		return body
+	}
+	tagBlock := strings.Join(added, "\n")
+	lines := strings.Split(body, "\n")
+	tagEnd := 0
+	for tagEnd < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[tagEnd]), "[") {
+		tagEnd++
+	}
+	if tagEnd > 0 {
+		head := strings.TrimRight(strings.Join(lines[:tagEnd], "\n"), "\n")
+		tail := strings.TrimSpace(strings.Join(lines[tagEnd:], "\n"))
+		if tail == "" {
+			return head + "\n" + tagBlock
+		}
+		return head + "\n" + tagBlock + "\n\n" + tail
+	}
+	return tagBlock + "\n\n" + body
+}
+
+func noemaPGNTags(opts Options, dec *decision.MoveDecision) []pgnTag {
+	mode := opts.Mode
+	if dec != nil && dec.Mode != "" {
+		mode = dec.Mode
+	}
+	providerName := ""
+	if dec != nil && dec.Provider.Name != "" {
+		providerName = dec.Provider.Name
+	} else if opts.Provider != nil {
+		providerName = opts.Provider.Name()
+	}
+	verifierName := ""
+	if dec != nil && dec.Assistance.VerifierName != "" {
+		verifierName = dec.Assistance.VerifierName
+	} else if dec != nil && dec.VerifierTrace != nil && dec.VerifierTrace.Name != "" {
+		verifierName = dec.VerifierTrace.Name
+	} else if opts.Verifier != nil {
+		verifierName = opts.Verifier.Name()
+	}
+	return []pgnTag{
+		{Name: "Annotator", Value: "Noema64"},
+		{Name: "EngineMode", Value: string(mode)},
+		{Name: "LLMProvider", Value: providerName},
+		{Name: "PromptVersion", Value: strategy.PromptVersion},
+		{Name: "Verifier", Value: verifierName},
+	}
+}
+
+func hasPGNTag(pgn string, name string) bool {
+	prefix := "[" + name + " "
+	for _, line := range strings.Split(pgn, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if !strings.HasPrefix(trimmed, "[") {
+			return false
+		}
+		if strings.HasPrefix(trimmed, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func pgnTagValue(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = "unknown"
+	}
+	value = strings.ReplaceAll(value, "\\", "\\\\")
+	value = strings.ReplaceAll(value, "\"", "\\\"")
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
+	return value
 }
 
 func newClock(tc TimeControl) ClockState {

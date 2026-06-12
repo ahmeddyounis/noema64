@@ -8,6 +8,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/strategy"
+	"github.com/ahmedyounis/noema64/internal/verifier"
 )
 
 func TestEngineFallbackOnProviderFaults(t *testing.T) {
@@ -108,6 +109,33 @@ func TestEngineClockStateAndTimeoutOutcome(t *testing.T) {
 	}
 	if _, err := e.ApplyUserMove(context.Background(), "e7e5"); err == nil {
 		t.Fatal("expected move after timeout to fail")
+	}
+}
+
+func TestEngineExportPGNIncludesNoema64MetadataAndComments(t *testing.T) {
+	e := New(Options{
+		Mode:     strategy.ModeHybrid,
+		Provider: providers.MockProvider{},
+		Verifier: verifier.StaticVerifier{},
+	})
+	if _, _, err := e.ChooseMove(context.Background()); err != nil {
+		t.Fatalf("choose move: %v", err)
+	}
+	pgn, err := e.ExportPGN(context.Background())
+	if err != nil {
+		t.Fatalf("export pgn: %v", err)
+	}
+	for _, want := range []string{
+		`[Annotator "Noema64"]`,
+		`[EngineMode "hybrid"]`,
+		`[LLMProvider "mock"]`,
+		`[PromptVersion "move_selection/1.0.0"]`,
+		`[Verifier "static_safety"]`,
+		"{Plan:",
+	} {
+		if !strings.Contains(pgn, want) {
+			t.Fatalf("PGN missing %q:\n%s", want, pgn)
+		}
 	}
 }
 
