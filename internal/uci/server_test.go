@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/storage"
 )
 
@@ -85,6 +86,45 @@ func TestUCITraceEnabledOptionDisablesTraceWrites(t *testing.T) {
 	}
 	if _, err := os.Stat(tracePath); !os.IsNotExist(err) {
 		t.Fatalf("trace file written with TraceEnabled=false: %v", err)
+	}
+}
+
+func TestUCIReadyAndStopDuringActiveSearch(t *testing.T) {
+	input := strings.Join([]string{
+		"uci",
+		"position startpos",
+		"go movetime 1000",
+		"isready",
+		"stop",
+		"quit",
+		"",
+	}, "\n")
+	var out bytes.Buffer
+	settings := storage.DefaultSettings()
+	settings.Logging.OutputDir = t.TempDir()
+	server := NewServer(strings.NewReader(input), &out, &bytes.Buffer{}, settings)
+	server.opts.Provider = providers.MockProvider{Behavior: "slow"}
+	server.engine.SetOptions(server.opts)
+
+	if err := server.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	text := out.String()
+	readyIndex := strings.Index(text, "readyok")
+	bestIndex := strings.Index(text, "bestmove ")
+	if readyIndex < 0 || bestIndex < 0 {
+		t.Fatalf("missing readyok or bestmove:\n%s", text)
+	}
+	if readyIndex > bestIndex {
+		t.Fatalf("readyok should be emitted while search is active before bestmove:\n%s", text)
+	}
+	if strings.Contains(text, "bestmove 0000") {
+		t.Fatalf("stop returned null move despite legal moves:\n%s", text)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
+		if !validUCILine(line) {
+			t.Fatalf("non-UCI stdout line: %q\n%s", line, text)
+		}
 	}
 }
 
