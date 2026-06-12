@@ -45,4 +45,8 @@ type FeatureSummary struct {
 	LegalMoveCount  int      `json:"legal_move_count"`
 	Captures        []string `json:"captures"`
 	Checks          []string `json:"checks"`
+	Threats         []string `json:"threats"`
+	PinnedPieces    []string `json:"pinned_pieces"`
+	HangingPieces   []string `json:"hanging_pieces"`
+	KingSafety      []string `json:"king_safety"`
 }
