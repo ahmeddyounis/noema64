@@ -31,3 +31,20 @@ func TestEngineRejectsIllegalUserMove(t *testing.T) {
 		t.Fatal("expected illegal move error")
 	}
 }
+
+func TestEngineUndoClearsFutureHistory(t *testing.T) {
+	e := New(Options{})
+	if _, err := e.ApplyUserMove(context.Background(), "e2e4"); err != nil {
+		t.Fatalf("move 1: %v", err)
+	}
+	if _, err := e.ApplyUserMove(context.Background(), "e7e5"); err != nil {
+		t.Fatalf("move 2: %v", err)
+	}
+	state, err := e.Undo(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("undo: %v", err)
+	}
+	if len(state.Snapshot.MoveHistory) != 1 {
+		t.Fatalf("history length = %d, want 1", len(state.Snapshot.MoveHistory))
+	}
+}

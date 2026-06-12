@@ -10,20 +10,24 @@ import (
 )
 
 type Game struct {
-	id string
-	g  *chess.Game
+	id         string
+	g          *chess.Game
+	initialFEN string
+	appliedUCI []string
 }
 
 func NewGame() *Game {
-	return &Game{id: uuid.NewString(), g: chess.NewGame()}
+	game := chess.NewGame()
+	return &Game{id: uuid.NewString(), g: game, initialFEN: game.FEN()}
 }
 
 func FromFEN(fen string) (*Game, error) {
-	opt, err := chess.FEN(strings.TrimSpace(fen))
+	fen = strings.TrimSpace(fen)
+	opt, err := chess.FEN(fen)
 	if err != nil {
 		return nil, err
 	}
-	return &Game{id: uuid.NewString(), g: chess.NewGame(opt)}, nil
+	return &Game{id: uuid.NewString(), g: chess.NewGame(opt), initialFEN: fen}, nil
 }
 
 func FromPGN(r io.Reader) (*Game, error) {
@@ -31,7 +35,13 @@ func FromPGN(r io.Reader) (*Game, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Game{id: uuid.NewString(), g: chess.NewGame(opt)}, nil
+	game := chess.NewGame(opt)
+	initialFEN := game.FEN()
+	positions := game.Positions()
+	if len(positions) > 0 {
+		initialFEN = positions[0].String()
+	}
+	return &Game{id: uuid.NewString(), g: game, initialFEN: initialFEN, appliedUCI: appliedMoves(game)}, nil
 }
 
 func (g *Game) ID() string {
@@ -39,7 +49,7 @@ func (g *Game) ID() string {
 }
 
 func (g *Game) Clone() *Game {
-	return &Game{id: g.id, g: g.g.Clone()}
+	return &Game{id: g.id, g: g.g.Clone(), initialFEN: g.initialFEN, appliedUCI: append([]string(nil), g.appliedUCI...)}
 }
 
 func (g *Game) FEN() string {
@@ -74,6 +84,10 @@ func (g *Game) LegalMoves() []LegalMove {
 }
 
 func (g *Game) ApplyUCI(moveUCI string) (MoveRecord, error) {
+	return g.applyUCI(moveUCI, true)
+}
+
+func (g *Game) applyUCI(moveUCI string, record bool) (MoveRecord, error) {
 	moveUCI = strings.TrimSpace(moveUCI)
 	if moveUCI == "" {
 		return MoveRecord{}, fmt.Errorf("empty move")
@@ -90,6 +104,9 @@ func (g *Game) ApplyUCI(moveUCI string) (MoveRecord, error) {
 	}
 	if err := g.g.Move(move, nil); err != nil {
 		return MoveRecord{}, err
+	}
+	if record {
+		g.appliedUCI = append(g.appliedUCI, uci)
 	}
 	return MoveRecord{
 		Ply:      len(g.g.Moves()),
@@ -173,11 +190,23 @@ func (g *Game) Undo(plies int) int {
 	if plies <= 0 {
 		return 0
 	}
-	undone := 0
-	for undone < plies && g.g.GoBack() {
-		undone++
+	if plies > len(g.appliedUCI) {
+		plies = len(g.appliedUCI)
 	}
-	return undone
+	target := len(g.appliedUCI) - plies
+	replayed, err := newChessGameFromFEN(g.initialFEN)
+	if err != nil {
+		return 0
+	}
+	kept := append([]string(nil), g.appliedUCI[:target]...)
+	g.g = replayed
+	g.appliedUCI = nil
+	for _, moveUCI := range kept {
+		if _, err := g.applyUCI(moveUCI, true); err != nil {
+			return 0
+		}
+	}
+	return plies
 }
 
 func (g *Game) NormalizeMove(raw string) (LegalMove, bool) {
@@ -301,4 +330,26 @@ func sanitizePGNComment(comment string) string {
 		comment = comment[:500]
 	}
 	return comment
+}
+
+func newChessGameFromFEN(fen string) (*chess.Game, error) {
+	opt, err := chess.FEN(fen)
+	if err != nil {
+		return nil, err
+	}
+	return chess.NewGame(opt), nil
+}
+
+func appliedMoves(game *chess.Game) []string {
+	moves := game.Moves()
+	positions := game.Positions()
+	out := make([]string, 0, len(moves))
+	for i, mv := range moves {
+		before := game.Position()
+		if i < len(positions) {
+			before = positions[i]
+		}
+		out = append(out, chess.UCINotation{}.Encode(before, mv))
+	}
+	return out
 }

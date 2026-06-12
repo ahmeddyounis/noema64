@@ -229,6 +229,7 @@ func (e *Engine) Undo(ctx context.Context, plies int) (*GameState, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.game.Undo(plies)
+	e.memory = strategy.NewMemory(e.game.ID(), e.game.SideToMove())
 	e.lastDecision = nil
 	return e.stateLocked(), nil
 }

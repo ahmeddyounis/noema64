@@ -49,3 +49,28 @@ func TestFENAndPGN(t *testing.T) {
 		t.Fatalf("exported PGN missing Nf3: %s", loaded.PGN())
 	}
 }
+
+func TestUndoTruncatesHistoryAndAllowsNewLine(t *testing.T) {
+	game := NewGame()
+	for _, move := range []string{"e2e4", "e7e5", "g1f3"} {
+		if _, err := game.ApplyUCI(move); err != nil {
+			t.Fatalf("apply %s: %v", move, err)
+		}
+	}
+	if undone := game.Undo(2); undone != 2 {
+		t.Fatalf("undone = %d, want 2", undone)
+	}
+	if len(game.MoveHistory()) != 1 {
+		t.Fatalf("history length = %d, want 1", len(game.MoveHistory()))
+	}
+	if game.SideToMove() != "black" {
+		t.Fatalf("side = %s, want black", game.SideToMove())
+	}
+	if _, err := game.ApplyUCI("c7c5"); err != nil {
+		t.Fatalf("apply new line: %v", err)
+	}
+	history := game.MoveHistory()
+	if len(history) != 2 || history[1].UCI != "c7c5" {
+		t.Fatalf("unexpected history after new line: %+v", history)
+	}
+}
