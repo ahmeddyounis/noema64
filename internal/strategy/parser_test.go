@@ -38,6 +38,54 @@ func TestNormalizeCandidatesRepairsSAN(t *testing.T) {
 	}
 }
 
+func TestNormalizeCandidatesRepairsLANAndDeduplicates(t *testing.T) {
+	game := chesscore.NewGame()
+	lan := ""
+	for _, move := range game.LegalMoves() {
+		if move.UCI == "g1f3" {
+			lan = move.LAN
+			break
+		}
+	}
+	if lan == "" {
+		t.Fatal("missing g1f3 LAN in legal moves")
+	}
+	candidates, attempts := NormalizeCandidates(game, []CandidateMove{
+		{SAN: lan, Purpose: "develop", LLMConfidence: 1.8},
+		{UCI: "g1f3", Purpose: "duplicate", LLMConfidence: 0.5},
+		{UCI: "e2e5", Purpose: "illegal", LLMConfidence: 0.5},
+	})
+	if len(candidates) != 1 {
+		t.Fatalf("candidates = %d attempts=%v", len(candidates), attempts)
+	}
+	if candidates[0].UCI != "g1f3" || candidates[0].RepairMethod != "lan_parse" || candidates[0].LLMConfidence != 1 {
+		t.Fatalf("unexpected repaired candidate: %+v", candidates[0])
+	}
+	if len(attempts) < 3 {
+		t.Fatalf("expected attempts for repaired, duplicate, and illegal candidates: %+v", attempts)
+	}
+}
+
+func TestNormalizeCandidatesRepairsCastlingAndPromotionNotation(t *testing.T) {
+	castling, err := chesscore.FromFEN("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1")
+	if err != nil {
+		t.Fatalf("castling fen: %v", err)
+	}
+	candidates, attempts := NormalizeCandidates(castling, []CandidateMove{{SAN: "O-O", Purpose: "castle"}})
+	if len(candidates) != 1 || candidates[0].UCI != "e1g1" {
+		t.Fatalf("castle repair failed candidates=%+v attempts=%+v", candidates, attempts)
+	}
+
+	promotion, err := chesscore.FromFEN("8/P7/8/8/8/8/8/4k2K w - - 0 1")
+	if err != nil {
+		t.Fatalf("promotion fen: %v", err)
+	}
+	candidates, attempts = NormalizeCandidates(promotion, []CandidateMove{{SAN: "a8=N", Purpose: "underpromote"}})
+	if len(candidates) != 1 || candidates[0].UCI != "a7a8n" || candidates[0].LegalMove.Promotion != "n" {
+		t.Fatalf("promotion repair failed candidates=%+v attempts=%+v", candidates, attempts)
+	}
+}
+
 func TestBuildPromptBoundsUntrustedPGN(t *testing.T) {
 	game := chesscore.NewGame()
 	_, user, err := BuildPrompt(StrategyRequest{

@@ -322,6 +322,13 @@ func cleanMove(raw string) string {
 	}
 	s = strings.ReplaceAll(s, "–", "-")
 	s = strings.ReplaceAll(s, "—", "-")
+	castle := strings.ToUpper(strings.ReplaceAll(s, "0", "O"))
+	switch strings.ReplaceAll(castle, "-", "") {
+	case "OO":
+		return "O-O"
+	case "OOO":
+		return "O-O-O"
+	}
 	s = strings.ReplaceAll(s, "-", "")
 	return strings.TrimSpace(s)
 }
