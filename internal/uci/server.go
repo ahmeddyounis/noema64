@@ -35,6 +35,7 @@ type Server struct {
 	apiKey           string
 	verifierPath     string
 	verifierMoveTime int
+	verifierMaxLoss  int
 	searchCancel     context.CancelFunc
 	searchDone       chan struct{}
 }
@@ -57,6 +58,7 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		apiKey:           settings.LLM.APIKey,
 		verifierPath:     settings.Verifier.Path,
 		verifierMoveTime: settings.Verifier.MoveTimeMS,
+		verifierMaxLoss:  settings.Verifier.MaxCentipawnLoss,
 	}
 }
 
@@ -96,6 +98,7 @@ func (s *Server) handle(ctx context.Context, line string) error {
 		s.write("option name VerifierEnabled type check default false")
 		s.write("option name VerifierPath type string default")
 		s.write("option name VerifierMoveTime type spin default 100 min 10 max 5000")
+		s.write("option name VerifierMaxCentipawnLoss type spin default 180 min 0 max 2000")
 		s.write("option name TraceFile type string default")
 		s.write("uciok")
 	case "isready":
@@ -162,6 +165,12 @@ func (s *Server) setOption(line string) error {
 			s.verifierMoveTime = n
 			s.refreshVerifierLocked(s.verifierPath != "")
 		}
+	case "verifiermaxcentipawnloss":
+		n, err := strconv.Atoi(value)
+		if err == nil && n >= 0 {
+			s.verifierMaxLoss = n
+			s.refreshVerifierLocked(s.verifierPath != "")
+		}
 	case "tracefile":
 		if value != "" {
 			s.traceStore = storage.NewTraceFileStore(value)
@@ -185,7 +194,11 @@ func (s *Server) refreshVerifierLocked(enabled bool) {
 		if moveTime <= 0 {
 			moveTime = 100
 		}
-		s.opts.Verifier = verifier.ExternalUCI{Path: s.verifierPath, MoveTimeMS: moveTime}
+		maxLoss := s.verifierMaxLoss
+		if maxLoss <= 0 {
+			maxLoss = 180
+		}
+		s.opts.Verifier = verifier.ExternalUCI{Path: s.verifierPath, MoveTimeMS: moveTime, MaxCentipawnLoss: maxLoss}
 		return
 	}
 	s.opts.Verifier = verifier.StaticVerifier{Enabled: enabled}
@@ -398,7 +411,11 @@ func engineOptions(settings storage.Settings) engine.Options {
 	}
 	v := verifier.Verifier(verifier.StaticVerifier{Enabled: settings.Verifier.Enabled})
 	if settings.Verifier.Enabled && settings.Verifier.Path != "" {
-		v = verifier.ExternalUCI{Path: settings.Verifier.Path, MoveTimeMS: settings.Verifier.MoveTimeMS}
+		v = verifier.ExternalUCI{
+			Path:             settings.Verifier.Path,
+			MoveTimeMS:       settings.Verifier.MoveTimeMS,
+			MaxCentipawnLoss: settings.Verifier.MaxCentipawnLoss,
+		}
 	}
 	timeout := time.Duration(settings.LLM.TimeoutMS) * time.Millisecond
 	if timeout <= 0 {

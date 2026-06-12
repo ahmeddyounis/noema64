@@ -41,7 +41,11 @@ func (a *Application) engineOptions() engine.Options {
 	}
 	var verify verifier.Verifier = verifier.StaticVerifier{Enabled: a.settings.Verifier.Enabled}
 	if a.settings.Verifier.Enabled && a.settings.Verifier.Path != "" {
-		verify = verifier.ExternalUCI{Path: a.settings.Verifier.Path, MoveTimeMS: a.settings.Verifier.MoveTimeMS}
+		verify = verifier.ExternalUCI{
+			Path:             a.settings.Verifier.Path,
+			MoveTimeMS:       a.settings.Verifier.MoveTimeMS,
+			MaxCentipawnLoss: a.settings.Verifier.MaxCentipawnLoss,
+		}
 	}
 	timeout := time.Duration(a.settings.LLM.TimeoutMS) * time.Millisecond
 	if timeout <= 0 {
