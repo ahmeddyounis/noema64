@@ -18,6 +18,6 @@ jobs:
       - run: |
           go list ./... | grep -v '/cmd/noema64-gui$' | xargs go vet
           go list ./... | grep -v '/cmd/noema64-gui$' | xargs go test
-      - run: node --check cmd/noema64-gui/frontend/dist/app.js
+      - run: npm --prefix cmd/noema64-gui/frontend test
       - run: printf 'uci\nisready\nucinewgame\nposition startpos moves e2e4 e7e5 g1f3\ngo movetime 100\nquit\n' | go run ./cmd/noema64-uci
       - run: go run ./cmd/noema64-bench -games 100

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test": "node --test smoke.test.mjs && node --check dist/app.js",
     "typecheck": "node --check dist/app.js"
   }
 }
-

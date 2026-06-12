@@ -21,6 +21,7 @@ Implemented in this repository:
 ## Requirements
 
 - Go 1.22 or newer.
+- Node.js for frontend syntax and GUI smoke checks.
 - Wails v2 CLI for packaged desktop builds.
 - Optional: a local OpenAI-compatible LLM endpoint or cloud endpoint.
 - Optional: a user-supplied UCI verifier such as Stockfish. No verifier binary is bundled.
@@ -29,6 +30,7 @@ Implemented in this repository:
 
 ```sh
 go test ./...
+npm --prefix cmd/noema64-gui/frontend test
 go run ./cmd/noema64 -cmd state
 go run ./cmd/noema64 -cmd engine
 go run ./cmd/noema64-bench -games 100

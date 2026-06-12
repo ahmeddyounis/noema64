@@ -15,3 +15,9 @@ It exposes:
 - Provider health and random benchmark actions.
 
 The frontend never calculates legal chess moves authoritatively.
+
+Run the dependency-free GUI smoke check with:
+
+```sh
+npm --prefix cmd/noema64-gui/frontend test
+```
