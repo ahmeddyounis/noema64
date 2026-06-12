@@ -42,8 +42,13 @@ func (p OpenAICompatible) HealthCheck(ctx context.Context) error {
 		MaxTokens:   16,
 		Temperature: 0,
 	}
-	if _, err := p.CompleteJSON(ctx, req); err != nil {
+	resp, err := p.CompleteJSON(ctx, req)
+	if err != nil {
 		return err
+	}
+	var parsed any
+	if err := json.Unmarshal([]byte(resp.Text), &parsed); err != nil {
+		return fmt.Errorf("provider health response was not valid JSON: %w", err)
 	}
 	return nil
 }
