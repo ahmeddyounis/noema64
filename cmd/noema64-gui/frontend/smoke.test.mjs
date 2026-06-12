@@ -21,6 +21,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /aria-label="Chess board workspace"/);
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
+  assert.match(indexHTML, /data-tab="prompt"/);
 });
 
 test("primary toolbar and dialogs expose expected controls", () => {
@@ -83,8 +84,11 @@ test("bundle wires core actions and renders trace metadata", () => {
     "renderBenchmarkSummary",
     "subscribeDecisionStageEvents",
     "stageSummary",
+    "promptInspectorText",
     "decision.stage",
     "populateProviderProfiles",
+    "raw_prompt",
+    "raw_response",
     "applySelectedProviderProfile",
     "search_score",
     "verifier_score",

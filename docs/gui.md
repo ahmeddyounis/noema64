@@ -11,7 +11,7 @@ It exposes:
 - Relaunch restore for the latest saved game, clock, and strategy memory from `logging.output_dir/games`.
 - Strategy memory panel.
 - Candidate move panel with confidence, plan alignment, final rank, and verifier status.
-- Decision trace tabs and backend-emitted `decision.stage` progress updates.
+- Decision trace tabs, prompt/raw-response inspector, and backend-emitted `decision.stage` progress updates.
 - Provider health and random benchmark actions.
 
 The frontend never calculates legal chess moves authoritatively.

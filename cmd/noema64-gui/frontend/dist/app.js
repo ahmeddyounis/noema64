@@ -279,10 +279,35 @@ function tabText(dec) {
   switch (activeTab) {
     case "diff": return JSON.stringify(dec.strategy_diff, null, 2);
     case "verifier": return JSON.stringify(dec.verifier_trace, null, 2);
+    case "prompt": return promptInspectorText(dec);
     case "raw": return JSON.stringify(dec, null, 2);
     default:
       return `${dec.selected_move?.san || dec.selected_move?.uci}: ${dec.explanation}\n\n${dec.position_summary}\n\nFallback used: ${dec.fallback_used}\n\n${stageSummary(dec)}`;
   }
+}
+
+function promptInspectorText(dec) {
+  const provider = dec.provider || {};
+  const prompt = provider.raw_prompt || {};
+  const lines = [
+    `Prompt version: ${provider.prompt_version || "unknown"}`,
+    `Provider: ${provider.name || "unknown"}`,
+    `Model: ${provider.model || "unknown"}`,
+    `Parse status: ${provider.parse_status || "unknown"}`,
+    "",
+    "SYSTEM PROMPT",
+    prompt.system || "Raw prompt logging is disabled.",
+    "",
+    "USER PROMPT",
+    prompt.user || "Raw prompt logging is disabled.",
+    "",
+    "RAW LLM RESPONSE",
+    provider.raw_response || "Raw LLM response logging is disabled.",
+    "",
+    "PARSED STRATEGY MEMORY AFTER",
+    JSON.stringify(dec.strategy_after || {}, null, 2)
+  ];
+  return lines.join("\n");
 }
 
 function lastDecisionStage(dec) {
