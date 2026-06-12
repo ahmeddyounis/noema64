@@ -200,6 +200,30 @@ func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
 	}
 }
 
+func TestPrivacySettingsEnableRawProviderTrace(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.LogRawPrompts = true
+	settings.Privacy.LogRawLLMResponses = true
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save raw logging settings: %v", err)
+	}
+	_, appErr := app.RequestEngineMove()
+	if appErr != nil {
+		t.Fatalf("engine move: %v", appErr)
+	}
+	state, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get game: %v", err)
+	}
+	if state.LastDecision == nil {
+		t.Fatal("missing last decision")
+	}
+	if state.LastDecision.Provider.RawPrompt == nil || state.LastDecision.Provider.RawResponse == "" {
+		t.Fatalf("raw provider trace not populated: %+v", state.LastDecision.Provider)
+	}
+}
+
 func TestRunModeBenchmarkCoversCoreModes(t *testing.T) {
 	app, _ := newTestApplication(t)
 	summary, err := app.RunModeBenchmark(1, 64)

@@ -10,17 +10,19 @@ import (
 )
 
 type Request struct {
-	Game          *chesscore.Game
-	Memory        strategy.StrategyMemory
-	Mode          strategy.EngineMode
-	Personality   strategy.Personality
-	Provider      providers.Provider
-	Verifier      verifier.Verifier
-	Model         string
-	Temperature   float64
-	MaxTokens     int
-	MaxCandidates int
-	Timeout       time.Duration
+	Game           *chesscore.Game
+	Memory         strategy.StrategyMemory
+	Mode           strategy.EngineMode
+	Personality    strategy.Personality
+	Provider       providers.Provider
+	Verifier       verifier.Verifier
+	Model          string
+	Temperature    float64
+	MaxTokens      int
+	MaxCandidates  int
+	Timeout        time.Duration
+	LogRawPrompts  bool
+	LogRawResponse bool
 }
 
 type MoveDecision struct {
@@ -49,12 +51,19 @@ type MoveDecision struct {
 }
 
 type ProviderTrace struct {
-	Name          string `json:"name"`
-	Model         string `json:"model"`
-	PromptVersion string `json:"prompt_version"`
-	ParseStatus   string `json:"parse_status"`
-	RawAvailable  bool   `json:"raw_available"`
-	Error         string `json:"error,omitempty"`
+	Name          string       `json:"name"`
+	Model         string       `json:"model"`
+	PromptVersion string       `json:"prompt_version"`
+	ParseStatus   string       `json:"parse_status"`
+	RawAvailable  bool         `json:"raw_available"`
+	Error         string       `json:"error,omitempty"`
+	RawPrompt     *PromptTrace `json:"raw_prompt,omitempty"`
+	RawResponse   string       `json:"raw_response,omitempty"`
+}
+
+type PromptTrace struct {
+	System string `json:"system"`
+	User   string `json:"user"`
 }
 
 type Timing struct {

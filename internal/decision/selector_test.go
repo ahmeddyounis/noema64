@@ -3,6 +3,7 @@ package decision
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,6 +82,55 @@ func TestChooseMoveDisclosesHybridSearchAssistance(t *testing.T) {
 	}
 	if len(dec.CandidateMoves) == 0 || dec.CandidateMoves[0].SearchScore <= 0 {
 		t.Fatalf("top candidate search score was not recorded: %+v", dec.CandidateMoves)
+	}
+}
+
+func TestChooseMoveRawProviderLoggingIsOptIn(t *testing.T) {
+	game := searchTestGame(t)
+	provider := scriptedProvider{
+		moves: []strategy.CandidateMove{{UCI: "g3h4", Purpose: "Win the loose queen.", LLMConfidence: 0.7}},
+	}
+
+	defaultTrace, err := ChooseMove(context.Background(), Request{
+		Game:          game,
+		Memory:        strategy.NewMemory(game.ID(), "white"),
+		Mode:          strategy.ModePure,
+		Provider:      provider,
+		Verifier:      verifier.LegalOnlyVerifier{},
+		Model:         "scripted",
+		MaxCandidates: 1,
+		Timeout:       time.Second,
+	})
+	if err != nil {
+		t.Fatalf("default ChooseMove error = %v", err)
+	}
+	if defaultTrace.Provider.RawPrompt != nil || defaultTrace.Provider.RawResponse != "" {
+		t.Fatalf("raw provider data logged by default: %+v", defaultTrace.Provider)
+	}
+
+	rawTrace, err := ChooseMove(context.Background(), Request{
+		Game:           game,
+		Memory:         strategy.NewMemory(game.ID(), "white"),
+		Mode:           strategy.ModePure,
+		Provider:       provider,
+		Verifier:       verifier.LegalOnlyVerifier{},
+		Model:          "scripted",
+		MaxCandidates:  1,
+		Timeout:        time.Second,
+		LogRawPrompts:  true,
+		LogRawResponse: true,
+	})
+	if err != nil {
+		t.Fatalf("raw logging ChooseMove error = %v", err)
+	}
+	if rawTrace.Provider.RawPrompt == nil {
+		t.Fatal("raw prompt was not logged when enabled")
+	}
+	if !strings.Contains(rawTrace.Provider.RawPrompt.User, "g3h4") {
+		t.Fatalf("raw prompt does not include legal/candidate context: %s", rawTrace.Provider.RawPrompt.User)
+	}
+	if !strings.Contains(rawTrace.Provider.RawResponse, "candidate_moves") {
+		t.Fatalf("raw response was not logged: %q", rawTrace.Provider.RawResponse)
 	}
 }
 

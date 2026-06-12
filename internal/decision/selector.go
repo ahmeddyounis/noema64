@@ -87,6 +87,9 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		Model:         req.Model,
 		PromptVersion: strategy.PromptVersion,
 	}
+	if req.LogRawPrompts {
+		providerTrace.RawPrompt = &PromptTrace{System: system, User: user}
+	}
 	if err != nil {
 		providerTrace.Error = err.Error()
 		return fallbackDecision(req, decisionID, memBefore, "provider_error", start, &providerTrace), nil
@@ -94,6 +97,9 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	providerTrace.RawAvailable = resp.RawAvailable
 	providerTrace.Name = resp.Provider
 	providerTrace.Model = resp.Model
+	if req.LogRawResponse {
+		providerTrace.RawResponse = resp.Text
+	}
 
 	parse := strategy.ParseDecision(resp.Text)
 	providerTrace.ParseStatus = parse.Status
