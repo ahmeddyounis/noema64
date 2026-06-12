@@ -145,7 +145,17 @@ function renderDecision() {
   for (const c of dec.candidate_moves) {
     const div = document.createElement("div");
     div.className = "candidate";
-    div.innerHTML = `<strong>${c.san || c.uci}</strong><span>${c.purpose || ""}<br><small>${c.verifier_score?.status || "not_checked"} · ${c.risk || ""}</small></span><small>${Number(c.final_score || 0).toFixed(2)}</small>`;
+    const move = document.createElement("strong");
+    move.textContent = c.san || c.uci;
+    const detail = document.createElement("span");
+    detail.append(document.createTextNode(c.purpose || ""));
+    detail.append(document.createElement("br"));
+    const meta = document.createElement("small");
+    meta.textContent = `${c.verifier_score?.status || "not_checked"} · ${c.risk || ""}`;
+    detail.append(meta);
+    const score = document.createElement("small");
+    score.textContent = Number(c.final_score || 0).toFixed(2);
+    div.append(move, detail, score);
     box.appendChild(div);
   }
 }
