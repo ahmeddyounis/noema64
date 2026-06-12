@@ -156,7 +156,7 @@ func (s *GameStore) List(ctx context.Context, limit int) ([]GameRecord, error) {
 		}
 		record, err := readGameRecord(item.path)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		records = append(records, record)
 		if len(records) >= limit {
