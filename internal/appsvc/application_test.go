@@ -8,6 +8,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/storage"
+	"github.com/ahmedyounis/noema64/internal/strategy"
 )
 
 func newTestApplication(t *testing.T) (*Application, string) {
@@ -112,6 +113,27 @@ func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
 	}
 	if entries, err := filepath.Glob(filepath.Join(traceDir, "*.jsonl")); err == nil && len(entries) > 0 {
 		t.Fatalf("trace files written while trace_enabled=false: %v", entries)
+	}
+}
+
+func TestRunModeBenchmarkCoversCoreModes(t *testing.T) {
+	app, _ := newTestApplication(t)
+	summary, err := app.RunModeBenchmark(1, 64)
+	if err != nil {
+		t.Fatalf("run mode benchmark: %v", err)
+	}
+	wantModes := []strategy.EngineMode{strategy.ModePure, strategy.ModeBlunderguard, strategy.ModeHybrid}
+	if len(summary.Results) != len(wantModes) {
+		t.Fatalf("results = %d, want %d", len(summary.Results), len(wantModes))
+	}
+	for i, want := range wantModes {
+		result := summary.Results[i]
+		if result.Mode != want {
+			t.Fatalf("result %d mode = %s, want %s", i, result.Mode, want)
+		}
+		if result.Summary.GamesCompleted != 1 {
+			t.Fatalf("%s completed = %d, want 1", result.Mode, result.Summary.GamesCompleted)
+		}
 	}
 }
 

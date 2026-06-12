@@ -12,8 +12,9 @@ import (
 )
 
 func main() {
-	games := flag.Int("games", 100, "number of random legal benchmark games")
+	games := flag.Int("games", 0, "number of games; defaults to 100 random games or 20 games per mode")
 	seed := flag.Int64("seed", 64, "random seed")
+	modes := flag.Bool("modes", false, "run pure, blunderguard, and hybrid mode benchmarks")
 	timeout := flag.Duration("timeout", 2*time.Minute, "benchmark timeout")
 	flag.Parse()
 
@@ -24,7 +25,19 @@ func main() {
 	}
 	done := make(chan result, 1)
 	go func() {
-		summary, err := app.RunRandomBenchmark(*games, *seed)
+		gameCount := *games
+		if gameCount <= 0 && !*modes {
+			gameCount = 100
+		}
+		if gameCount <= 0 && *modes {
+			gameCount = 20
+		}
+		if *modes {
+			summary, err := app.RunModeBenchmark(gameCount, *seed)
+			done <- result{summary: summary, err: err}
+			return
+		}
+		summary, err := app.RunRandomBenchmark(gameCount, *seed)
 		done <- result{summary: summary, err: err}
 	}()
 

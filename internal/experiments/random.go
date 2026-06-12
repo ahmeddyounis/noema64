@@ -27,6 +27,18 @@ type Summary struct {
 	Results           []GameSummary `json:"results"`
 }
 
+type ModeBenchmarkSummary struct {
+	SchemaVersion string                `json:"schema_version"`
+	GamesPerMode  int                   `json:"games_per_mode"`
+	Seed          int64                 `json:"seed"`
+	Results       []ModeBenchmarkResult `json:"results"`
+}
+
+type ModeBenchmarkResult struct {
+	Mode    strategy.EngineMode `json:"mode"`
+	Summary Summary             `json:"summary"`
+}
+
 type GameSummary struct {
 	GameIndex     int    `json:"game_index"`
 	Plies         int    `json:"plies"`
@@ -66,6 +78,36 @@ func (r Runner) RandomLegalBenchmark(ctx context.Context, games int, seed int64)
 		}
 	}
 	summary.DurationMS = time.Since(start).Milliseconds()
+	return summary, nil
+}
+
+func (r Runner) RandomLegalModeBenchmark(ctx context.Context, games int, seed int64, modes []strategy.EngineMode) (ModeBenchmarkSummary, error) {
+	if seed == 0 {
+		seed = 64
+	}
+	if len(modes) == 0 {
+		modes = []strategy.EngineMode{strategy.ModePure, strategy.ModeBlunderguard, strategy.ModeHybrid}
+	}
+	summary := ModeBenchmarkSummary{
+		SchemaVersion: "1.0",
+		GamesPerMode:  games,
+		Seed:          seed,
+	}
+	for _, mode := range modes {
+		opts := r.Options
+		opts.Mode = mode
+		if opts.Verifier == nil {
+			opts.Verifier = verifier.StaticVerifier{}
+		}
+		modeSummary, err := (Runner{Options: opts}).RandomLegalBenchmark(ctx, games, seed)
+		summary.Results = append(summary.Results, ModeBenchmarkResult{
+			Mode:    mode,
+			Summary: modeSummary,
+		})
+		if err != nil {
+			return summary, err
+		}
+	}
 	return summary, nil
 }
 

@@ -252,6 +252,21 @@ func (a *Application) RunRandomBenchmark(games int, seed int64) (experiments.Sum
 	return summary, appErr("ERR_EXPERIMENT", err, true)
 }
 
+func (a *Application) RunModeBenchmark(games int, seed int64) (experiments.ModeBenchmarkSummary, error) {
+	if games <= 0 {
+		games = 20
+	}
+	opts := a.engineOptions()
+	opts.Verifier = verifier.StaticVerifier{}
+	runner := experiments.Runner{Options: opts}
+	summary, err := runner.RandomLegalModeBenchmark(context.Background(), games, seed, []strategy.EngineMode{
+		strategy.ModePure,
+		strategy.ModeBlunderguard,
+		strategy.ModeHybrid,
+	})
+	return summary, appErr("ERR_EXPERIMENT", err, true)
+}
+
 func (a *Application) Modes() []strategy.EngineMode {
 	return []strategy.EngineMode{strategy.ModePure, strategy.ModeBlunderguard, strategy.ModeHybrid, strategy.ModeCoach}
 }
