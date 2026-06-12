@@ -132,6 +132,9 @@ func TestChooseMoveRawProviderLoggingIsOptIn(t *testing.T) {
 	if !strings.Contains(rawTrace.Provider.RawResponse, "candidate_moves") {
 		t.Fatalf("raw response was not logged: %q", rawTrace.Provider.RawResponse)
 	}
+	if rawTrace.Provider.ParsedDecision == nil || rawTrace.Provider.ParsedDecision.PositionSummary == "" {
+		t.Fatalf("parsed provider decision was not retained: %+v", rawTrace.Provider)
+	}
 }
 
 func TestChooseMovePureModeBypassesConfiguredVerifier(t *testing.T) {

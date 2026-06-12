@@ -304,7 +304,10 @@ function promptInspectorText(dec) {
     "RAW LLM RESPONSE",
     provider.raw_response || "Raw LLM response logging is disabled.",
     "",
-    "PARSED STRATEGY MEMORY AFTER",
+    "PARSED PROVIDER JSON",
+    JSON.stringify(provider.parsed_decision || {}, null, 2),
+    "",
+    "STRATEGY MEMORY AFTER",
     JSON.stringify(dec.strategy_after || {}, null, 2)
   ];
   return lines.join("\n");

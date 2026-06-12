@@ -96,6 +96,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "populateProviderProfiles",
     "raw_prompt",
     "raw_response",
+    "parsed_decision",
     "applySelectedProviderProfile",
     "tablebase_enabled",
     "tablebase_timeout_ms",

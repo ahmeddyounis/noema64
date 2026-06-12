@@ -53,14 +53,15 @@ type MoveDecision struct {
 }
 
 type ProviderTrace struct {
-	Name          string       `json:"name"`
-	Model         string       `json:"model"`
-	PromptVersion string       `json:"prompt_version"`
-	ParseStatus   string       `json:"parse_status"`
-	RawAvailable  bool         `json:"raw_available"`
-	Error         string       `json:"error,omitempty"`
-	RawPrompt     *PromptTrace `json:"raw_prompt,omitempty"`
-	RawResponse   string       `json:"raw_response,omitempty"`
+	Name           string                   `json:"name"`
+	Model          string                   `json:"model"`
+	PromptVersion  string                   `json:"prompt_version"`
+	ParseStatus    string                   `json:"parse_status"`
+	RawAvailable   bool                     `json:"raw_available"`
+	Error          string                   `json:"error,omitempty"`
+	RawPrompt      *PromptTrace             `json:"raw_prompt,omitempty"`
+	RawResponse    string                   `json:"raw_response,omitempty"`
+	ParsedDecision *strategy.DecisionOutput `json:"parsed_decision,omitempty"`
 }
 
 type PromptTrace struct {

@@ -120,6 +120,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		providerTrace.Error = parse.Error
 		return fallbackDecision(req, decisionID, memBefore, "provider_schema_invalid", start, &providerTrace, stages.snapshot()), nil
 	}
+	providerTrace.ParsedDecision = &parse.Decision
 
 	candidates, repairs := strategy.NormalizeCandidates(req.Game, parse.Decision.CandidateMoves)
 	if len(candidates) == 0 {
