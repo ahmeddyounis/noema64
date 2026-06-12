@@ -37,6 +37,9 @@ Additional Noema64 options:
 - `VerifierPath`
 - `VerifierMoveTime`
 - `VerifierMaxCentipawnLoss`
+- `TablebaseEnabled`
+- `TablebasePath`
+- `TablebaseTimeoutMS`
 - `TraceEnabled`
 - `TraceFile`
 

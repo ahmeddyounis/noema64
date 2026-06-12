@@ -32,7 +32,7 @@ func TestUCISmoke(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	text := out.String()
-	for _, want := range []string{"id name Noema64", "uciok", "readyok", "bestmove "} {
+	for _, want := range []string{"id name Noema64", "uciok", "readyok", "bestmove ", "option name TablebaseEnabled", "option name TablebasePath", "option name TablebaseTimeoutMS"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("output missing %q:\n%s", want, text)
 		}
