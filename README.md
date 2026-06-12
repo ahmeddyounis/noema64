@@ -14,7 +14,7 @@ Implemented in this repository:
 - Deterministic fallback ladder that always chooses a legal move when legal moves exist.
 - Static blunderguard verifier plus optional external UCI verifier path support.
 - UCI binary with `uci`, `isready`, `ucinewgame`, `position`, `go`, `stop`, `quit`, and `setoption`.
-- Wails v2 GUI entrypoint with embedded board, settings, strategy, candidates, trace, PGN export, and benchmark controls.
+- Wails v2 GUI entrypoint with embedded board, settings, strategy, candidates, trace, PGN/FEN export, and benchmark controls.
 - CLI and benchmark commands.
 - Local YAML settings, JSONL decision traces, redaction, tests, prompts, configs, and docs.
 
