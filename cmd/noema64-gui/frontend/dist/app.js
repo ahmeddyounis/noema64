@@ -14,6 +14,14 @@ let playerSide = "white";
 let autoReply = true;
 let pendingPromotion = null;
 
+const timeControlPresets = {
+  untimed: { initial_ms: 0, increment_ms: 0 },
+  bullet: { initial_ms: 60000, increment_ms: 0 },
+  blitz: { initial_ms: 300000, increment_ms: 0 },
+  rapid: { initial_ms: 600000, increment_ms: 0 },
+  classical: { initial_ms: 1800000, increment_ms: 0 }
+};
+
 const api = () => window.go?.appsvc?.Application;
 
 function appErrorMessage(err) {
@@ -62,7 +70,21 @@ function render() {
 function renderStatus() {
   const s = state.snapshot;
   document.querySelector("#statusText").textContent = `${s.side_to_move} to move · ${s.outcome.status} · ${s.fen}`;
+  document.querySelector("#clockText").textContent = formatClock(state.clock);
   document.querySelector("#modeText").textContent = state.last_decision?.mode || settings?.engine?.default_mode || "blunderguard";
+}
+
+function formatClock(clock) {
+  if (!clock?.enabled) return "Untimed";
+  return `White ${formatClockMS(clock.white_ms)} · Black ${formatClockMS(clock.black_ms)} · +${Math.round((clock.increment_ms || 0) / 1000)}s`;
+}
+
+function formatClockMS(ms) {
+  ms = Math.max(0, Number(ms) || 0);
+  const totalSeconds = Math.ceil(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = `${totalSeconds % 60}`.padStart(2, "0");
+  return `${minutes}:${seconds}`;
 }
 
 function squareOrder() {
@@ -247,6 +269,9 @@ async function loadSettings() {
   document.querySelector("#settingMode").value = settings.engine.default_mode;
   document.querySelector("#settingPersonality").value = settings.engine.personality;
   document.querySelector("#settingSide").value = playerSide;
+  document.querySelector("#settingTimeControl").value = settings.gui?.time_control || "untimed";
+  document.querySelector("#settingClockInitial").value = Math.max(1, Math.round((settings.gui?.clock_initial_ms || 300000) / 60000));
+  document.querySelector("#settingClockIncrement").value = Math.max(0, Math.round((settings.gui?.clock_increment_ms || 0) / 1000));
   document.querySelector("#settingAutoReply").checked = autoReply;
   document.querySelector("#settingMaxCandidates").value = settings.engine.max_candidates || 5;
   document.querySelector("#settingProvider").value = settings.llm.provider;
@@ -262,6 +287,7 @@ async function loadSettings() {
   document.querySelector("#settingLogDir").value = settings.logging.output_dir || "logs";
   document.querySelector("#settingRaw").checked = !!settings.privacy.log_raw_prompts;
   document.querySelector("#settingRawResponses").checked = !!settings.privacy.log_raw_llm_responses;
+  syncTimeControlInputsFromPreset(false);
 }
 
 async function saveSettings() {
@@ -269,9 +295,13 @@ async function saveSettings() {
     playerSide = document.querySelector("#settingSide").value;
     if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
     autoReply = document.querySelector("#settingAutoReply").checked;
+    const timeControl = timeControlForNewGame();
     settings.engine.default_mode = document.querySelector("#settingMode").value;
     settings.engine.personality = document.querySelector("#settingPersonality").value;
     settings.engine.max_candidates = Number(document.querySelector("#settingMaxCandidates").value) || settings.engine.max_candidates;
+    settings.gui.time_control = document.querySelector("#settingTimeControl").value;
+    settings.gui.clock_initial_ms = timeControl.initial_ms || Number(document.querySelector("#settingClockInitial").value) * 60000 || settings.gui.clock_initial_ms;
+    settings.gui.clock_increment_ms = timeControl.increment_ms || Number(document.querySelector("#settingClockIncrement").value) * 1000 || 0;
     settings.llm.provider = document.querySelector("#settingProvider").value;
     settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
     settings.llm.model = document.querySelector("#settingModel").value;
@@ -290,6 +320,32 @@ async function saveSettings() {
   } catch (err) {
     showError(err, "#settingsOutput");
   }
+}
+
+function syncTimeControlInputsFromPreset(overwrite) {
+  const preset = document.querySelector("#settingTimeControl").value;
+  if (preset === "custom") return;
+  const tc = timeControlPresets[preset] || timeControlPresets.untimed;
+  if (overwrite || preset === "untimed") {
+    document.querySelector("#settingClockInitial").value = Math.max(1, Math.round((tc.initial_ms || 300000) / 60000));
+    document.querySelector("#settingClockIncrement").value = Math.round((tc.increment_ms || 0) / 1000);
+  }
+}
+
+function timeControlForNewGame() {
+  const preset = document.querySelector("#settingTimeControl")?.value || settings?.gui?.time_control || "untimed";
+  if (preset !== "custom") return timeControlPresets[preset] || timeControlPresets.untimed;
+  return {
+    initial_ms: numericInputMS("#settingClockInitial", 60000, settings?.gui?.clock_initial_ms || 0),
+    increment_ms: numericInputMS("#settingClockIncrement", 1000, settings?.gui?.clock_increment_ms || 0)
+  };
+}
+
+function numericInputMS(selector, multiplier, fallbackMS) {
+  const raw = document.querySelector(selector)?.value;
+  const value = Number(raw);
+  if (Number.isFinite(value) && value >= 0) return Math.round(value * multiplier);
+  return Math.max(0, Number(fallbackMS) || 0);
 }
 
 function formatSavedAt(value) {
@@ -370,7 +426,8 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
     state = await call("NewGame", {
       side,
       mode: document.querySelector("#settingMode")?.value || "blunderguard",
-      personality: document.querySelector("#settingPersonality")?.value || "balanced"
+      personality: document.querySelector("#settingPersonality")?.value || "balanced",
+      time_control: timeControlForNewGame()
     });
     render();
     if (autoReply && side === "black") await askEngine();
@@ -378,6 +435,7 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
     showError(err);
   }
 });
+document.querySelector("#settingTimeControl").addEventListener("change", () => syncTimeControlInputsFromPreset(true));
 document.querySelector("#recentBtn").addEventListener("click", openRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#stopBtn").addEventListener("click", async () => {
@@ -484,4 +542,13 @@ window.addEventListener("keydown", (event) => {
   if (event.key === ",") document.querySelector("#settingsBtn").click();
 });
 
-refresh();
+async function init() {
+  try {
+    await loadSettings();
+  } catch (err) {
+    settings = null;
+  }
+  await refresh();
+}
+
+init();

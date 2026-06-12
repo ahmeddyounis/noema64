@@ -100,6 +100,28 @@ func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
 	}
 }
 
+func TestNewGameAcceptsTimeControl(t *testing.T) {
+	app, _ := newTestApplication(t)
+	state, err := app.NewGame(engine.NewGameOptions{
+		Side:        "white",
+		TimeControl: engine.TimeControl{InitialMS: 60000, IncrementMS: 1000},
+	})
+	if err != nil {
+		t.Fatalf("new game: %v", err)
+	}
+	if !state.Clock.Enabled || state.Clock.WhiteMS != 60000 || state.Clock.BlackMS != 60000 || state.Clock.IncrementMS != 1000 {
+		t.Fatalf("unexpected clock: %+v", state.Clock)
+	}
+	restored := NewApplication(filepath.Join(filepath.Dir(app.settingsPath), "config.yaml"))
+	restoredState, err := restored.GetGame()
+	if err != nil {
+		t.Fatalf("restored state: %v", err)
+	}
+	if restoredState.Clock != state.Clock {
+		t.Fatalf("clock did not persist: got %+v want %+v", restoredState.Clock, state.Clock)
+	}
+}
+
 func TestApplicationRestoresLatestGameAndRecentRecords(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

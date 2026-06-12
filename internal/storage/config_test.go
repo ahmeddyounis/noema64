@@ -37,6 +37,9 @@ func TestLoadSettingsMergesDefaults(t *testing.T) {
 	if loaded.LLM.Provider != "mock" || loaded.LLM.Model == "" || loaded.LLM.TimeoutMS == 0 {
 		t.Fatalf("defaults not merged: %+v", loaded.LLM)
 	}
+	if loaded.GUI.TimeControl != "untimed" || loaded.GUI.ClockInitialMS == 0 {
+		t.Fatalf("gui clock defaults not merged: %+v", loaded.GUI)
+	}
 }
 
 func TestSaveSettingsValidatesProvider(t *testing.T) {
@@ -46,5 +49,14 @@ func TestSaveSettingsValidatesProvider(t *testing.T) {
 	err := SaveSettings(filepath.Join(t.TempDir(), "config.yaml"), settings)
 	if err == nil {
 		t.Fatal("expected validation error")
+	}
+}
+
+func TestSaveSettingsValidatesTimeControl(t *testing.T) {
+	settings := DefaultSettings()
+	settings.GUI.TimeControl = "sudden_mystery"
+	err := SaveSettings(filepath.Join(t.TempDir(), "config.yaml"), settings)
+	if err == nil {
+		t.Fatal("expected invalid time control to fail")
 	}
 }

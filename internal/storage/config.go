@@ -55,6 +55,9 @@ type GUISettings struct {
 	ShowRawJSON      bool   `json:"show_raw_json" yaml:"show_raw_json"`
 	ShowVerifierEval bool   `json:"show_verifier_eval" yaml:"show_verifier_eval"`
 	BoardCoordinates bool   `json:"board_coordinates" yaml:"board_coordinates"`
+	TimeControl      string `json:"time_control" yaml:"time_control"`
+	ClockInitialMS   int64  `json:"clock_initial_ms" yaml:"clock_initial_ms"`
+	ClockIncrementMS int64  `json:"clock_increment_ms" yaml:"clock_increment_ms"`
 }
 
 type PrivacySettings struct {
@@ -99,6 +102,8 @@ func DefaultSettings() Settings {
 			Theme:            "system",
 			ShowVerifierEval: true,
 			BoardCoordinates: true,
+			TimeControl:      "untimed",
+			ClockInitialMS:   300000,
 		},
 		Privacy: PrivacySettings{
 			RedactAPIKeys: true,
@@ -214,6 +219,15 @@ func NormalizeSettings(settings Settings) Settings {
 	if settings.GUI.Theme == "" {
 		settings.GUI.Theme = defaults.GUI.Theme
 	}
+	if settings.GUI.TimeControl == "" {
+		settings.GUI.TimeControl = defaults.GUI.TimeControl
+	}
+	if settings.GUI.ClockInitialMS <= 0 {
+		settings.GUI.ClockInitialMS = defaults.GUI.ClockInitialMS
+	}
+	if settings.GUI.ClockIncrementMS < 0 {
+		settings.GUI.ClockIncrementMS = defaults.GUI.ClockIncrementMS
+	}
 	if settings.Logging.OutputDir == "" {
 		settings.Logging.OutputDir = defaults.Logging.OutputDir
 	}
@@ -239,6 +253,11 @@ func validateSettings(settings Settings) error {
 	}
 	if settings.Engine.MaxCandidates < 1 || settings.Engine.MaxCandidates > 10 {
 		return errors.New("settings engine.max_candidates must be between 1 and 10")
+	}
+	switch settings.GUI.TimeControl {
+	case "untimed", "bullet", "blitz", "rapid", "classical", "custom":
+	default:
+		return errors.New("settings gui.time_control is invalid")
 	}
 	return nil
 }

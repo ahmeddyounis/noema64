@@ -74,6 +74,42 @@ func TestEngineUndoClearsFutureHistory(t *testing.T) {
 	}
 }
 
+func TestEngineClockStateAndTimeoutOutcome(t *testing.T) {
+	e := New(Options{})
+	state, err := e.NewGame(context.Background(), NewGameOptions{
+		Side:        "white",
+		TimeControl: TimeControl{InitialMS: 300000, IncrementMS: 2000},
+	})
+	if err != nil {
+		t.Fatalf("new game: %v", err)
+	}
+	if !state.Clock.Enabled || state.Clock.WhiteMS != 300000 || state.Clock.BlackMS != 300000 || state.Clock.IncrementMS != 2000 {
+		t.Fatalf("unexpected clock: %+v", state.Clock)
+	}
+	state, err = e.ApplyUserMove(context.Background(), "e2e4")
+	if err != nil {
+		t.Fatalf("user move: %v", err)
+	}
+	if state.Clock.WhiteMS != 302000 {
+		t.Fatalf("white clock after increment = %d, want 302000", state.Clock.WhiteMS)
+	}
+
+	e.clock.WhiteMS = 0
+	state, err = e.State(context.Background())
+	if err != nil {
+		t.Fatalf("state: %v", err)
+	}
+	if state.Snapshot.Outcome.Status != "timeout" || state.Snapshot.Outcome.Winner != "black" {
+		t.Fatalf("timeout outcome not represented: %+v", state.Snapshot.Outcome)
+	}
+	if len(state.Snapshot.LegalMoves) != 0 {
+		t.Fatalf("timeout state kept legal moves: %d", len(state.Snapshot.LegalMoves))
+	}
+	if _, err := e.ApplyUserMove(context.Background(), "e7e5"); err == nil {
+		t.Fatal("expected move after timeout to fail")
+	}
+}
+
 func TestEngineLoadStateRestoresMovesAndStrategyMemory(t *testing.T) {
 	e := New(Options{})
 	if _, err := e.ApplyUserMove(context.Background(), "e2e4"); err != nil {

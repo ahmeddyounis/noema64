@@ -29,14 +29,28 @@ type Options struct {
 type NewGameOptions struct {
 	Side        string               `json:"side"`
 	FEN         string               `json:"fen,omitempty"`
+	TimeControl TimeControl          `json:"time_control,omitempty"`
 	Mode        strategy.EngineMode  `json:"mode,omitempty"`
 	Personality strategy.Personality `json:"personality,omitempty"`
+}
+
+type TimeControl struct {
+	InitialMS   int64 `json:"initial_ms"`
+	IncrementMS int64 `json:"increment_ms"`
+}
+
+type ClockState struct {
+	Enabled     bool  `json:"enabled"`
+	WhiteMS     int64 `json:"white_ms"`
+	BlackMS     int64 `json:"black_ms"`
+	IncrementMS int64 `json:"increment_ms"`
 }
 
 type GameState struct {
 	Snapshot       chesscore.Snapshot      `json:"snapshot"`
 	InitialFEN     string                  `json:"initial_fen"`
 	AppliedMoves   []string                `json:"applied_moves"`
+	Clock          ClockState              `json:"clock"`
 	StrategyMemory strategy.StrategyMemory `json:"strategy_memory"`
 	LastDecision   *decision.MoveDecision  `json:"last_decision,omitempty"`
 }
@@ -46,6 +60,7 @@ type Engine struct {
 	game         *chesscore.Game
 	memory       strategy.StrategyMemory
 	lastDecision *decision.MoveDecision
+	clock        ClockState
 	opts         Options
 	cancel       context.CancelFunc
 	activeID     string
@@ -67,6 +82,7 @@ func (e *Engine) NewGame(ctx context.Context, opts NewGameOptions) (*GameState, 
 	if e.cancel != nil {
 		e.cancel()
 		e.cancel = nil
+		e.activeID = ""
 	}
 	var game *chesscore.Game
 	var err error
@@ -79,6 +95,7 @@ func (e *Engine) NewGame(ctx context.Context, opts NewGameOptions) (*GameState, 
 		game = chesscore.NewGame()
 	}
 	e.game = game
+	e.clock = newClock(opts.TimeControl)
 	if opts.Mode != "" {
 		e.opts.Mode = opts.Mode
 	}
@@ -97,12 +114,14 @@ func (e *Engine) NewGame(ctx context.Context, opts NewGameOptions) (*GameState, 
 func (e *Engine) ApplyUserMove(ctx context.Context, moveUCI string) (*GameState, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.game.Outcome().Status != "ongoing" {
+	if e.currentOutcomeLocked().Status != "ongoing" {
 		return nil, fmt.Errorf("game is over")
 	}
+	movingSide := e.game.SideToMove()
 	if _, err := e.game.ApplyUCI(moveUCI); err != nil {
 		return nil, err
 	}
+	e.applyClockLocked(movingSide, 0)
 	return e.stateLocked(), nil
 }
 
@@ -119,6 +138,7 @@ func (e *Engine) LoadPGN(ctx context.Context, pgn string) (*GameState, error) {
 		return nil, err
 	}
 	e.game = game
+	e.clock = ClockState{}
 	e.memory = strategy.NewMemory(game.ID(), game.SideToMove())
 	e.lastDecision = nil
 	return e.stateLocked(), nil
@@ -142,6 +162,7 @@ func (e *Engine) LoadState(ctx context.Context, state GameState) (*GameState, er
 		return nil, err
 	}
 	e.game = game
+	e.clock = state.Clock
 	e.memory = state.StrategyMemory
 	if strings.TrimSpace(e.memory.SchemaVersion) == "" {
 		e.memory = strategy.NewMemory(game.ID(), game.SideToMove())
@@ -156,7 +177,7 @@ func (e *Engine) LoadState(ctx context.Context, state GameState) (*GameState, er
 
 func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameState, error) {
 	e.mu.Lock()
-	if e.game.Outcome().Status != "ongoing" {
+	if e.currentOutcomeLocked().Status != "ongoing" {
 		e.mu.Unlock()
 		return nil, nil, fmt.Errorf("game is over")
 	}
@@ -168,6 +189,8 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	e.cancel = cancel
 	activeID := fmt.Sprintf("%d", time.Now().UnixNano())
 	e.activeID = activeID
+	movingSide := e.game.SideToMove()
+	start := time.Now()
 	req := decision.Request{
 		Game:          e.game.Clone(),
 		Memory:        e.memory,
@@ -204,6 +227,7 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 		return nil, nil, err
 	}
 	e.game.AnnotateLastMove("Plan: " + dec.Explanation)
+	e.applyClockLocked(movingSide, time.Since(start).Milliseconds())
 	e.memory = dec.StrategyAfter
 	e.lastDecision = dec
 	return dec, e.stateLocked(), nil
@@ -242,6 +266,9 @@ func (e *Engine) SetOptions(opts Options) {
 func (e *Engine) LegalMoves(ctx context.Context) ([]chesscore.LegalMove, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if e.currentOutcomeLocked().Status != "ongoing" {
+		return []chesscore.LegalMove{}, nil
+	}
 	return e.game.LegalMoves(), nil
 }
 
@@ -267,13 +294,76 @@ func (e *Engine) Undo(ctx context.Context, plies int) (*GameState, error) {
 }
 
 func (e *Engine) stateLocked() *GameState {
+	snapshot := e.game.Snapshot()
+	if outcome := e.currentOutcomeLocked(); outcome != snapshot.Outcome {
+		snapshot.Outcome = outcome
+		snapshot.LegalMoves = []chesscore.LegalMove{}
+	}
 	return &GameState{
-		Snapshot:       e.game.Snapshot(),
+		Snapshot:       snapshot,
 		InitialFEN:     e.game.InitialFEN(),
 		AppliedMoves:   e.game.AppliedUCI(),
+		Clock:          e.clock,
 		StrategyMemory: e.memory,
 		LastDecision:   e.lastDecision,
 	}
+}
+
+func newClock(tc TimeControl) ClockState {
+	if tc.InitialMS <= 0 {
+		return ClockState{}
+	}
+	increment := tc.IncrementMS
+	if increment < 0 {
+		increment = 0
+	}
+	return ClockState{
+		Enabled:     true,
+		WhiteMS:     tc.InitialMS,
+		BlackMS:     tc.InitialMS,
+		IncrementMS: increment,
+	}
+}
+
+func (e *Engine) applyClockLocked(side string, elapsedMS int64) {
+	if !e.clock.Enabled {
+		return
+	}
+	if elapsedMS < 0 {
+		elapsedMS = 0
+	}
+	switch side {
+	case "white":
+		e.clock.WhiteMS -= elapsedMS
+		if e.clock.WhiteMS < 0 {
+			e.clock.WhiteMS = 0
+		}
+		if e.clock.WhiteMS > 0 {
+			e.clock.WhiteMS += e.clock.IncrementMS
+		}
+	case "black":
+		e.clock.BlackMS -= elapsedMS
+		if e.clock.BlackMS < 0 {
+			e.clock.BlackMS = 0
+		}
+		if e.clock.BlackMS > 0 {
+			e.clock.BlackMS += e.clock.IncrementMS
+		}
+	}
+}
+
+func (e *Engine) currentOutcomeLocked() chesscore.Outcome {
+	if e.clock.Enabled {
+		switch {
+		case e.clock.WhiteMS <= 0 && e.clock.BlackMS <= 0:
+			return chesscore.Outcome{Status: "draw", Method: "timeout"}
+		case e.clock.WhiteMS <= 0:
+			return chesscore.Outcome{Status: "timeout", Winner: "black", Method: "timeout"}
+		case e.clock.BlackMS <= 0:
+			return chesscore.Outcome{Status: "timeout", Winner: "white", Method: "timeout"}
+		}
+	}
+	return e.game.Outcome()
 }
 
 func gameFromState(ctx context.Context, state GameState) (*chesscore.Game, error) {

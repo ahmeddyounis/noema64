@@ -30,7 +30,7 @@
         <section class="board-area" aria-label="Chess board workspace">
           <div class="status-row">
             <span id="statusText">Loading game...</span>
-            <span id="modeText">mode</span>
+            <span class="status-meta"><span id="clockText">Untimed</span><span id="modeText">mode</span></span>
           </div>
           <div id="board" class="board" role="grid" aria-label="Chess board"></div>
           <div class="move-entry">
@@ -94,6 +94,20 @@
               <option value="random">Random</option>
             </select>
           </label>
+          <label>Time control
+            <select id="settingTimeControl">
+              <option value="untimed">Untimed</option>
+              <option value="bullet">Bullet 1+0</option>
+              <option value="blitz">Blitz 5+0</option>
+              <option value="rapid">Rapid 10+0</option>
+              <option value="classical">Classical 30+0</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <div class="time-control-grid">
+            <label>Initial minutes <input id="settingClockInitial" type="number" min="1" max="180" step="1" /></label>
+            <label>Increment seconds <input id="settingClockIncrement" type="number" min="0" max="120" step="1" /></label>
+          </div>
           <label><input id="settingAutoReply" type="checkbox" checked /> Engine replies automatically</label>
           <label>Max candidates <input id="settingMaxCandidates" type="number" min="1" max="10" /></label>
           <label>Provider
