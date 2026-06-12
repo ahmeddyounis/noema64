@@ -30,6 +30,17 @@ func FromFEN(fen string) (*Game, error) {
 	return &Game{id: uuid.NewString(), g: chess.NewGame(opt), initialFEN: fen}, nil
 }
 
+func FromFENWithID(fen, id string) (*Game, error) {
+	game, err := FromFEN(fen)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(id) != "" {
+		game.id = id
+	}
+	return game, nil
+}
+
 func FromPGN(r io.Reader) (*Game, error) {
 	opt, err := chess.PGN(r)
 	if err != nil {
@@ -44,12 +55,31 @@ func FromPGN(r io.Reader) (*Game, error) {
 	return &Game{id: uuid.NewString(), g: game, initialFEN: initialFEN, appliedUCI: appliedMoves(game)}, nil
 }
 
+func FromPGNWithID(r io.Reader, id string) (*Game, error) {
+	game, err := FromPGN(r)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(id) != "" {
+		game.id = id
+	}
+	return game, nil
+}
+
 func (g *Game) ID() string {
 	return g.id
 }
 
 func (g *Game) Clone() *Game {
 	return &Game{id: g.id, g: g.g.Clone(), initialFEN: g.initialFEN, appliedUCI: append([]string(nil), g.appliedUCI...)}
+}
+
+func (g *Game) InitialFEN() string {
+	return g.initialFEN
+}
+
+func (g *Game) AppliedUCI() []string {
+	return append([]string(nil), g.appliedUCI...)
 }
 
 func (g *Game) FEN() string {

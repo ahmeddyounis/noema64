@@ -10,6 +10,7 @@ coverage.out
 /logs/
 /runs/
 /.tmp/
+/cmd/noema64-gui/logs/
 
 # IDE and Wails generated output
 .idea/

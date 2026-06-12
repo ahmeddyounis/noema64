@@ -18,7 +18,7 @@ Core packages:
 - `engine`: stateful game engine used by CLI, UCI, and app services.
 - `uci`: protocol loop with stdout-only UCI lines.
 - `appsvc`: Wails-facing service DTO boundary.
-- `storage`: local YAML settings and JSONL traces.
+- `storage`: local YAML settings, JSONL traces, and redacted game snapshots.
 
 Move pipeline:
 
@@ -34,7 +34,7 @@ Score candidates
 Apply final legal move
 Merge memory
 Emit trace
+Persist game snapshot
 ```
 
 The final move is rechecked against `chesscore` immediately before it mutates game state.
-

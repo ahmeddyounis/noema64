@@ -2,6 +2,7 @@ package appsvc
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ type Application struct {
 	settings     storage.Settings
 	engine       *engine.Engine
 	traces       *storage.TraceStore
+	games        *storage.GameStore
 }
 
 const (
@@ -34,8 +36,10 @@ func NewApplication(settingsPath string) *Application {
 		settingsPath: settingsPath,
 		settings:     settings,
 		traces:       storage.NewTraceStore(settings.Logging.OutputDir),
+		games:        storage.NewGameStore(gameStoreDir(settings)),
 	}
 	app.engine = engine.New(app.engineOptions())
+	app.restoreLatestGame()
 	return app
 }
 
@@ -77,7 +81,10 @@ func (a *Application) NewGame(opts engine.NewGameOptions) (*engine.GameState, er
 		opts.Personality = a.settings.Engine.Personality
 	}
 	state, err := a.engine.NewGame(context.Background(), opts)
-	return state, appErr("ERR_NEW_GAME", err, true)
+	if err != nil {
+		return state, appErr("ERR_NEW_GAME", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
 func (a *Application) GetGame() (*engine.GameState, error) {
@@ -92,7 +99,10 @@ func (a *Application) LegalMoves() (any, error) {
 
 func (a *Application) MakeUserMove(moveUCI string) (*engine.GameState, error) {
 	state, err := a.engine.ApplyUserMove(context.Background(), moveUCI)
-	return state, appErr("ERR_INVALID_MOVE", err, true)
+	if err != nil {
+		return state, appErr("ERR_INVALID_MOVE", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
 func (a *Application) RequestEngineMove() (any, error) {
@@ -100,7 +110,10 @@ func (a *Application) RequestEngineMove() (any, error) {
 	if err == nil && a.settings.Engine.TraceEnabled {
 		_ = a.traces.AppendDecision(context.Background(), dec)
 	}
-	return map[string]any{"decision": dec, "state": state}, appErr("ERR_ENGINE_MOVE", err, true)
+	if err != nil {
+		return map[string]any{"decision": dec, "state": state}, appErr("ERR_ENGINE_MOVE", err, true)
+	}
+	return map[string]any{"decision": dec, "state": state}, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
 func (a *Application) StopEngine() error {
@@ -109,7 +122,10 @@ func (a *Application) StopEngine() error {
 
 func (a *Application) Undo(plies int) (*engine.GameState, error) {
 	state, err := a.engine.Undo(context.Background(), plies)
-	return state, appErr("ERR_UNDO", err, true)
+	if err != nil {
+		return state, appErr("ERR_UNDO", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
 func (a *Application) ExportPGN() (string, error) {
@@ -136,7 +152,10 @@ func (a *Application) ImportFEN(fen string) (*engine.GameState, error) {
 		Mode:        a.settings.Engine.DefaultMode,
 		Personality: a.settings.Engine.Personality,
 	})
-	return state, appErr("ERR_IMPORT_INVALID_FEN", err, true)
+	if err != nil {
+		return state, appErr("ERR_IMPORT_INVALID_FEN", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
 func (a *Application) ImportPGN(pgn string) (*engine.GameState, error) {
@@ -148,7 +167,10 @@ func (a *Application) ImportPGN(pgn string) (*engine.GameState, error) {
 		return nil, &AppError{Code: "ERR_IMPORT_TOO_LARGE", Message: "PGN import is too large", Recoverable: true}
 	}
 	state, err := a.engine.LoadPGN(context.Background(), pgn)
-	return state, appErr("ERR_IMPORT_INVALID_PGN", err, true)
+	if err != nil {
+		return state, appErr("ERR_IMPORT_INVALID_PGN", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
 func (a *Application) GetSettings() (storage.Settings, error) {
@@ -170,7 +192,29 @@ func (a *Application) SaveSettings(settings storage.Settings) error {
 	a.settings = settings
 	a.engine.SetOptions(a.engineOptions())
 	a.traces = storage.NewTraceStore(settings.Logging.OutputDir)
-	return nil
+	a.games = storage.NewGameStore(gameStoreDir(settings))
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return appErr("ERR_GAME_STATE", err, true)
+	}
+	return appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
+}
+
+func (a *Application) RecentGames(limit int) ([]storage.GameRecord, error) {
+	records, err := a.games.List(context.Background(), limit)
+	return records, appErr("ERR_RECENT_GAMES", err, true)
+}
+
+func (a *Application) LoadRecentGame(gameID string) (*engine.GameState, error) {
+	record, err := a.games.Load(context.Background(), gameID)
+	if err != nil {
+		return nil, appErr("ERR_RECENT_GAMES", err, true)
+	}
+	state, err := a.engine.LoadState(context.Background(), record.State)
+	if err != nil {
+		return nil, appErr("ERR_RECENT_GAMES", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
 func (a *Application) HealthCheckProvider() (map[string]any, error) {
@@ -199,4 +243,27 @@ func (a *Application) RunRandomBenchmark(games int, seed int64) (experiments.Sum
 
 func (a *Application) Modes() []strategy.EngineMode {
 	return []strategy.EngineMode{strategy.ModePure, strategy.ModeBlunderguard, strategy.ModeHybrid, strategy.ModeCoach}
+}
+
+func (a *Application) restoreLatestGame() {
+	record, err := a.games.LoadLatest(context.Background())
+	if err != nil {
+		return
+	}
+	_, _ = a.engine.LoadState(context.Background(), record.State)
+}
+
+func (a *Application) persistGameState(state *engine.GameState) error {
+	if a.games == nil {
+		return nil
+	}
+	return a.games.Save(context.Background(), state)
+}
+
+func gameStoreDir(settings storage.Settings) string {
+	outputDir := strings.TrimSpace(settings.Logging.OutputDir)
+	if outputDir == "" {
+		outputDir = "logs"
+	}
+	return filepath.Join(outputDir, "games")
 }

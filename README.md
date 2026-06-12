@@ -14,9 +14,9 @@ Implemented in this repository:
 - Deterministic fallback ladder that always chooses a legal move when legal moves exist.
 - Static blunderguard verifier plus optional external UCI verifier path support.
 - UCI binary with `uci`, `isready`, `ucinewgame`, `position`, `go`, `stop`, `quit`, and `setoption`.
-- Wails v2 GUI entrypoint with embedded board, settings, strategy, candidates, trace, PGN/FEN export, and benchmark controls.
+- Wails v2 GUI entrypoint with embedded board, recent games, settings, strategy, candidates, trace, PGN/FEN export, and benchmark controls.
 - CLI and benchmark commands.
-- Local YAML settings, JSONL decision traces, redaction, tests, prompts, configs, and docs.
+- Local YAML settings, JSONL decision traces, redacted game snapshots with strategy memory, tests, prompts, configs, and docs.
 
 ## Requirements
 
@@ -47,7 +47,7 @@ cd cmd/noema64-gui
 wails dev
 ```
 
-The embedded frontend is static and works with Wails bindings. The mock provider is the default, so no API key is required.
+The embedded frontend is static and works with Wails bindings. The mock provider is the default, so no API key is required. The GUI restores the most recent saved game from the configured log directory on relaunch.
 
 ## Modes
 
@@ -96,7 +96,7 @@ go wtime 300000 btime 300000 winc 2000 binc 2000
 quit
 ```
 
-The UCI process writes protocol output only to stdout. JSON traces are written to local files when enabled.
+The UCI process writes protocol output only to stdout. JSON traces are written to local files when enabled. GUI game snapshots are stored under `logging.output_dir/games`.
 
 ## Limitations
 

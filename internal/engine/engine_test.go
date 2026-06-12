@@ -73,3 +73,35 @@ func TestEngineUndoClearsFutureHistory(t *testing.T) {
 		t.Fatalf("history length = %d, want 1", len(state.Snapshot.MoveHistory))
 	}
 }
+
+func TestEngineLoadStateRestoresMovesAndStrategyMemory(t *testing.T) {
+	e := New(Options{})
+	if _, err := e.ApplyUserMove(context.Background(), "e2e4"); err != nil {
+		t.Fatalf("user move: %v", err)
+	}
+	if _, _, err := e.ChooseMove(context.Background()); err != nil {
+		t.Fatalf("engine move: %v", err)
+	}
+	saved, err := e.State(context.Background())
+	if err != nil {
+		t.Fatalf("state: %v", err)
+	}
+
+	restored := New(Options{})
+	state, err := restored.LoadState(context.Background(), *saved)
+	if err != nil {
+		t.Fatalf("load state: %v", err)
+	}
+	if state.Snapshot.GameID != saved.Snapshot.GameID {
+		t.Fatalf("game id = %s, want %s", state.Snapshot.GameID, saved.Snapshot.GameID)
+	}
+	if len(state.Snapshot.MoveHistory) != len(saved.Snapshot.MoveHistory) {
+		t.Fatalf("history length = %d, want %d", len(state.Snapshot.MoveHistory), len(saved.Snapshot.MoveHistory))
+	}
+	if state.StrategyMemory.LastUpdate.MovePlayed == "" {
+		t.Fatalf("strategy memory did not restore last update: %+v", state.StrategyMemory)
+	}
+	if len(state.Snapshot.LegalMoves) == 0 && state.Snapshot.Outcome.Status == "ongoing" {
+		t.Fatalf("ongoing restored game has no legal moves")
+	}
+}

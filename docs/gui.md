@@ -6,8 +6,9 @@ It exposes:
 
 - Interactive board with click source/destination moves.
 - Legal move highlighting from backend data.
-- New game, engine move, stop, undo, flip, PGN/FEN export, and settings controls.
+- New game, recent games, engine move, stop, undo, flip, PGN/FEN export, and settings controls.
 - Settings for mode, personality, provider, API endpoint/key, verifier path/timing, trace logging, raw logging flags, and log output directory.
+- Relaunch restore for the latest saved game and strategy memory from `logging.output_dir/games`.
 - Strategy memory panel.
 - Candidate move panel.
 - Decision trace tabs.

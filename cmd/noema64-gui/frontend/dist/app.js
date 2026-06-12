@@ -292,6 +292,67 @@ async function saveSettings() {
   }
 }
 
+function formatSavedAt(value) {
+  if (!value) return "Unknown time";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function gameRecordFields(record) {
+  const gameID = record.game_id || record.GameID || "";
+  const savedAt = record.saved_at || record.SavedAt || "";
+  const stateValue = record.state || record.State || {};
+  const snapshot = stateValue.snapshot || stateValue.Snapshot || {};
+  return { gameID, savedAt, snapshot };
+}
+
+function renderRecentGames(records) {
+  const list = document.querySelector("#recentList");
+  list.innerHTML = "";
+  if (!records?.length) {
+    list.textContent = "No recent games.";
+    return;
+  }
+  for (const record of records) {
+    const { gameID, savedAt, snapshot } = gameRecordFields(record);
+    const row = document.createElement("div");
+    row.className = "recent-game";
+    const detail = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = snapshot.ply ? `${snapshot.ply} plies · ${snapshot.side_to_move || "unknown"} to move` : "New game";
+    const meta = document.createElement("small");
+    meta.textContent = `${formatSavedAt(savedAt)} · ${snapshot.outcome?.status || "ongoing"}`;
+    detail.append(title, meta);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Load";
+    button.addEventListener("click", async () => {
+      try {
+        state = await call("LoadRecentGame", gameID);
+        selected = null;
+        render();
+        document.querySelector("#recentDialog").close();
+      } catch (err) {
+        showError(err, "#recentOutput");
+      }
+    });
+    row.append(detail, button);
+    list.appendChild(row);
+  }
+}
+
+async function openRecentGames() {
+  try {
+    document.querySelector("#recentOutput").textContent = "";
+    document.querySelector("#recentList").textContent = "Loading...";
+    document.querySelector("#recentDialog").showModal();
+    renderRecentGames(await call("RecentGames", 10));
+  } catch (err) {
+    showError(err, "#recentOutput");
+  }
+}
+
 document.querySelectorAll(".tabs button").forEach((btn) => {
   btn.addEventListener("click", () => {
     document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
@@ -317,6 +378,7 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
     showError(err);
   }
 });
+document.querySelector("#recentBtn").addEventListener("click", openRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#stopBtn").addEventListener("click", async () => {
   try {

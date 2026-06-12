@@ -35,6 +35,8 @@ type NewGameOptions struct {
 
 type GameState struct {
 	Snapshot       chesscore.Snapshot      `json:"snapshot"`
+	InitialFEN     string                  `json:"initial_fen"`
+	AppliedMoves   []string                `json:"applied_moves"`
 	StrategyMemory strategy.StrategyMemory `json:"strategy_memory"`
 	LastDecision   *decision.MoveDecision  `json:"last_decision,omitempty"`
 }
@@ -119,6 +121,36 @@ func (e *Engine) LoadPGN(ctx context.Context, pgn string) (*GameState, error) {
 	e.game = game
 	e.memory = strategy.NewMemory(game.ID(), game.SideToMove())
 	e.lastDecision = nil
+	return e.stateLocked(), nil
+}
+
+func (e *Engine) LoadState(ctx context.Context, state GameState) (*GameState, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.cancel != nil {
+		e.cancel()
+		e.cancel = nil
+		e.activeID = ""
+	}
+	game, err := gameFromState(ctx, state)
+	if err != nil {
+		return nil, err
+	}
+	e.game = game
+	e.memory = state.StrategyMemory
+	if strings.TrimSpace(e.memory.SchemaVersion) == "" {
+		e.memory = strategy.NewMemory(game.ID(), game.SideToMove())
+	}
+	e.memory.GameID = game.ID()
+	if strings.TrimSpace(e.memory.Side) == "" {
+		e.memory.Side = game.SideToMove()
+	}
+	e.lastDecision = state.LastDecision
 	return e.stateLocked(), nil
 }
 
@@ -237,9 +269,44 @@ func (e *Engine) Undo(ctx context.Context, plies int) (*GameState, error) {
 func (e *Engine) stateLocked() *GameState {
 	return &GameState{
 		Snapshot:       e.game.Snapshot(),
+		InitialFEN:     e.game.InitialFEN(),
+		AppliedMoves:   e.game.AppliedUCI(),
 		StrategyMemory: e.memory,
 		LastDecision:   e.lastDecision,
 	}
+}
+
+func gameFromState(ctx context.Context, state GameState) (*chesscore.Game, error) {
+	gameID := state.Snapshot.GameID
+	pgn := strings.TrimSpace(state.Snapshot.PGN)
+	if pgn != "" && pgn != "*" {
+		if game, err := chesscore.FromPGNWithID(strings.NewReader(pgn), gameID); err == nil {
+			return game, nil
+		}
+	}
+
+	initialFEN := strings.TrimSpace(state.InitialFEN)
+	if initialFEN == "" {
+		initialFEN = strings.TrimSpace(state.Snapshot.FEN)
+	}
+	if initialFEN == "" {
+		return nil, fmt.Errorf("saved game state is missing FEN")
+	}
+	game, err := chesscore.FromFENWithID(initialFEN, gameID)
+	if err != nil {
+		return nil, err
+	}
+	for _, moveUCI := range state.AppliedMoves {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+		if _, err := game.ApplyUCI(moveUCI); err != nil {
+			return nil, fmt.Errorf("replay saved move %q: %w", moveUCI, err)
+		}
+	}
+	return game, nil
 }
 
 func normalizeOptions(opts Options) Options {

@@ -303,6 +303,37 @@ dialog h2 {
   align-items: end;
 }
 
+.recent-list {
+  display: grid;
+  gap: 0;
+  max-height: 380px;
+  overflow: auto;
+}
+
+.recent-game {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #e1e6ee;
+}
+
+.recent-game div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.recent-game strong,
+.recent-game small {
+  overflow-wrap: anywhere;
+}
+
+.recent-game small {
+  color: #607083;
+}
+
 .promotion-grid {
   display: grid;
   grid-template-columns: repeat(4, 64px);
@@ -338,6 +369,37 @@ textarea {
 
 @media (max-width: 1100px) {
   body {
+    min-width: 0;
+  }
+
+  .topbar {
+    height: auto;
+    min-height: 58px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .brand {
+    min-width: 0;
+    flex: 1 1 180px;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .brand span {
+    font-size: 12px;
+  }
+
+  .toolbar {
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: repeat(9, minmax(34px, 1fr));
+    gap: 6px;
+  }
+
+  .toolbar button {
     min-width: 0;
   }
 

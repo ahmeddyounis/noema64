@@ -15,6 +15,7 @@
         </div>
         <div class="toolbar">
           <button id="newGameBtn" title="New game">N</button>
+          <button id="recentBtn" title="Recent games">◷</button>
           <button id="engineBtn" title="Ask engine">▶</button>
           <button id="stopBtn" title="Stop thinking">■</button>
           <button id="undoBtn" title="Undo">↶</button>
@@ -158,6 +159,17 @@
           </div>
           <textarea id="importText" placeholder="Paste FEN or PGN"></textarea>
           <pre id="importOutput"></pre>
+        </form>
+      </dialog>
+
+      <dialog id="recentDialog">
+        <form method="dialog">
+          <header>
+            <h2>Recent Games</h2>
+            <button value="cancel" title="Close">×</button>
+          </header>
+          <div id="recentList" class="recent-list"></div>
+          <pre id="recentOutput"></pre>
         </form>
       </dialog>
 
