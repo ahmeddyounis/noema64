@@ -2,6 +2,7 @@ package appsvc
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/ahmedyounis/noema64/internal/engine"
@@ -36,7 +37,7 @@ func NewApplication(settingsPath string) *Application {
 func (a *Application) engineOptions() engine.Options {
 	var provider providers.Provider = providers.MockProvider{}
 	if a.settings.LLM.Provider == "openai_compatible" && a.settings.LLM.Endpoint != "" {
-		provider = providers.OpenAICompatible{BaseURL: a.settings.LLM.Endpoint, APIKey: a.settings.LLM.APIKey}
+		provider = providers.OpenAICompatible{BaseURL: a.settings.LLM.Endpoint, APIKey: a.settings.LLM.APIKey, Model: a.settings.LLM.Model}
 	}
 	var verify verifier.Verifier = verifier.StaticVerifier{Enabled: a.settings.Verifier.Enabled}
 	if a.settings.Verifier.Enabled && a.settings.Verifier.Path != "" {
@@ -110,6 +111,28 @@ func (a *Application) ExportPGN(ctx context.Context) (string, *AppError) {
 func (a *Application) ExportFEN(ctx context.Context) (string, *AppError) {
 	fen, err := a.engine.ExportFEN(ctx)
 	return fen, appErr("ERR_EXPORT_FEN", err, true)
+}
+
+func (a *Application) ImportFEN(ctx context.Context, fen string) (*engine.GameState, *AppError) {
+	fen = strings.TrimSpace(fen)
+	if fen == "" {
+		return nil, &AppError{Code: "ERR_IMPORT_INVALID_FEN", Message: "FEN is required", Recoverable: true}
+	}
+	state, err := a.engine.NewGame(ctx, engine.NewGameOptions{
+		Side:        "auto",
+		FEN:         fen,
+		Mode:        a.settings.Engine.DefaultMode,
+		Personality: a.settings.Engine.Personality,
+	})
+	return state, appErr("ERR_IMPORT_INVALID_FEN", err, true)
+}
+
+func (a *Application) ImportPGN(ctx context.Context, pgn string) (*engine.GameState, *AppError) {
+	if strings.TrimSpace(pgn) == "" {
+		return nil, &AppError{Code: "ERR_IMPORT_INVALID_PGN", Message: "PGN is required", Recoverable: true}
+	}
+	state, err := a.engine.LoadPGN(ctx, pgn)
+	return state, appErr("ERR_IMPORT_INVALID_PGN", err, true)
 }
 
 func (a *Application) GetSettings(ctx context.Context) (storage.Settings, *AppError) {

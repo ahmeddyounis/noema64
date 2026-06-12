@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -100,6 +101,24 @@ func (e *Engine) ApplyUserMove(ctx context.Context, moveUCI string) (*GameState,
 	if _, err := e.game.ApplyUCI(moveUCI); err != nil {
 		return nil, err
 	}
+	return e.stateLocked(), nil
+}
+
+func (e *Engine) LoadPGN(ctx context.Context, pgn string) (*GameState, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.cancel != nil {
+		e.cancel()
+		e.cancel = nil
+		e.activeID = ""
+	}
+	game, err := chesscore.FromPGN(strings.NewReader(pgn))
+	if err != nil {
+		return nil, err
+	}
+	e.game = game
+	e.memory = strategy.NewMemory(game.ID(), game.SideToMove())
+	e.lastDecision = nil
 	return e.stateLocked(), nil
 }
 

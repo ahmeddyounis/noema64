@@ -19,6 +19,7 @@
           <button id="stopBtn" title="Stop thinking">■</button>
           <button id="undoBtn" title="Undo">↶</button>
           <button id="flipBtn" title="Flip board">⇅</button>
+          <button id="importBtn" title="Import PGN or FEN">⇧</button>
           <button id="exportBtn" title="Export PGN">⇩</button>
           <button id="settingsBtn" title="Settings">⚙</button>
         </div>
@@ -107,8 +108,27 @@
           <textarea id="exportText" readonly></textarea>
         </form>
       </dialog>
+
+      <dialog id="importDialog">
+        <form method="dialog">
+          <header>
+            <h2>Import Position</h2>
+            <button value="cancel" title="Close">×</button>
+          </header>
+          <div class="import-controls">
+            <label>Type
+              <select id="importType">
+                <option value="fen">FEN</option>
+                <option value="pgn">PGN</option>
+              </select>
+            </label>
+            <button id="runImportBtn" value="none" type="button">Import</button>
+          </div>
+          <textarea id="importText" placeholder="Paste FEN or PGN"></textarea>
+          <pre id="importOutput"></pre>
+        </form>
+      </dialog>
     </div>
     <script src="./app.js"></script>
   </body>
 </html>
-

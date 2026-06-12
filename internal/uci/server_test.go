@@ -3,6 +3,8 @@ package uci
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -36,6 +38,29 @@ func TestUCISmoke(t *testing.T) {
 		if !validUCILine(line) {
 			t.Fatalf("non-UCI stdout line: %q\n%s", line, text)
 		}
+	}
+}
+
+func TestUCITraceFileOption(t *testing.T) {
+	tracePath := filepath.Join(t.TempDir(), "trace.jsonl")
+	input := strings.Join([]string{
+		"uci",
+		"setoption name TraceFile value " + tracePath,
+		"position startpos moves e2e4 e7e5",
+		"go movetime 100",
+		"quit",
+		"",
+	}, "\n")
+	var out bytes.Buffer
+	server := NewServer(strings.NewReader(input), &out, &bytes.Buffer{}, storage.DefaultSettings())
+	if err := server.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if !strings.Contains(out.String(), "bestmove ") {
+		t.Fatalf("missing bestmove:\n%s", out.String())
+	}
+	if _, err := os.Stat(tracePath); err != nil {
+		t.Fatalf("trace file not written: %v", err)
 	}
 }
 

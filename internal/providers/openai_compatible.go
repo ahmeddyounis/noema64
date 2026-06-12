@@ -13,6 +13,7 @@ import (
 type OpenAICompatible struct {
 	BaseURL string
 	APIKey  string
+	Model   string
 	Client  *http.Client
 }
 
@@ -30,8 +31,12 @@ func (p OpenAICompatible) Capabilities() Capabilities {
 }
 
 func (p OpenAICompatible) HealthCheck(ctx context.Context) error {
+	model := p.Model
+	if model == "" {
+		model = "local-model"
+	}
 	req := CompletionRequest{
-		Model:       "health-check",
+		Model:       model,
 		System:      "Return JSON.",
 		User:        `{"ok":true}`,
 		MaxTokens:   16,

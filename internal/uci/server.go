@@ -25,13 +25,18 @@ type Server struct {
 	out    io.Writer
 	errOut io.Writer
 
-	mu           sync.Mutex
-	outMu        sync.Mutex
-	engine       *engine.Engine
-	traceStore   *storage.TraceStore
-	opts         engine.Options
-	searchCancel context.CancelFunc
-	searchDone   chan struct{}
+	mu               sync.Mutex
+	outMu            sync.Mutex
+	engine           *engine.Engine
+	traceStore       *storage.TraceStore
+	opts             engine.Options
+	providerKind     string
+	endpoint         string
+	apiKey           string
+	verifierPath     string
+	verifierMoveTime int
+	searchCancel     context.CancelFunc
+	searchDone       chan struct{}
 }
 
 func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.Settings) *Server {
@@ -41,12 +46,17 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		traceDir = "logs"
 	}
 	return &Server{
-		in:         in,
-		out:        out,
-		errOut:     errOut,
-		opts:       opts,
-		engine:     engine.New(opts),
-		traceStore: storage.NewTraceStore(traceDir),
+		in:               in,
+		out:              out,
+		errOut:           errOut,
+		opts:             opts,
+		engine:           engine.New(opts),
+		traceStore:       storage.NewTraceStore(traceDir),
+		providerKind:     settings.LLM.Provider,
+		endpoint:         settings.LLM.Endpoint,
+		apiKey:           settings.LLM.APIKey,
+		verifierPath:     settings.Verifier.Path,
+		verifierMoveTime: settings.Verifier.MoveTimeMS,
 	}
 }
 
@@ -118,8 +128,15 @@ func (s *Server) setOption(line string) error {
 		s.opts.Mode = strategy.EngineMode(value)
 	case "personality", "strategypersonality":
 		s.opts.Personality = strategy.Personality(value)
+	case "llmprovider", "providerprofile":
+		s.providerKind = value
+		s.refreshProviderLocked()
 	case "llmmodel":
 		s.opts.Model = value
+		s.refreshProviderLocked()
+	case "llmendpoint":
+		s.endpoint = value
+		s.refreshProviderLocked()
 	case "temperature":
 		n, err := strconv.Atoi(value)
 		if err == nil {
@@ -131,14 +148,47 @@ func (s *Server) setOption(line string) error {
 			s.opts.MaxCandidates = n
 		}
 	case "verifierenabled":
-		s.opts.Verifier = verifier.StaticVerifier{Enabled: strings.EqualFold(value, "true")}
+		if strings.EqualFold(value, "true") {
+			s.refreshVerifierLocked(true)
+		} else {
+			s.opts.Verifier = verifier.StaticVerifier{Enabled: false}
+		}
 	case "verifierpath":
+		s.verifierPath = value
+		s.refreshVerifierLocked(value != "")
+	case "verifiermovetime":
+		n, err := strconv.Atoi(value)
+		if err == nil && n > 0 {
+			s.verifierMoveTime = n
+			s.refreshVerifierLocked(s.verifierPath != "")
+		}
+	case "tracefile":
 		if value != "" {
-			s.opts.Verifier = verifier.ExternalUCI{Path: value, MoveTimeMS: 100}
+			s.traceStore = storage.NewTraceFileStore(value)
 		}
 	}
 	s.engine.SetOptions(s.opts)
 	return nil
+}
+
+func (s *Server) refreshProviderLocked() {
+	if strings.EqualFold(s.providerKind, "openai_compatible") && s.endpoint != "" {
+		s.opts.Provider = providers.OpenAICompatible{BaseURL: s.endpoint, APIKey: s.apiKey, Model: s.opts.Model}
+		return
+	}
+	s.opts.Provider = providers.MockProvider{}
+}
+
+func (s *Server) refreshVerifierLocked(enabled bool) {
+	if enabled && s.verifierPath != "" {
+		moveTime := s.verifierMoveTime
+		if moveTime <= 0 {
+			moveTime = 100
+		}
+		s.opts.Verifier = verifier.ExternalUCI{Path: s.verifierPath, MoveTimeMS: moveTime}
+		return
+	}
+	s.opts.Verifier = verifier.StaticVerifier{Enabled: enabled}
 }
 
 func (s *Server) position(ctx context.Context, args []string) error {
@@ -344,7 +394,7 @@ func sanitizeInfo(s string) string {
 func engineOptions(settings storage.Settings) engine.Options {
 	provider := providers.Provider(providers.MockProvider{})
 	if settings.LLM.Provider == "openai_compatible" && settings.LLM.Endpoint != "" {
-		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: settings.LLM.APIKey}
+		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: settings.LLM.APIKey, Model: settings.LLM.Model}
 	}
 	v := verifier.Verifier(verifier.StaticVerifier{Enabled: settings.Verifier.Enabled})
 	if settings.Verifier.Enabled && settings.Verifier.Path != "" {

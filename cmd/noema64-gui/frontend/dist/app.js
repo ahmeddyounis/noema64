@@ -218,6 +218,22 @@ document.querySelector("#undoBtn").addEventListener("click", async () => { state
 document.querySelector("#flipBtn").addEventListener("click", () => { flipped = !flipped; renderBoard(); });
 document.querySelector("#moveBtn").addEventListener("click", () => makeMove(document.querySelector("#moveInput").value.trim()));
 document.querySelector("#settingsBtn").addEventListener("click", async () => { await loadSettings(); document.querySelector("#settingsDialog").showModal(); });
+document.querySelector("#importBtn").addEventListener("click", () => {
+  document.querySelector("#importOutput").textContent = "";
+  document.querySelector("#importDialog").showModal();
+});
+document.querySelector("#runImportBtn").addEventListener("click", async () => {
+  const type = document.querySelector("#importType").value;
+  const text = document.querySelector("#importText").value;
+  try {
+    state = type === "fen" ? await call("ImportFEN", text) : await call("ImportPGN", text);
+    selected = null;
+    render();
+    document.querySelector("#importDialog").close();
+  } catch (err) {
+    document.querySelector("#importOutput").textContent = String(err);
+  }
+});
 document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
 document.querySelector("#healthBtn").addEventListener("click", async () => {
   document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
@@ -241,4 +257,3 @@ window.addEventListener("keydown", (event) => {
 });
 
 refresh();
-
