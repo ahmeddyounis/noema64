@@ -122,6 +122,33 @@ func TestNewGameAcceptsTimeControl(t *testing.T) {
 	}
 }
 
+func TestResignPersistsTerminalOutcome(t *testing.T) {
+	app, _ := newTestApplication(t)
+	state, err := app.NewGame(engine.NewGameOptions{Side: "white"})
+	if err != nil {
+		t.Fatalf("new game: %v", err)
+	}
+	state, err = app.Resign("white")
+	if err != nil {
+		t.Fatalf("resign: %v", err)
+	}
+	if state.Snapshot.Outcome.Status != "resignation" || state.Snapshot.Outcome.Winner != "black" {
+		t.Fatalf("unexpected resignation outcome: %+v", state.Snapshot.Outcome)
+	}
+
+	restored := NewApplication(filepath.Join(filepath.Dir(app.settingsPath), "config.yaml"))
+	restoredState, err := restored.GetGame()
+	if err != nil {
+		t.Fatalf("restored state: %v", err)
+	}
+	if restoredState.Snapshot.GameID != state.Snapshot.GameID {
+		t.Fatalf("game id = %s, want %s", restoredState.Snapshot.GameID, state.Snapshot.GameID)
+	}
+	if restoredState.Snapshot.Outcome.Status != "resignation" || restoredState.Snapshot.Outcome.Winner != "black" {
+		t.Fatalf("restored outcome = %+v, want black resignation win", restoredState.Snapshot.Outcome)
+	}
+}
+
 func TestApplicationRestoresLatestGameAndRecentRecords(t *testing.T) {
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "config.yaml")

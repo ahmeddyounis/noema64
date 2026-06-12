@@ -92,6 +92,32 @@ func TestUndoTruncatesHistoryAndAllowsNewLine(t *testing.T) {
 	}
 }
 
+func TestResignSetsTerminalOutcome(t *testing.T) {
+	game := NewGame()
+	if err := game.Resign("white"); err != nil {
+		t.Fatalf("resign: %v", err)
+	}
+	outcome := game.Outcome()
+	if outcome.Status != "resignation" || outcome.Winner != "black" {
+		t.Fatalf("outcome = %+v, want black resignation win", outcome)
+	}
+	if len(game.LegalMoves()) != 0 {
+		t.Fatalf("resigned game kept legal moves")
+	}
+	if game.Ply() != 0 || len(game.MoveHistory()) != 0 {
+		t.Fatalf("resignation created move history: ply=%d history=%+v", game.Ply(), game.MoveHistory())
+	}
+	if pgn := strings.TrimSpace(game.PGN()); pgn != "0-1" {
+		t.Fatalf("resignation PGN = %q, want 0-1", pgn)
+	}
+	if _, err := game.ApplyUCI("e2e4"); err == nil {
+		t.Fatal("expected move after resignation to fail")
+	}
+	if err := game.Resign("black"); err == nil {
+		t.Fatal("expected second resignation to fail")
+	}
+}
+
 func perft(game *Game, depth int) int {
 	if depth == 0 {
 		return 1

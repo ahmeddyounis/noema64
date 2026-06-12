@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,86 @@ func TestEngineClockStateAndTimeoutOutcome(t *testing.T) {
 	}
 }
 
+func TestEngineResignStopsGameAndRestoresFromState(t *testing.T) {
+	e := New(Options{})
+	state, err := e.Resign(context.Background(), "white")
+	if err != nil {
+		t.Fatalf("resign: %v", err)
+	}
+	if state.Snapshot.Outcome.Status != "resignation" || state.Snapshot.Outcome.Winner != "black" {
+		t.Fatalf("unexpected resignation outcome: %+v", state.Snapshot.Outcome)
+	}
+	if len(state.Snapshot.LegalMoves) != 0 {
+		t.Fatalf("resigned state kept legal moves: %d", len(state.Snapshot.LegalMoves))
+	}
+	if _, err := e.ApplyUserMove(context.Background(), "e2e4"); err == nil {
+		t.Fatal("expected move after resignation to fail")
+	}
+
+	restored := New(Options{})
+	restoredState, err := restored.LoadState(context.Background(), *state)
+	if err != nil {
+		t.Fatalf("load resigned state: %v", err)
+	}
+	if restoredState.Snapshot.Outcome.Status != "resignation" || restoredState.Snapshot.Outcome.Winner != "black" {
+		t.Fatalf("restored outcome = %+v, want black resignation win", restoredState.Snapshot.Outcome)
+	}
+	if len(restoredState.Snapshot.LegalMoves) != 0 {
+		t.Fatalf("restored resigned state kept legal moves: %d", len(restoredState.Snapshot.LegalMoves))
+	}
+}
+
+func TestEngineResignCancelsLateEngineMove(t *testing.T) {
+	provider := &lateProvider{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	e := New(Options{Provider: provider})
+	type chooseResult struct {
+		state *GameState
+		err   error
+	}
+	done := make(chan chooseResult, 1)
+	go func() {
+		_, state, err := e.ChooseMove(context.Background())
+		done <- chooseResult{state: state, err: err}
+	}()
+
+	select {
+	case <-provider.started:
+	case <-time.After(time.Second):
+		t.Fatal("provider did not start")
+	}
+	resigned, err := e.Resign(context.Background(), "white")
+	if err != nil {
+		t.Fatalf("resign: %v", err)
+	}
+	if resigned.Snapshot.Outcome.Status != "resignation" {
+		t.Fatalf("resigned outcome = %+v", resigned.Snapshot.Outcome)
+	}
+	close(provider.release)
+
+	select {
+	case result := <-done:
+		if result.err == nil || !strings.Contains(result.err.Error(), "cancelled") {
+			t.Fatalf("late search err = %v, want cancellation", result.err)
+		}
+		if result.state == nil || result.state.Snapshot.Outcome.Status != "resignation" {
+			t.Fatalf("late search state = %+v", result.state)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("engine search did not finish after release")
+	}
+
+	final, err := e.State(context.Background())
+	if err != nil {
+		t.Fatalf("final state: %v", err)
+	}
+	if final.Snapshot.Ply != 0 || final.Snapshot.Outcome.Status != "resignation" {
+		t.Fatalf("late engine move mutated resigned game: %+v", final.Snapshot)
+	}
+}
+
 func TestEngineLoadStateRestoresMovesAndStrategyMemory(t *testing.T) {
 	e := New(Options{})
 	if _, err := e.ApplyUserMove(context.Background(), "e2e4"); err != nil {
@@ -140,4 +221,27 @@ func TestEngineLoadStateRestoresMovesAndStrategyMemory(t *testing.T) {
 	if len(state.Snapshot.LegalMoves) == 0 && state.Snapshot.Outcome.Status == "ongoing" {
 		t.Fatalf("ongoing restored game has no legal moves")
 	}
+}
+
+type lateProvider struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (p *lateProvider) Name() string {
+	return "late"
+}
+
+func (p *lateProvider) Capabilities() providers.Capabilities {
+	return providers.MockProvider{}.Capabilities()
+}
+
+func (p *lateProvider) HealthCheck(ctx context.Context) error {
+	return nil
+}
+
+func (p *lateProvider) CompleteJSON(ctx context.Context, req providers.CompletionRequest) (*providers.CompletionResponse, error) {
+	close(p.started)
+	<-p.release
+	return providers.MockProvider{}.CompleteJSON(context.Background(), req)
 }

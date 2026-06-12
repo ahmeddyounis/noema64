@@ -264,6 +264,19 @@ async function askEngine() {
   }
 }
 
+async function resignGame() {
+  if (!state?.snapshot || state.snapshot.outcome?.status !== "ongoing") return;
+  const side = playerSide || state.snapshot.side_to_move || "white";
+  if (!window.confirm(`Resign as ${side}?`)) return;
+  try {
+    state = await call("Resign", side);
+    selected = null;
+    render();
+  } catch (err) {
+    showError(err);
+  }
+}
+
 async function loadSettings() {
   settings = await call("GetSettings");
   document.querySelector("#settingMode").value = settings.engine.default_mode;
@@ -446,6 +459,7 @@ document.querySelector("#stopBtn").addEventListener("click", async () => {
     showError(err);
   }
 });
+document.querySelector("#resignBtn").addEventListener("click", resignGame);
 document.querySelector("#undoBtn").addEventListener("click", async () => {
   try {
     state = await call("Undo", 1);
@@ -537,6 +551,7 @@ window.addEventListener("keydown", (event) => {
   if (event.target.matches("input, textarea, select")) return;
   if (event.key === "n" || event.key === "N") document.querySelector("#newGameBtn").click();
   if (event.key === " ") { event.preventDefault(); askEngine(); }
+  if (event.key === "r" || event.key === "R") document.querySelector("#resignBtn").click();
   if (event.key === "u" || event.key === "U") document.querySelector("#undoBtn").click();
   if (event.key === "f" || event.key === "F") document.querySelector("#flipBtn").click();
   if (event.key === ",") document.querySelector("#settingsBtn").click();

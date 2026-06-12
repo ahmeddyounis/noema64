@@ -210,9 +210,19 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.activeID == activeID {
+	stillActive := e.activeID == activeID
+	if stillActive {
 		e.cancel = nil
 		e.activeID = ""
+	}
+	if !stillActive {
+		return nil, e.stateLocked(), fmt.Errorf("engine search was cancelled")
+	}
+	if e.currentOutcomeLocked().Status != "ongoing" {
+		return nil, e.stateLocked(), fmt.Errorf("game is over")
+	}
+	if e.game.SideToMove() != movingSide {
+		return nil, e.stateLocked(), fmt.Errorf("position changed while engine was thinking")
 	}
 	if err != nil {
 		return nil, nil, err
@@ -231,6 +241,31 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	e.memory = dec.StrategyAfter
 	e.lastDecision = dec
 	return dec, e.stateLocked(), nil
+}
+
+func (e *Engine) Resign(ctx context.Context, side string) (*GameState, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.cancel != nil {
+		e.cancel()
+		e.cancel = nil
+		e.activeID = ""
+	}
+	if strings.TrimSpace(side) == "" || strings.EqualFold(side, "auto") {
+		side = e.game.SideToMove()
+	}
+	if e.currentOutcomeLocked().Status != "ongoing" {
+		return nil, fmt.Errorf("game is over")
+	}
+	if err := e.game.Resign(side); err != nil {
+		return nil, err
+	}
+	return e.stateLocked(), nil
 }
 
 func (e *Engine) Stop(ctx context.Context) error {
@@ -367,6 +402,9 @@ func (e *Engine) currentOutcomeLocked() chesscore.Outcome {
 }
 
 func gameFromState(ctx context.Context, state GameState) (*chesscore.Game, error) {
+	if state.Snapshot.Outcome.Status == "resignation" {
+		return gameFromReplayState(ctx, state)
+	}
 	gameID := state.Snapshot.GameID
 	pgn := strings.TrimSpace(state.Snapshot.PGN)
 	if pgn != "" && pgn != "*" {
@@ -374,7 +412,11 @@ func gameFromState(ctx context.Context, state GameState) (*chesscore.Game, error
 			return game, nil
 		}
 	}
+	return gameFromReplayState(ctx, state)
+}
 
+func gameFromReplayState(ctx context.Context, state GameState) (*chesscore.Game, error) {
+	gameID := state.Snapshot.GameID
 	initialFEN := strings.TrimSpace(state.InitialFEN)
 	if initialFEN == "" {
 		initialFEN = strings.TrimSpace(state.Snapshot.FEN)
@@ -396,7 +438,27 @@ func gameFromState(ctx context.Context, state GameState) (*chesscore.Game, error
 			return nil, fmt.Errorf("replay saved move %q: %w", moveUCI, err)
 		}
 	}
+	if state.Snapshot.Outcome.Status == "resignation" {
+		side, err := resigningSideFromOutcome(state.Snapshot.Outcome)
+		if err != nil {
+			return nil, err
+		}
+		if err := game.Resign(side); err != nil {
+			return nil, err
+		}
+	}
 	return game, nil
+}
+
+func resigningSideFromOutcome(outcome chesscore.Outcome) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(outcome.Winner)) {
+	case "white":
+		return "black", nil
+	case "black":
+		return "white", nil
+	default:
+		return "", fmt.Errorf("saved resignation outcome is missing a winner")
+	}
 }
 
 func normalizeOptions(opts Options) Options {

@@ -120,6 +120,14 @@ func (a *Application) StopEngine() error {
 	return appErr("ERR_CANCELLED", a.engine.Stop(context.Background()), true)
 }
 
+func (a *Application) Resign(side string) (*engine.GameState, error) {
+	state, err := a.engine.Resign(context.Background(), side)
+	if err != nil {
+		return state, appErr("ERR_RESIGN", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
+}
+
 func (a *Application) Undo(plies int) (*engine.GameState, error) {
 	state, err := a.engine.Undo(context.Background(), plies)
 	if err != nil {

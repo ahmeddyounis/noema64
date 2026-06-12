@@ -87,11 +87,16 @@ func (g *Game) FEN() string {
 }
 
 func (g *Game) PGN() string {
+	if len(g.appliedUCI) == 0 {
+		if result := resultToken(g.Outcome()); result != "" {
+			return result
+		}
+	}
 	return g.g.String()
 }
 
 func (g *Game) Ply() int {
-	return len(g.g.Moves())
+	return len(g.appliedUCI)
 }
 
 func (g *Game) SideToMove() string {
@@ -103,6 +108,9 @@ func (g *Game) Outcome() Outcome {
 }
 
 func (g *Game) LegalMoves() []LegalMove {
+	if g.Outcome().Status != "ongoing" {
+		return []LegalMove{}
+	}
 	pos := g.g.Position()
 	moves := g.g.ValidMoves()
 	out := make([]LegalMove, 0, len(moves))
@@ -111,6 +119,21 @@ func (g *Game) LegalMoves() []LegalMove {
 		out = append(out, moveDTO(pos, &m))
 	}
 	return out
+}
+
+func (g *Game) Resign(side string) error {
+	if g.Outcome().Status != "ongoing" {
+		return fmt.Errorf("game is over")
+	}
+	color, err := colorFromName(side)
+	if err != nil {
+		return err
+	}
+	g.g.Resign(color)
+	if g.Outcome().Status != "resignation" {
+		return fmt.Errorf("resignation was not applied")
+	}
+	return nil
 }
 
 func (g *Game) ApplyUCI(moveUCI string) (MoveRecord, error) {
@@ -174,7 +197,13 @@ func (g *Game) Snapshot() Snapshot {
 }
 
 func (g *Game) MoveHistory() []MoveRecord {
+	if len(g.appliedUCI) == 0 {
+		return []MoveRecord{}
+	}
 	moves := g.g.Moves()
+	if len(moves) > len(g.appliedUCI) {
+		moves = moves[:len(g.appliedUCI)]
+	}
 	positions := g.g.Positions()
 	history := make([]MoveRecord, 0, len(moves))
 	for i, mv := range moves {
@@ -188,7 +217,7 @@ func (g *Game) MoveHistory() []MoveRecord {
 		}
 		history = append(history, MoveRecord{
 			Ply:      i + 1,
-			UCI:      chess.UCINotation{}.Encode(before, mv),
+			UCI:      g.appliedUCI[i],
 			SAN:      chess.AlgebraicNotation{}.Encode(before, mv),
 			FENAfter: fenAfter,
 			Comment:  mv.Comments(),
@@ -308,6 +337,17 @@ func colorName(c chess.Color) string {
 	}
 }
 
+func colorFromName(side string) (chess.Color, error) {
+	switch strings.ToLower(strings.TrimSpace(side)) {
+	case "white", "w":
+		return chess.White, nil
+	case "black", "b":
+		return chess.Black, nil
+	default:
+		return chess.NoColor, fmt.Errorf("invalid side %q", side)
+	}
+}
+
 func outcomeDTO(outcome chess.Outcome, method chess.Method) Outcome {
 	if outcome == chess.NoOutcome || outcome == chess.UnknownOutcome {
 		return Outcome{Status: "ongoing", Method: method.String()}
@@ -334,6 +374,19 @@ func outcomeDTO(outcome chess.Outcome, method chess.Method) Outcome {
 		dto.Winner = "black"
 	}
 	return dto
+}
+
+func resultToken(outcome Outcome) string {
+	switch {
+	case outcome.Winner == "white":
+		return "1-0"
+	case outcome.Winner == "black":
+		return "0-1"
+	case outcome.Status == "draw":
+		return "1/2-1/2"
+	default:
+		return ""
+	}
 }
 
 func promotionString(piece chess.PieceType) string {

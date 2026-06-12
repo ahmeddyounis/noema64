@@ -409,7 +409,7 @@ textarea {
   .toolbar {
     flex: 1 1 100%;
     display: grid;
-    grid-template-columns: repeat(9, minmax(34px, 1fr));
+    grid-template-columns: repeat(5, minmax(34px, 1fr));
     gap: 6px;
   }
 
