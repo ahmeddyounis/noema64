@@ -146,12 +146,12 @@ func (s *Server) setOption(line string) error {
 	case "temperature":
 		n, err := strconv.Atoi(value)
 		if err == nil {
-			s.opts.Temperature = float64(n) / 100
+			s.opts.Temperature = float64(clampInt(n, 0, 200)) / 100
 		}
 	case "maxcandidates":
 		n, err := strconv.Atoi(value)
 		if err == nil && n > 0 {
-			s.opts.MaxCandidates = n
+			s.opts.MaxCandidates = clampInt(n, 1, 10)
 		}
 	case "verifierenabled":
 		if strings.EqualFold(value, "true") {
@@ -411,6 +411,16 @@ func indexOf(items []string, needle string) int {
 		}
 	}
 	return -1
+}
+
+func clampInt(value, min, max int) int {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func sanitizeInfo(s string) string {

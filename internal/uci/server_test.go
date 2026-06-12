@@ -90,6 +90,28 @@ func TestUCITraceEnabledOptionDisablesTraceWrites(t *testing.T) {
 	}
 }
 
+func TestUCIOptionRangesMatchHandshake(t *testing.T) {
+	server := NewServer(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, storage.DefaultSettings())
+	if err := server.setOption("setoption name Temperature value 999"); err != nil {
+		t.Fatalf("set temperature: %v", err)
+	}
+	if server.opts.Temperature != 2.0 {
+		t.Fatalf("temperature = %v, want 2.0", server.opts.Temperature)
+	}
+	if err := server.setOption("setoption name Temperature value -25"); err != nil {
+		t.Fatalf("set temperature: %v", err)
+	}
+	if server.opts.Temperature != 0 {
+		t.Fatalf("temperature = %v, want 0", server.opts.Temperature)
+	}
+	if err := server.setOption("setoption name MaxCandidates value 99"); err != nil {
+		t.Fatalf("set max candidates: %v", err)
+	}
+	if server.opts.MaxCandidates != 10 {
+		t.Fatalf("max candidates = %d, want 10", server.opts.MaxCandidates)
+	}
+}
+
 func TestUCIReadyAndStopDuringActiveSearch(t *testing.T) {
 	input := strings.Join([]string{
 		"uci",
