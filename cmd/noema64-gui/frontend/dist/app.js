@@ -15,10 +15,28 @@ let autoReply = true;
 
 const api = () => window.go?.appsvc?.Application;
 
+function appErrorMessage(err) {
+  if (!err) return "Unknown error";
+  if (typeof err === "string") return err;
+  if (err.message) return err.message;
+  if (err.Message) return err.Message;
+  return String(err);
+}
+
+function isAppErrorValue(value) {
+  return value && typeof value === "object" && typeof value.message === "string" && typeof value.code === "string";
+}
+
+function showError(err, selector = "#statusText") {
+  const target = document.querySelector(selector) || document.querySelector("#statusText");
+  target.textContent = appErrorMessage(err);
+}
+
 async function call(name, ...args) {
   const svc = api();
   if (!svc || !svc[name]) throw new Error("Wails bindings are not available");
   const result = await svc[name](...args);
+  if (isAppErrorValue(result)) throw new Error(result.message);
   return result;
 }
 
@@ -174,19 +192,29 @@ function tabText(dec) {
 }
 
 async function makeMove(move) {
-  document.querySelector("#thinkingStage").textContent = "Applying user move";
-  state = await call("MakeUserMove", move);
-  render();
-  if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
-    await askEngine();
+  try {
+    document.querySelector("#thinkingStage").textContent = "Applying user move";
+    state = await call("MakeUserMove", move);
+    render();
+    if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
+      await askEngine();
+    }
+  } catch (err) {
+    showError(err);
+    document.querySelector("#thinkingStage").textContent = "Move failed";
   }
 }
 
 async function askEngine() {
-  document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
-  const result = await call("RequestEngineMove");
-  state = result.state;
-  render();
+  try {
+    document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
+    const result = await call("RequestEngineMove");
+    state = result.state;
+    render();
+  } catch (err) {
+    showError(err);
+    document.querySelector("#thinkingStage").textContent = "Engine stopped";
+  }
 }
 
 async function loadSettings() {
@@ -204,19 +232,23 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
-  playerSide = document.querySelector("#settingSide").value;
-  if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
-  autoReply = document.querySelector("#settingAutoReply").checked;
-  settings.engine.default_mode = document.querySelector("#settingMode").value;
-  settings.llm.provider = document.querySelector("#settingProvider").value;
-  settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
-  settings.llm.model = document.querySelector("#settingModel").value;
-  settings.llm.api_key = document.querySelector("#settingKey").value;
-  settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
-  settings.verifier.path = document.querySelector("#settingVerifierPath").value;
-  settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
-  await call("SaveSettings", settings);
-  document.querySelector("#settingsOutput").textContent = "Settings saved.";
+  try {
+    playerSide = document.querySelector("#settingSide").value;
+    if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
+    autoReply = document.querySelector("#settingAutoReply").checked;
+    settings.engine.default_mode = document.querySelector("#settingMode").value;
+    settings.llm.provider = document.querySelector("#settingProvider").value;
+    settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
+    settings.llm.model = document.querySelector("#settingModel").value;
+    settings.llm.api_key = document.querySelector("#settingKey").value;
+    settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
+    settings.verifier.path = document.querySelector("#settingVerifierPath").value;
+    settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
+    await call("SaveSettings", settings);
+    document.querySelector("#settingsOutput").textContent = "Settings saved.";
+  } catch (err) {
+    showError(err, "#settingsOutput");
+  }
 }
 
 document.querySelectorAll(".tabs button").forEach((btn) => {
@@ -229,19 +261,44 @@ document.querySelectorAll(".tabs button").forEach((btn) => {
 });
 
 document.querySelector("#newGameBtn").addEventListener("click", async () => {
-  let side = document.querySelector("#settingSide")?.value || playerSide;
-  if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
-  playerSide = side;
-  state = await call("NewGame", { side, mode: document.querySelector("#settingMode")?.value || "blunderguard" });
-  render();
-  if (autoReply && side === "black") await askEngine();
+  try {
+    let side = document.querySelector("#settingSide")?.value || playerSide;
+    if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
+    playerSide = side;
+    state = await call("NewGame", { side, mode: document.querySelector("#settingMode")?.value || "blunderguard" });
+    render();
+    if (autoReply && side === "black") await askEngine();
+  } catch (err) {
+    showError(err);
+  }
 });
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
-document.querySelector("#stopBtn").addEventListener("click", () => call("StopEngine"));
-document.querySelector("#undoBtn").addEventListener("click", async () => { state = await call("Undo", 1); render(); });
+document.querySelector("#stopBtn").addEventListener("click", async () => {
+  try {
+    await call("StopEngine");
+    document.querySelector("#thinkingStage").textContent = "Stop requested";
+  } catch (err) {
+    showError(err);
+  }
+});
+document.querySelector("#undoBtn").addEventListener("click", async () => {
+  try {
+    state = await call("Undo", 1);
+    render();
+  } catch (err) {
+    showError(err);
+  }
+});
 document.querySelector("#flipBtn").addEventListener("click", () => { flipped = !flipped; renderBoard(); });
 document.querySelector("#moveBtn").addEventListener("click", () => makeMove(document.querySelector("#moveInput").value.trim()));
-document.querySelector("#settingsBtn").addEventListener("click", async () => { await loadSettings(); document.querySelector("#settingsDialog").showModal(); });
+document.querySelector("#settingsBtn").addEventListener("click", async () => {
+  try {
+    await loadSettings();
+    document.querySelector("#settingsDialog").showModal();
+  } catch (err) {
+    showError(err);
+  }
+});
 document.querySelector("#importBtn").addEventListener("click", () => {
   document.querySelector("#importOutput").textContent = "";
   document.querySelector("#importDialog").showModal();
@@ -260,15 +317,27 @@ document.querySelector("#runImportBtn").addEventListener("click", async () => {
 });
 document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
 document.querySelector("#healthBtn").addEventListener("click", async () => {
-  document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
+  try {
+    document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
+  } catch (err) {
+    showError(err, "#settingsOutput");
+  }
 });
 document.querySelector("#benchBtn").addEventListener("click", async () => {
-  document.querySelector("#settingsOutput").textContent = "Running benchmark...";
-  document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("RunRandomBenchmark", 100, 64), null, 2);
+  try {
+    document.querySelector("#settingsOutput").textContent = "Running benchmark...";
+    document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("RunRandomBenchmark", 100, 64), null, 2);
+  } catch (err) {
+    showError(err, "#settingsOutput");
+  }
 });
 document.querySelector("#exportBtn").addEventListener("click", async () => {
-  document.querySelector("#exportText").value = await call("ExportPGN");
-  document.querySelector("#exportDialog").showModal();
+  try {
+    document.querySelector("#exportText").value = await call("ExportPGN");
+    document.querySelector("#exportDialog").showModal();
+  } catch (err) {
+    showError(err);
+  }
 });
 
 window.addEventListener("keydown", (event) => {
