@@ -27,6 +27,22 @@ func TestParseDecisionRejectsInvalid(t *testing.T) {
 	}
 }
 
+func TestParseDecisionRejectsWrongSchemaVersion(t *testing.T) {
+	raw := `{"schema_version":"decision-output.v9","previous_plan_status":"continue","position_summary":"ok","strategy_update":{"plan_summary":"develop","phase":"opening","confidence":0.6},"candidate_moves":[{"uci":"e2e4","purpose":"center","confidence":0.7}],"do_not_play":[]}`
+	parsed := ParseDecision(raw)
+	if parsed.Status != "schema_invalid" || !strings.Contains(parsed.Error, "unsupported schema_version") {
+		t.Fatalf("parsed = %+v, want unsupported schema error", parsed)
+	}
+}
+
+func TestParseDecisionRequiresCoreStrategicFields(t *testing.T) {
+	raw := `{"schema_version":"decision-output.v1.2","previous_plan_status":"continue","strategy_update":{"phase":"opening","confidence":0.6},"candidate_moves":[{"uci":"e2e4","purpose":"center","confidence":0.7}],"do_not_play":[]}`
+	parsed := ParseDecision(raw)
+	if parsed.Status != "schema_invalid" || !strings.Contains(parsed.Error, "missing position_summary") {
+		t.Fatalf("parsed = %+v, want missing position summary error", parsed)
+	}
+}
+
 func TestNormalizeCandidatesRepairsSAN(t *testing.T) {
 	game := chesscore.NewGame()
 	candidates, attempts := NormalizeCandidates(game, []CandidateMove{{SAN: "Nf3!", Purpose: "develop", LLMConfidence: 0.8}})

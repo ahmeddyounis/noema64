@@ -40,8 +40,22 @@ func ParseDecision(raw string) ParseResult {
 }
 
 func validateDecision(out DecisionOutput) error {
-	if out.SchemaVersion == "" {
-		return errors.New("missing schema_version")
+	if out.SchemaVersion != DecisionSchemaVersion {
+		if out.SchemaVersion == "" {
+			return errors.New("missing schema_version")
+		}
+		return fmt.Errorf("unsupported schema_version %q", out.SchemaVersion)
+	}
+	switch strings.ToLower(strings.TrimSpace(out.PreviousPlanStatus)) {
+	case "continue", "modify", "abandon", "new":
+	default:
+		return errors.New("previous_plan_status must be continue, modify, abandon, or new")
+	}
+	if strings.TrimSpace(out.PositionSummary) == "" {
+		return errors.New("missing position_summary")
+	}
+	if strings.TrimSpace(out.StrategyUpdate.PlanSummary) == "" {
+		return errors.New("missing strategy_update.plan_summary")
 	}
 	if len(out.CandidateMoves) == 0 {
 		return errors.New("candidate_moves must not be empty")
