@@ -1,0 +1,368 @@
+package uci
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"io"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/ahmedyounis/noema64/internal/decision"
+	"github.com/ahmedyounis/noema64/internal/engine"
+	"github.com/ahmedyounis/noema64/internal/providers"
+	"github.com/ahmedyounis/noema64/internal/storage"
+	"github.com/ahmedyounis/noema64/internal/strategy"
+	"github.com/ahmedyounis/noema64/internal/verifier"
+)
+
+const EngineName = "Noema64 0.1.0"
+
+type Server struct {
+	in     io.Reader
+	out    io.Writer
+	errOut io.Writer
+
+	mu           sync.Mutex
+	outMu        sync.Mutex
+	engine       *engine.Engine
+	traceStore   *storage.TraceStore
+	opts         engine.Options
+	searchCancel context.CancelFunc
+	searchDone   chan struct{}
+}
+
+func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.Settings) *Server {
+	opts := engineOptions(settings)
+	traceDir := settings.Logging.OutputDir
+	if traceDir == "" {
+		traceDir = "logs"
+	}
+	return &Server{
+		in:         in,
+		out:        out,
+		errOut:     errOut,
+		opts:       opts,
+		engine:     engine.New(opts),
+		traceStore: storage.NewTraceStore(traceDir),
+	}
+}
+
+func (s *Server) Run(ctx context.Context) error {
+	scanner := bufio.NewScanner(s.in)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if err := s.handle(ctx, line); err != nil {
+			s.info("warning: " + err.Error())
+		}
+		if line == "quit" {
+			return nil
+		}
+	}
+	return scanner.Err()
+}
+
+func (s *Server) handle(ctx context.Context, line string) error {
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return nil
+	}
+	switch fields[0] {
+	case "uci":
+		s.write("id name " + EngineName)
+		s.write("id author Noema64 contributors")
+		s.write("option name Mode type combo default blunderguard var pure var blunderguard var hybrid var coach")
+		s.write("option name Personality type combo default balanced var balanced var aggressive var positional var beginner_coach")
+		s.write("option name LLMProvider type string default mock")
+		s.write("option name LLMModel type string default mock-balanced")
+		s.write("option name LLMEndpoint type string default")
+		s.write("option name Temperature type spin default 20 min 0 max 200")
+		s.write("option name MaxCandidates type spin default 5 min 1 max 10")
+		s.write("option name VerifierEnabled type check default false")
+		s.write("option name VerifierPath type string default")
+		s.write("option name VerifierMoveTime type spin default 100 min 10 max 5000")
+		s.write("option name TraceFile type string default")
+		s.write("uciok")
+	case "isready":
+		s.write("readyok")
+	case "ucinewgame":
+		_, err := s.engine.NewGame(ctx, engine.NewGameOptions{Side: "auto"})
+		return err
+	case "setoption":
+		return s.setOption(line)
+	case "position":
+		return s.position(ctx, fields[1:])
+	case "go":
+		return s.goCommand(ctx, fields[1:])
+	case "stop":
+		s.stop()
+	case "quit":
+		s.stop()
+	default:
+		s.info("ignored unsupported command: " + fields[0])
+	}
+	return nil
+}
+
+func (s *Server) setOption(line string) error {
+	name, value := parseSetOption(line)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch strings.ToLower(name) {
+	case "mode":
+		s.opts.Mode = strategy.EngineMode(value)
+	case "personality", "strategypersonality":
+		s.opts.Personality = strategy.Personality(value)
+	case "llmmodel":
+		s.opts.Model = value
+	case "temperature":
+		n, err := strconv.Atoi(value)
+		if err == nil {
+			s.opts.Temperature = float64(n) / 100
+		}
+	case "maxcandidates":
+		n, err := strconv.Atoi(value)
+		if err == nil && n > 0 {
+			s.opts.MaxCandidates = n
+		}
+	case "verifierenabled":
+		s.opts.Verifier = verifier.StaticVerifier{Enabled: strings.EqualFold(value, "true")}
+	case "verifierpath":
+		if value != "" {
+			s.opts.Verifier = verifier.ExternalUCI{Path: value, MoveTimeMS: 100}
+		}
+	}
+	s.engine.SetOptions(s.opts)
+	return nil
+}
+
+func (s *Server) position(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("position command missing argument")
+	}
+	moves := []string{}
+	var fen string
+	switch args[0] {
+	case "startpos":
+		if idx := indexOf(args, "moves"); idx >= 0 {
+			moves = args[idx+1:]
+		}
+	case "fen":
+		idx := indexOf(args, "moves")
+		fenFields := args[1:]
+		if idx >= 0 {
+			fenFields = args[1:idx]
+			moves = args[idx+1:]
+		}
+		if len(fenFields) < 4 {
+			return fmt.Errorf("fen position requires at least 4 fields")
+		}
+		fen = strings.Join(fenFields, " ")
+	default:
+		return fmt.Errorf("unsupported position mode %s", args[0])
+	}
+	s.stop()
+	if _, err := s.engine.NewGame(ctx, engine.NewGameOptions{Side: "auto", FEN: fen}); err != nil {
+		return err
+	}
+	for _, mv := range moves {
+		if _, err := s.engine.ApplyUserMove(ctx, mv); err != nil {
+			return fmt.Errorf("invalid position move %s: %w", mv, err)
+		}
+	}
+	return nil
+}
+
+func (s *Server) goCommand(ctx context.Context, args []string) error {
+	s.mu.Lock()
+	if s.searchCancel != nil {
+		s.mu.Unlock()
+		s.info("search already active")
+		return nil
+	}
+	budget := parseGoBudget(args)
+	searchCtx, cancel := context.WithTimeout(ctx, budget)
+	done := make(chan struct{})
+	s.searchCancel = cancel
+	s.searchDone = done
+	s.mu.Unlock()
+
+	go func() {
+		defer close(done)
+		defer cancel()
+		dec, _, err := s.engine.ChooseMove(searchCtx)
+		if err != nil {
+			s.bestmove("0000")
+			s.clearSearch(done)
+			return
+		}
+		_ = s.traceStore.AppendDecision(context.Background(), dec)
+		s.emitDecisionInfo(dec)
+		s.bestmove(dec.SelectedMove.UCI)
+		s.clearSearch(done)
+	}()
+	return nil
+}
+
+func (s *Server) stop() {
+	s.mu.Lock()
+	cancel := s.searchCancel
+	done := s.searchDone
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
+		_ = s.engine.Stop(context.Background())
+	}
+	if done != nil {
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			s.info("stop timeout; fallback will complete asynchronously")
+		}
+	}
+}
+
+func (s *Server) clearSearch(done chan struct{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.searchDone == done {
+		s.searchCancel = nil
+		s.searchDone = nil
+	}
+}
+
+func (s *Server) emitDecisionInfo(dec *decision.MoveDecision) {
+	if dec == nil {
+		return
+	}
+	mode := string(dec.Mode)
+	assist := "legal-only"
+	if dec.Assistance.VerifierUsed {
+		assist = "verifier:" + dec.Assistance.VerifierName
+	}
+	s.info(fmt.Sprintf("noema64 mode=%s assistance=%s fallback=%t", mode, assist, dec.FallbackUsed))
+}
+
+func (s *Server) write(line string) {
+	s.outMu.Lock()
+	defer s.outMu.Unlock()
+	fmt.Fprintln(s.out, line)
+}
+
+func (s *Server) info(msg string) {
+	s.write("info string " + sanitizeInfo(msg))
+}
+
+func (s *Server) bestmove(move string) {
+	if move == "" {
+		move = "0000"
+	}
+	s.write("bestmove " + move)
+}
+
+func parseSetOption(line string) (string, string) {
+	fields := strings.Fields(line)
+	nameParts := []string{}
+	valueParts := []string{}
+	readingName := false
+	readingValue := false
+	for _, field := range fields[1:] {
+		switch field {
+		case "name":
+			readingName = true
+			readingValue = false
+		case "value":
+			readingValue = true
+			readingName = false
+		default:
+			if readingValue {
+				valueParts = append(valueParts, field)
+			} else if readingName {
+				nameParts = append(nameParts, field)
+			}
+		}
+	}
+	return strings.Join(nameParts, " "), strings.Join(valueParts, " ")
+}
+
+func parseGoBudget(args []string) time.Duration {
+	if idx := indexOf(args, "movetime"); idx >= 0 && idx+1 < len(args) {
+		if ms, err := strconv.Atoi(args[idx+1]); err == nil && ms > 0 {
+			return time.Duration(ms) * time.Millisecond
+		}
+	}
+	if idx := indexOf(args, "depth"); idx >= 0 && idx+1 < len(args) {
+		return 1500 * time.Millisecond
+	}
+	wtime := valueAfter(args, "wtime")
+	btime := valueAfter(args, "btime")
+	remaining := wtime
+	if btime > 0 && (remaining == 0 || btime < remaining) {
+		remaining = btime
+	}
+	if remaining <= 0 {
+		return 3 * time.Second
+	}
+	budget := time.Duration(remaining/30) * time.Millisecond
+	if budget < 200*time.Millisecond {
+		return 200 * time.Millisecond
+	}
+	if budget > 12*time.Second {
+		return 12 * time.Second
+	}
+	return budget
+}
+
+func valueAfter(args []string, key string) int {
+	if idx := indexOf(args, key); idx >= 0 && idx+1 < len(args) {
+		n, _ := strconv.Atoi(args[idx+1])
+		return n
+	}
+	return 0
+}
+
+func indexOf(items []string, needle string) int {
+	for i, item := range items {
+		if item == needle {
+			return i
+		}
+	}
+	return -1
+}
+
+func sanitizeInfo(s string) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", " ")
+	return s
+}
+
+func engineOptions(settings storage.Settings) engine.Options {
+	provider := providers.Provider(providers.MockProvider{})
+	if settings.LLM.Provider == "openai_compatible" && settings.LLM.Endpoint != "" {
+		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: settings.LLM.APIKey}
+	}
+	v := verifier.Verifier(verifier.StaticVerifier{Enabled: settings.Verifier.Enabled})
+	if settings.Verifier.Enabled && settings.Verifier.Path != "" {
+		v = verifier.ExternalUCI{Path: settings.Verifier.Path, MoveTimeMS: settings.Verifier.MoveTimeMS}
+	}
+	timeout := time.Duration(settings.LLM.TimeoutMS) * time.Millisecond
+	if timeout <= 0 {
+		timeout = 12 * time.Second
+	}
+	return engine.Options{
+		Mode:          settings.Engine.DefaultMode,
+		Personality:   settings.Engine.Personality,
+		Provider:      provider,
+		Verifier:      v,
+		Model:         settings.LLM.Model,
+		Temperature:   settings.LLM.Temperature,
+		MaxTokens:     settings.LLM.MaxTokens,
+		MaxCandidates: settings.Engine.MaxCandidates,
+		MoveTimeout:   timeout,
+	}
+}

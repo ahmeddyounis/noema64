@@ -1,0 +1,244 @@
+const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
+const ranks = ["1", "2", "3", "4", "5", "6", "7", "8"];
+const pieces = {
+  K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙",
+  k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟"
+};
+
+let state = null;
+let selected = null;
+let flipped = false;
+let activeTab = "summary";
+let settings = null;
+
+const api = () => window.go?.appsvc?.Application;
+
+async function call(name, ...args) {
+  const svc = api();
+  if (!svc || !svc[name]) throw new Error("Wails bindings are not available");
+  const result = await svc[name](...args);
+  return result;
+}
+
+async function refresh() {
+  try {
+    state = await call("GetGame");
+    render();
+  } catch (err) {
+    document.querySelector("#statusText").textContent = String(err);
+  }
+}
+
+function render() {
+  if (!state?.snapshot) return;
+  renderBoard();
+  renderStatus();
+  renderMoves();
+  renderStrategy();
+  renderDecision();
+}
+
+function renderStatus() {
+  const s = state.snapshot;
+  document.querySelector("#statusText").textContent = `${s.side_to_move} to move · ${s.outcome.status} · ${s.fen}`;
+  document.querySelector("#modeText").textContent = state.last_decision?.mode || settings?.engine?.default_mode || "blunderguard";
+}
+
+function squareOrder() {
+  const fs = flipped ? [...files].reverse() : files;
+  const rs = flipped ? ranks : [...ranks].reverse();
+  const out = [];
+  for (const r of rs) for (const f of fs) out.push(f + r);
+  return out;
+}
+
+function renderBoard() {
+  const board = document.querySelector("#board");
+  board.innerHTML = "";
+  const legalTargets = selected
+    ? state.snapshot.legal_moves.filter((m) => m.from === selected).map((m) => m.to)
+    : [];
+  const last = state.snapshot.move_history.at(-1);
+  for (const sq of squareOrder()) {
+    const file = files.indexOf(sq[0]);
+    const rank = ranks.indexOf(sq[1]);
+    const div = document.createElement("button");
+    div.className = `square ${(file + rank) % 2 === 0 ? "dark" : "light"}`;
+    div.setAttribute("role", "gridcell");
+    div.setAttribute("aria-label", `${sq} ${state.snapshot.board[sq] || "empty"}`);
+    div.dataset.square = sq;
+    if (selected === sq) div.classList.add("selected");
+    if (legalTargets.includes(sq)) div.classList.add("target");
+    if (last && (last.uci.startsWith(sq) || last.uci.slice(2, 4) === sq)) div.classList.add("last-move");
+    div.textContent = pieces[state.snapshot.board[sq]] || "";
+    const coord = document.createElement("span");
+    coord.className = "coord";
+    coord.textContent = sq;
+    div.appendChild(coord);
+    div.addEventListener("click", () => squareClicked(sq));
+    board.appendChild(div);
+  }
+}
+
+async function squareClicked(sq) {
+  if (!state?.snapshot) return;
+  if (!selected) {
+    if (state.snapshot.board[sq]) selected = sq;
+    renderBoard();
+    return;
+  }
+  const legal = state.snapshot.legal_moves.find((m) => m.from === selected && m.to === sq);
+  if (!legal) {
+    selected = state.snapshot.board[sq] ? sq : null;
+    renderBoard();
+    return;
+  }
+  selected = null;
+  await makeMove(legal.uci);
+}
+
+function renderMoves() {
+  const list = document.querySelector("#moveList");
+  list.innerHTML = "";
+  for (const move of state.snapshot.move_history) {
+    const item = document.createElement("li");
+    item.textContent = `${move.san} (${move.uci})`;
+    list.appendChild(item);
+  }
+}
+
+function renderStrategy() {
+  const mem = state.strategy_memory || {};
+  document.querySelector("#confidence").textContent = Number(mem.plan?.confidence || 0).toFixed(2);
+  const dl = document.querySelector("#strategyMemory");
+  dl.innerHTML = "";
+  const rows = [
+    ["Plan", mem.plan?.summary],
+    ["Status", mem.plan?.status],
+    ["Phase", mem.phase],
+    ["Targets", [...(mem.targets?.squares || []), ...(mem.targets?.pieces || []), ...(mem.targets?.pawns || [])].join(", ")],
+    ["Opponent", mem.opponent_model?.likely_plan],
+    ["Warnings", (mem.tactical_warnings || []).join("; ")],
+    ["Commitments", (mem.commitments || []).join("; ")],
+    ["Triggers", (mem.refutation_triggers || []).map((t) => t.condition || t).join("; ")],
+    ["Last", mem.last_update?.summary]
+  ];
+  for (const [label, value] of rows) {
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = value || "None";
+    dl.append(dt, dd);
+  }
+}
+
+function renderDecision() {
+  const dec = state.last_decision;
+  document.querySelector("#thinkingStage").textContent = dec ? "Decision finished" : "Idle";
+  document.querySelector("#tabContent").textContent = tabText(dec);
+  const box = document.querySelector("#candidates");
+  box.innerHTML = "";
+  if (!dec?.candidate_moves?.length) {
+    box.textContent = "Candidate moves will appear here while the engine is thinking.";
+    return;
+  }
+  for (const c of dec.candidate_moves) {
+    const div = document.createElement("div");
+    div.className = "candidate";
+    div.innerHTML = `<strong>${c.san || c.uci}</strong><span>${c.purpose || ""}<br><small>${c.verifier_score?.status || "not_checked"} · ${c.risk || ""}</small></span><small>${Number(c.final_score || 0).toFixed(2)}</small>`;
+    box.appendChild(div);
+  }
+}
+
+function tabText(dec) {
+  if (!dec) return "No strategy yet. Noema64 will create a plan after its first decision.";
+  switch (activeTab) {
+    case "diff": return JSON.stringify(dec.strategy_diff, null, 2);
+    case "verifier": return JSON.stringify(dec.verifier_trace, null, 2);
+    case "raw": return JSON.stringify(dec, null, 2);
+    default:
+      return `${dec.selected_move?.san || dec.selected_move?.uci}: ${dec.explanation}\n\n${dec.position_summary}\n\nFallback used: ${dec.fallback_used}`;
+  }
+}
+
+async function makeMove(move) {
+  document.querySelector("#thinkingStage").textContent = "Applying user move";
+  state = await call("MakeUserMove", move);
+  render();
+}
+
+async function askEngine() {
+  document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
+  const result = await call("RequestEngineMove");
+  state = result.state;
+  render();
+}
+
+async function loadSettings() {
+  settings = await call("GetSettings");
+  document.querySelector("#settingMode").value = settings.engine.default_mode;
+  document.querySelector("#settingProvider").value = settings.llm.provider;
+  document.querySelector("#settingEndpoint").value = settings.llm.endpoint || "";
+  document.querySelector("#settingModel").value = settings.llm.model || "";
+  document.querySelector("#settingKey").value = settings.llm.api_key || "";
+  document.querySelector("#settingVerifier").checked = !!settings.verifier.enabled;
+  document.querySelector("#settingVerifierPath").value = settings.verifier.path || "";
+  document.querySelector("#settingRaw").checked = !!settings.privacy.log_raw_prompts;
+}
+
+async function saveSettings() {
+  settings.engine.default_mode = document.querySelector("#settingMode").value;
+  settings.llm.provider = document.querySelector("#settingProvider").value;
+  settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
+  settings.llm.model = document.querySelector("#settingModel").value;
+  settings.llm.api_key = document.querySelector("#settingKey").value;
+  settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
+  settings.verifier.path = document.querySelector("#settingVerifierPath").value;
+  settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
+  await call("SaveSettings", settings);
+  document.querySelector("#settingsOutput").textContent = "Settings saved.";
+}
+
+document.querySelectorAll(".tabs button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeTab = btn.dataset.tab;
+    renderDecision();
+  });
+});
+
+document.querySelector("#newGameBtn").addEventListener("click", async () => {
+  state = await call("NewGame", { side: "white", mode: document.querySelector("#settingMode")?.value || "blunderguard" });
+  render();
+});
+document.querySelector("#engineBtn").addEventListener("click", askEngine);
+document.querySelector("#stopBtn").addEventListener("click", () => call("StopEngine"));
+document.querySelector("#undoBtn").addEventListener("click", async () => { state = await call("Undo", 1); render(); });
+document.querySelector("#flipBtn").addEventListener("click", () => { flipped = !flipped; renderBoard(); });
+document.querySelector("#moveBtn").addEventListener("click", () => makeMove(document.querySelector("#moveInput").value.trim()));
+document.querySelector("#settingsBtn").addEventListener("click", async () => { await loadSettings(); document.querySelector("#settingsDialog").showModal(); });
+document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
+document.querySelector("#healthBtn").addEventListener("click", async () => {
+  document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
+});
+document.querySelector("#benchBtn").addEventListener("click", async () => {
+  document.querySelector("#settingsOutput").textContent = "Running benchmark...";
+  document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("RunRandomBenchmark", 100, 64), null, 2);
+});
+document.querySelector("#exportBtn").addEventListener("click", async () => {
+  document.querySelector("#exportText").value = await call("ExportPGN");
+  document.querySelector("#exportDialog").showModal();
+});
+
+window.addEventListener("keydown", (event) => {
+  if (event.target.matches("input, textarea, select")) return;
+  if (event.key === "n" || event.key === "N") document.querySelector("#newGameBtn").click();
+  if (event.key === " ") { event.preventDefault(); askEngine(); }
+  if (event.key === "u" || event.key === "U") document.querySelector("#undoBtn").click();
+  if (event.key === "f" || event.key === "F") document.querySelector("#flipBtn").click();
+  if (event.key === ",") document.querySelector("#settingsBtn").click();
+});
+
+refresh();
+

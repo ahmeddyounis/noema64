@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noema64</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <strong>Noema64</strong>
+          <span>A chess engine that remembers what it is trying to do.</span>
+        </div>
+        <div class="toolbar">
+          <button id="newGameBtn" title="New game">N</button>
+          <button id="engineBtn" title="Ask engine">▶</button>
+          <button id="stopBtn" title="Stop thinking">■</button>
+          <button id="undoBtn" title="Undo">↶</button>
+          <button id="flipBtn" title="Flip board">⇅</button>
+          <button id="exportBtn" title="Export PGN">⇩</button>
+          <button id="settingsBtn" title="Settings">⚙</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="board-area" aria-label="Chess board workspace">
+          <div class="status-row">
+            <span id="statusText">Loading game...</span>
+            <span id="modeText">mode</span>
+          </div>
+          <div id="board" class="board" role="grid" aria-label="Chess board"></div>
+          <div class="move-entry">
+            <input id="moveInput" aria-label="UCI move" placeholder="e2e4" />
+            <button id="moveBtn">Play</button>
+          </div>
+          <ol id="moveList" class="move-list" aria-label="Move list"></ol>
+        </section>
+
+        <section class="panel trace-panel" aria-label="Decision trace">
+          <div class="panel-header">
+            <h2>Decision Trace</h2>
+            <span id="thinkingStage">Idle</span>
+          </div>
+          <div class="tabs">
+            <button data-tab="summary" class="active">Summary</button>
+            <button data-tab="diff">Diff</button>
+            <button data-tab="verifier">Verifier</button>
+            <button data-tab="raw">JSON</button>
+          </div>
+          <div id="tabContent" class="tab-content"></div>
+          <h2>Candidate Moves</h2>
+          <div id="candidates" class="candidates"></div>
+        </section>
+
+        <section class="panel strategy-panel" aria-label="Strategy memory">
+          <div class="panel-header">
+            <h2>Strategy Memory</h2>
+            <span id="confidence">0.00</span>
+          </div>
+          <dl id="strategyMemory" class="strategy-memory"></dl>
+        </section>
+      </main>
+
+      <dialog id="settingsDialog">
+        <form method="dialog" class="settings">
+          <header>
+            <h2>Settings</h2>
+            <button value="cancel" title="Close">×</button>
+          </header>
+          <label>Mode
+            <select id="settingMode">
+              <option value="pure">Pure</option>
+              <option value="blunderguard">Blunderguard</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="coach">Coach</option>
+            </select>
+          </label>
+          <label>Provider
+            <select id="settingProvider">
+              <option value="mock">Mock</option>
+              <option value="openai_compatible">OpenAI-compatible</option>
+            </select>
+          </label>
+          <label>Endpoint <input id="settingEndpoint" placeholder="http://localhost:11434/v1" /></label>
+          <label>Model <input id="settingModel" placeholder="mock-balanced" /></label>
+          <label>API key <input id="settingKey" type="password" autocomplete="off" /></label>
+          <label><input id="settingVerifier" type="checkbox" /> Verifier enabled</label>
+          <label>Verifier path <input id="settingVerifierPath" placeholder="stockfish" /></label>
+          <label><input id="settingRaw" type="checkbox" /> Raw prompt logging</label>
+          <menu>
+            <button id="healthBtn" value="none" type="button">Health</button>
+            <button id="benchBtn" value="none" type="button">Benchmark 100</button>
+            <button id="saveSettingsBtn" value="none" type="button">Save</button>
+          </menu>
+          <pre id="settingsOutput"></pre>
+        </form>
+      </dialog>
+
+      <dialog id="exportDialog">
+        <form method="dialog">
+          <header>
+            <h2>Export PGN</h2>
+            <button value="cancel" title="Close">×</button>
+          </header>
+          <textarea id="exportText" readonly></textarea>
+        </form>
+      </dialog>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>
+

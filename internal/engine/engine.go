@@ -175,6 +175,19 @@ func (e *Engine) State(ctx context.Context) (*GameState, error) {
 	return e.stateLocked(), nil
 }
 
+func (e *Engine) SetOptions(opts Options) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	normalized := normalizeOptions(opts)
+	if opts.Provider == nil {
+		normalized.Provider = e.opts.Provider
+	}
+	if opts.Verifier == nil {
+		normalized.Verifier = e.opts.Verifier
+	}
+	e.opts = normalized
+}
+
 func (e *Engine) LegalMoves(ctx context.Context) ([]chesscore.LegalMove, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
