@@ -2,7 +2,11 @@ package appsvc
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/ahmedyounis/noema64/internal/storage"
 )
 
 func TestImportFENAndPGN(t *testing.T) {
@@ -21,5 +25,37 @@ func TestImportFENAndPGN(t *testing.T) {
 	}
 	if len(pgnState.Snapshot.MoveHistory) != 4 {
 		t.Fatalf("history length = %d, want 4", len(pgnState.Snapshot.MoveHistory))
+	}
+}
+
+func TestSaveSettingsKeepsNormalizedRuntimeSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	app := NewApplication(path)
+
+	if appErr := app.SaveSettings(context.Background(), storage.Settings{}); appErr != nil {
+		t.Fatalf("save settings: %v", appErr)
+	}
+
+	if app.settings.Engine.MaxCandidates == 0 {
+		t.Fatal("runtime settings kept unnormalized max_candidates")
+	}
+	if app.settings.Logging.OutputDir == "" {
+		t.Fatal("runtime settings kept unnormalized logging output dir")
+	}
+}
+
+func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
+	traceDir := filepath.Join(t.TempDir(), "traces")
+	app := NewApplication("")
+	app.settings.Engine.TraceEnabled = false
+	app.settings.Logging.OutputDir = traceDir
+	app.traces = storage.NewTraceStore(traceDir)
+
+	_, appErr := app.RequestEngineMove(context.Background())
+	if appErr != nil {
+		t.Fatalf("engine move: %v", appErr)
+	}
+	if entries, err := os.ReadDir(traceDir); err == nil && len(entries) > 0 {
+		t.Fatalf("trace files written while trace_enabled=false: %v", entries)
 	}
 }

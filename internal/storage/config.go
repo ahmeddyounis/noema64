@@ -143,7 +143,7 @@ func LoadSettings(path string) (Settings, error) {
 }
 
 func SaveSettings(path string, settings Settings) error {
-	settings = normalizeSettings(settings)
+	settings = NormalizeSettings(settings)
 	if err := validateSettings(settings); err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func SaveSettings(path string, settings Settings) error {
 	return os.WriteFile(path, b, 0o600)
 }
 
-func normalizeSettings(settings Settings) Settings {
+func NormalizeSettings(settings Settings) Settings {
 	defaults := DefaultSettings()
 	if settings.SchemaVersion == "" {
 		settings.SchemaVersion = defaults.SchemaVersion

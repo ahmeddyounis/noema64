@@ -92,7 +92,7 @@ func (a *Application) MakeUserMove(ctx context.Context, moveUCI string) (*engine
 
 func (a *Application) RequestEngineMove(ctx context.Context) (any, *AppError) {
 	dec, state, err := a.engine.ChooseMove(ctx)
-	if err == nil {
+	if err == nil && a.settings.Engine.TraceEnabled {
 		_ = a.traces.AppendDecision(context.Background(), dec)
 	}
 	return map[string]any{"decision": dec, "state": state}, appErr("ERR_ENGINE_MOVE", err, true)
@@ -154,6 +154,7 @@ func (a *Application) SaveSettings(ctx context.Context, settings storage.Setting
 	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
 		return appErr("ERR_SETTINGS_INVALID", err, true)
 	}
+	settings = storage.NormalizeSettings(settings)
 	a.settings = settings
 	a.engine.SetOptions(a.engineOptions())
 	a.traces = storage.NewTraceStore(settings.Logging.OutputDir)
