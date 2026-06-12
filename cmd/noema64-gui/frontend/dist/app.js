@@ -218,13 +218,25 @@ function renderDecision() {
     detail.append(document.createTextNode(c.purpose || ""));
     detail.append(document.createElement("br"));
     const meta = document.createElement("small");
-    meta.textContent = `${c.verifier_score?.status || "not_checked"} · ${c.risk || ""}`;
+    meta.textContent = `confidence ${formatScore(c.confidence)} · plan ${formatScore(c.plan_alignment_score)} · verifier ${c.verifier_score?.status || "not_checked"}`;
     detail.append(meta);
+    if (c.risk) {
+      detail.append(document.createElement("br"));
+      const risk = document.createElement("small");
+      risk.textContent = c.risk;
+      detail.append(risk);
+    }
     const score = document.createElement("small");
-    score.textContent = Number(c.final_score || 0).toFixed(2);
+    score.className = "candidate-score";
+    score.textContent = `#${c.rank || "-"} · final ${formatScore(c.final_score)}`;
     div.append(move, detail, score);
     box.appendChild(div);
   }
+}
+
+function formatScore(value) {
+  const score = Number(value);
+  return Number.isFinite(score) ? score.toFixed(2) : "0.00";
 }
 
 function tabText(dec) {

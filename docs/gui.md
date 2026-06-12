@@ -10,7 +10,7 @@ It exposes:
 - Settings for mode, personality, provider, API endpoint/key, verifier path/timing, trace logging, raw logging flags, and log output directory.
 - Relaunch restore for the latest saved game, clock, and strategy memory from `logging.output_dir/games`.
 - Strategy memory panel.
-- Candidate move panel.
+- Candidate move panel with confidence, plan alignment, final rank, and verifier status.
 - Decision trace tabs.
 - Provider health and random benchmark actions.
 

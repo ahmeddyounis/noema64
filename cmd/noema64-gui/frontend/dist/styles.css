@@ -227,18 +227,28 @@ button:hover {
 
 .candidate {
   display: grid;
-  grid-template-columns: 70px 1fr 52px;
+  grid-template-columns: 70px minmax(0, 1fr) 96px;
   gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid #e5e9f0;
+  align-items: start;
 }
 
 .candidate strong {
   font-size: 14px;
 }
 
+.candidate span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .candidate small {
   color: #607083;
+}
+
+.candidate-score {
+  text-align: right;
 }
 
 .strategy-memory {
