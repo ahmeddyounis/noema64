@@ -11,6 +11,10 @@ coverage.out
 /runs/
 /.tmp/
 
+# IDE and Wails generated output
+.idea/
+cmd/noema64-gui/build/
+cmd/noema64-gui/frontend/wailsjs/
+
 # Frontend dependencies
 node_modules/
-
