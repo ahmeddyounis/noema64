@@ -395,7 +395,10 @@ async function loadSettings() {
   document.querySelector("#settingProvider").value = settings.llm.provider;
   document.querySelector("#settingEndpoint").value = settings.llm.endpoint || "";
   document.querySelector("#settingModel").value = settings.llm.model || "";
+  document.querySelector("#settingTemperature").value = settings.llm.temperature ?? 0.2;
+  document.querySelector("#settingMaxTokens").value = settings.llm.max_tokens || 1600;
   document.querySelector("#settingTimeout").value = settings.llm.timeout_ms || 12000;
+  document.querySelector("#settingRetries").value = settings.llm.retries ?? 1;
   document.querySelector("#settingKey").value = settings.llm.api_key || "";
   document.querySelector("#settingCloudAck").checked = !!settings.privacy.cloud_provider_warning_acknowledged;
   document.querySelector("#settingVerifier").checked = !!settings.verifier.enabled;
@@ -447,7 +450,10 @@ function applySelectedProviderProfile() {
   document.querySelector("#settingProvider").value = profile.provider || "mock";
   document.querySelector("#settingEndpoint").value = profile.endpoint || profile.base_url || "";
   document.querySelector("#settingModel").value = profile.model || "";
+  document.querySelector("#settingTemperature").value = profile.temperature ?? settings?.llm?.temperature ?? 0.2;
+  document.querySelector("#settingMaxTokens").value = profile.max_tokens || settings?.llm?.max_tokens || 1600;
   document.querySelector("#settingTimeout").value = profile.timeout_ms || settings?.llm?.timeout_ms || 12000;
+  document.querySelector("#settingRetries").value = profile.retries ?? settings?.llm?.retries ?? 1;
   applyingProviderProfile = false;
   syncProviderDisclosure();
 }
@@ -473,7 +479,10 @@ async function saveSettings() {
     settings.llm.provider = document.querySelector("#settingProvider").value;
     settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
     settings.llm.model = document.querySelector("#settingModel").value;
+    settings.llm.temperature = Number(document.querySelector("#settingTemperature").value);
+    settings.llm.max_tokens = Number(document.querySelector("#settingMaxTokens").value) || settings.llm.max_tokens;
     settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
+    settings.llm.retries = Number(document.querySelector("#settingRetries").value) || 0;
     settings.llm.api_key = document.querySelector("#settingKey").value;
     settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
     if (settings.llm.provider === "openai_compatible" && !settings.privacy.cloud_provider_warning_acknowledged) {
@@ -635,7 +644,7 @@ document.querySelector("#settingProvider").addEventListener("change", () => {
   markProviderProfileCustom();
   syncProviderDisclosure();
 });
-["#settingEndpoint", "#settingModel", "#settingTimeout", "#settingKey"].forEach((selector) => {
+["#settingEndpoint", "#settingModel", "#settingTemperature", "#settingMaxTokens", "#settingTimeout", "#settingRetries", "#settingKey"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", markProviderProfileCustom);
 });
 document.querySelector("#recentBtn").addEventListener("click", openRecentGames);

@@ -33,6 +33,7 @@ type Server struct {
 	providerKind     string
 	endpoint         string
 	apiKey           string
+	providerRetries  int
 	verifierEnabled  bool
 	verifierPath     string
 	verifierMoveTime int
@@ -61,6 +62,7 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		providerKind:     settings.LLM.Provider,
 		endpoint:         settings.LLM.Endpoint,
 		apiKey:           settings.LLM.APIKey,
+		providerRetries:  settings.LLM.Retries,
 		verifierEnabled:  settings.Verifier.Enabled,
 		verifierPath:     settings.Verifier.Path,
 		verifierMoveTime: settings.Verifier.MoveTimeMS,
@@ -207,7 +209,7 @@ func (s *Server) setOption(line string) error {
 
 func (s *Server) refreshProviderLocked() {
 	if strings.EqualFold(s.providerKind, "openai_compatible") && s.endpoint != "" {
-		s.opts.Provider = providers.OpenAICompatible{BaseURL: s.endpoint, APIKey: s.apiKey, Model: s.opts.Model}
+		s.opts.Provider = providers.OpenAICompatible{BaseURL: s.endpoint, APIKey: s.apiKey, Model: s.opts.Model, Retries: s.providerRetries}
 		return
 	}
 	s.opts.Provider = providers.MockProvider{}
@@ -465,7 +467,7 @@ func sanitizeInfo(s string) string {
 func engineOptions(settings storage.Settings) engine.Options {
 	provider := providers.Provider(providers.MockProvider{})
 	if settings.LLM.Provider == "openai_compatible" && settings.LLM.Endpoint != "" {
-		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: settings.LLM.APIKey, Model: settings.LLM.Model}
+		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: settings.LLM.APIKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
 	}
 	v := verifier.Verifier(verifier.StaticVerifier{Enabled: settings.Verifier.Enabled})
 	if settings.Verifier.Enabled && settings.Verifier.Path != "" {

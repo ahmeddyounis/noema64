@@ -126,7 +126,10 @@
           <label id="cloudProviderWarning" class="provider-warning hidden"><input id="settingCloudAck" type="checkbox" /> I understand this provider may receive FEN, legal moves, move history, strategy memory, and selected settings.</label>
           <label>Endpoint <input id="settingEndpoint" placeholder="http://localhost:11434/v1" /></label>
           <label>Model <input id="settingModel" placeholder="mock-balanced" /></label>
+          <label>Temperature <input id="settingTemperature" type="number" min="0" max="2" step="0.05" /></label>
+          <label>Max tokens <input id="settingMaxTokens" type="number" min="1" step="100" /></label>
           <label>LLM timeout ms <input id="settingTimeout" type="number" min="100" step="100" /></label>
+          <label>Retries <input id="settingRetries" type="number" min="0" max="5" step="1" /></label>
           <label>API key <input id="settingKey" type="password" autocomplete="off" /></label>
           <label><input id="settingVerifier" type="checkbox" /> Verifier enabled</label>
           <label>Verifier path <input id="settingVerifierPath" placeholder="stockfish" /></label>

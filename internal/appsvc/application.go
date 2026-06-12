@@ -50,7 +50,7 @@ func NewApplication(settingsPath string) *Application {
 func (a *Application) engineOptions() engine.Options {
 	var provider providers.Provider = providers.MockProvider{}
 	if a.settings.LLM.Provider == "openai_compatible" && a.settings.LLM.Endpoint != "" {
-		provider = providers.OpenAICompatible{BaseURL: a.settings.LLM.Endpoint, APIKey: a.settings.LLM.APIKey, Model: a.settings.LLM.Model}
+		provider = providers.OpenAICompatible{BaseURL: a.settings.LLM.Endpoint, APIKey: a.settings.LLM.APIKey, Model: a.settings.LLM.Model, Retries: a.settings.LLM.Retries}
 	}
 	var verify verifier.Verifier = verifier.StaticVerifier{Enabled: a.settings.Verifier.Enabled}
 	if a.settings.Verifier.Enabled && a.settings.Verifier.Path != "" {

@@ -14,6 +14,7 @@ type OpenAICompatible struct {
 	BaseURL string
 	APIKey  string
 	Model   string
+	Retries int
 	Client  *http.Client
 }
 
@@ -54,6 +55,25 @@ func (p OpenAICompatible) HealthCheck(ctx context.Context) error {
 }
 
 func (p OpenAICompatible) CompleteJSON(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+	attempts := p.Retries + 1
+	if attempts < 1 {
+		attempts = 1
+	}
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		resp, err := p.completeJSONOnce(ctx, req)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			return nil, err
+		}
+	}
+	return nil, lastErr
+}
+
+func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
 	start := time.Now()
 	client := p.Client
 	if client == nil {

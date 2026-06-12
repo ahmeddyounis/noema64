@@ -68,6 +68,32 @@ func TestOpenAICompatibleCompleteJSONRequestShape(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleRetriesTransientFailure(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			http.Error(w, "temporary failure", http.StatusBadGateway)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{
+				"message": map[string]string{"content": `{"ok":true}`},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Retries: 1}
+	resp, err := provider.CompleteJSON(context.Background(), CompletionRequest{Model: "model-a", MaxTokens: 16})
+	if err != nil {
+		t.Fatalf("complete json with retry: %v", err)
+	}
+	if attempts != 2 || resp.Text != `{"ok":true}` {
+		t.Fatalf("attempts=%d response=%+v", attempts, resp)
+	}
+}
+
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`

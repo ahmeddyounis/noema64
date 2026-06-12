@@ -8,6 +8,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
+	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"github.com/ahmedyounis/noema64/internal/verifier"
@@ -132,6 +133,26 @@ func TestSaveSettingsStoresSelectedProviderProfile(t *testing.T) {
 	}
 	if app.settings.LLM.Provider != "openai_compatible" || app.settings.LLM.Endpoint != "http://localhost:11434/v1" || app.settings.LLM.Model != "llama3.1" {
 		t.Fatalf("selected provider profile not stored: %+v", app.settings.LLM)
+	}
+}
+
+func TestEngineOptionsHonorsProviderRetries(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.LLM.Model = "llama3.1"
+	settings.LLM.Retries = 3
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save retry settings: %v", err)
+	}
+	provider, ok := app.engineOptions().Provider.(providers.OpenAICompatible)
+	if !ok {
+		t.Fatalf("provider = %T, want OpenAICompatible", app.engineOptions().Provider)
+	}
+	if provider.Retries != 3 {
+		t.Fatalf("provider retries = %d, want 3", provider.Retries)
 	}
 }
 
