@@ -30,7 +30,9 @@ func (v ExternalUCI) HealthCheck(ctx context.Context) error {
 	if v.Path == "" {
 		return fmt.Errorf("external verifier path is empty")
 	}
-	cmd := exec.CommandContext(ctx, v.Path)
+	healthCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(healthCtx, v.Path)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -47,20 +49,19 @@ func (v ExternalUCI) HealthCheck(ctx context.Context) error {
 		_ = cmd.Wait()
 	}()
 	reader := bufio.NewReader(stdout)
-	if _, err := io.WriteString(stdin, "uci\nisready\n"); err != nil {
+	if _, err := io.WriteString(stdin, "uci\n"); err != nil {
 		return err
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			return err
-		}
-		if strings.TrimSpace(line) == "readyok" {
-			return nil
-		}
+	if err := waitForToken(healthCtx, reader, "uciok"); err != nil {
+		return fmt.Errorf("external verifier did not complete UCI handshake: %w", err)
 	}
-	return fmt.Errorf("external verifier did not become ready")
+	if _, err := io.WriteString(stdin, "isready\n"); err != nil {
+		return err
+	}
+	if err := waitForToken(healthCtx, reader, "readyok"); err != nil {
+		return fmt.Errorf("external verifier did not become ready: %w", err)
+	}
+	return nil
 }
 
 func (v ExternalUCI) VerifyCandidates(ctx context.Context, req Request) (*Result, error) {
