@@ -45,13 +45,20 @@ func TestFENAndPGN(t *testing.T) {
 		t.Fatalf("fen: %v", err)
 	}
 	foundPromotion := false
+	foundUnderpromotion := false
 	for _, mv := range game.LegalMoves() {
 		if mv.UCI == "a7a8q" {
 			foundPromotion = true
 		}
+		if mv.UCI == "a7a8n" && mv.Promotion == "n" {
+			foundUnderpromotion = true
+		}
 	}
 	if !foundPromotion {
 		t.Fatal("expected queen promotion legal move")
+	}
+	if !foundUnderpromotion {
+		t.Fatal("expected knight underpromotion legal move")
 	}
 
 	pgn := "1. e4 e5 2. Nf3 Nc6 *"
@@ -64,6 +71,55 @@ func TestFENAndPGN(t *testing.T) {
 	}
 	if !strings.Contains(loaded.PGN(), "Nf3") {
 		t.Fatalf("exported PGN missing Nf3: %s", loaded.PGN())
+	}
+}
+
+func TestSpecialMoveLegality(t *testing.T) {
+	castling, err := FromFEN("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1")
+	if err != nil {
+		t.Fatalf("castling fen: %v", err)
+	}
+	if !hasLegalMove(castling.LegalMoves(), "e1g1") || !hasLegalMove(castling.LegalMoves(), "e1c1") {
+		t.Fatalf("expected both white castling moves, got %+v", castling.LegalMoves())
+	}
+
+	enPassant, err := FromFEN("8/8/8/3pP3/8/8/8/4K2k w - d6 0 1")
+	if err != nil {
+		t.Fatalf("en passant fen: %v", err)
+	}
+	epMove, ok := findLegalMove(enPassant.LegalMoves(), "e5d6")
+	if !ok || !epMove.Capture {
+		t.Fatalf("expected e5d6 en passant capture, got %+v", enPassant.LegalMoves())
+	}
+	if _, err := enPassant.ApplyUCI("e5d6"); err != nil {
+		t.Fatalf("apply en passant: %v", err)
+	}
+	if enPassant.BoardMap()["d5"] != "" {
+		t.Fatalf("en passant left captured pawn on d5: %+v", enPassant.BoardMap())
+	}
+}
+
+func TestDrawOutcomesFromFEN(t *testing.T) {
+	tests := []struct {
+		name string
+		fen  string
+	}{
+		{name: "stalemate", fen: "7k/5K2/6Q1/8/8/8/8/8 b - - 0 1"},
+		{name: "insufficient material", fen: "8/8/8/8/8/8/8/K6k w - - 0 1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			game, err := FromFEN(tt.fen)
+			if err != nil {
+				t.Fatalf("fen: %v", err)
+			}
+			if outcome := game.Outcome(); outcome.Status != "draw" {
+				t.Fatalf("outcome = %+v, want draw", outcome)
+			}
+			if len(game.LegalMoves()) != 0 {
+				t.Fatalf("drawn terminal position kept legal moves: %+v", game.LegalMoves())
+			}
+		})
 	}
 }
 
@@ -131,4 +187,18 @@ func perft(game *Game, depth int) int {
 		nodes += perft(next, depth-1)
 	}
 	return nodes
+}
+
+func hasLegalMove(moves []LegalMove, uci string) bool {
+	_, ok := findLegalMove(moves, uci)
+	return ok
+}
+
+func findLegalMove(moves []LegalMove, uci string) (LegalMove, bool) {
+	for _, move := range moves {
+		if move.UCI == uci {
+			return move, true
+		}
+	}
+	return LegalMove{}, false
 }
