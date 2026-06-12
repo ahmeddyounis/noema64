@@ -36,6 +36,7 @@ type Server struct {
 	verifierPath     string
 	verifierMoveTime int
 	verifierMaxLoss  int
+	traceEnabled     bool
 	searchCancel     context.CancelFunc
 	searchDone       chan struct{}
 }
@@ -59,6 +60,7 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		verifierPath:     settings.Verifier.Path,
 		verifierMoveTime: settings.Verifier.MoveTimeMS,
 		verifierMaxLoss:  settings.Verifier.MaxCentipawnLoss,
+		traceEnabled:     settings.Engine.TraceEnabled,
 	}
 }
 
@@ -99,6 +101,7 @@ func (s *Server) handle(ctx context.Context, line string) error {
 		s.write("option name VerifierPath type string default")
 		s.write("option name VerifierMoveTime type spin default 100 min 10 max 5000")
 		s.write("option name VerifierMaxCentipawnLoss type spin default 180 min 0 max 2000")
+		s.write("option name TraceEnabled type check default true")
 		s.write("option name TraceFile type string default")
 		s.write("uciok")
 	case "isready":
@@ -175,6 +178,8 @@ func (s *Server) setOption(line string) error {
 		if value != "" {
 			s.traceStore = storage.NewTraceFileStore(value)
 		}
+	case "traceenabled":
+		s.traceEnabled = strings.EqualFold(value, "true")
 	}
 	s.engine.SetOptions(s.opts)
 	return nil
@@ -264,7 +269,9 @@ func (s *Server) goCommand(ctx context.Context, args []string) error {
 			s.clearSearch(done)
 			return
 		}
-		_ = s.traceStore.AppendDecision(context.Background(), dec)
+		if s.traceEnabled {
+			_ = s.traceStore.AppendDecision(context.Background(), dec)
+		}
 		s.emitDecisionInfo(dec)
 		s.bestmove(dec.SelectedMove.UCI)
 		s.clearSearch(done)

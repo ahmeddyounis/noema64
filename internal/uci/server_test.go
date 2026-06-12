@@ -64,6 +64,30 @@ func TestUCITraceFileOption(t *testing.T) {
 	}
 }
 
+func TestUCITraceEnabledOptionDisablesTraceWrites(t *testing.T) {
+	tracePath := filepath.Join(t.TempDir(), "trace.jsonl")
+	input := strings.Join([]string{
+		"uci",
+		"setoption name TraceFile value " + tracePath,
+		"setoption name TraceEnabled value false",
+		"position startpos moves e2e4 e7e5",
+		"go movetime 100",
+		"quit",
+		"",
+	}, "\n")
+	var out bytes.Buffer
+	server := NewServer(strings.NewReader(input), &out, &bytes.Buffer{}, storage.DefaultSettings())
+	if err := server.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if !strings.Contains(out.String(), "bestmove ") {
+		t.Fatalf("missing bestmove:\n%s", out.String())
+	}
+	if _, err := os.Stat(tracePath); !os.IsNotExist(err) {
+		t.Fatalf("trace file written with TraceEnabled=false: %v", err)
+	}
+}
+
 func validUCILine(line string) bool {
 	for _, prefix := range []string{"id ", "option ", "uciok", "readyok", "bestmove ", "info "} {
 		if strings.HasPrefix(line, prefix) {

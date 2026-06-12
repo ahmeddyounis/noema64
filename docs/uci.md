@@ -32,4 +32,5 @@ Additional Noema64 options:
 - `VerifierPath`
 - `VerifierMoveTime`
 - `VerifierMaxCentipawnLoss`
+- `TraceEnabled`
 - `TraceFile`
