@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/ahmedyounis/noema64/internal/engine"
+	"github.com/ahmedyounis/noema64/internal/strategy"
+	"github.com/ahmedyounis/noema64/internal/verifier"
 )
 
 type Runner struct {
@@ -63,7 +65,14 @@ func (r Runner) RandomLegalBenchmark(ctx context.Context, games int, seed int64)
 }
 
 func (r Runner) playOne(ctx context.Context, index int, rng *rand.Rand) (GameSummary, error) {
-	e := engine.New(r.Options)
+	opts := r.Options
+	if opts.Mode == "" {
+		opts.Mode = strategy.ModePure
+	}
+	if opts.Verifier == nil {
+		opts.Verifier = verifier.LegalOnlyVerifier{}
+	}
+	e := engine.New(opts)
 	state, err := e.NewGame(ctx, engine.NewGameOptions{Side: "white"})
 	if err != nil {
 		return GameSummary{GameIndex: index}, err

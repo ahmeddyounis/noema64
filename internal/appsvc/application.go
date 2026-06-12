@@ -149,7 +149,10 @@ func (a *Application) RunRandomBenchmark(ctx context.Context, games int, seed in
 	if games <= 0 {
 		games = 100
 	}
-	runner := experiments.Runner{Options: a.engineOptions()}
+	opts := a.engineOptions()
+	opts.Mode = strategy.ModePure
+	opts.Verifier = verifier.LegalOnlyVerifier{}
+	runner := experiments.Runner{Options: opts}
 	summary, err := runner.RandomLegalBenchmark(ctx, games, seed)
 	return summary, appErr("ERR_EXPERIMENT", err, true)
 }
