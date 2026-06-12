@@ -402,6 +402,9 @@ async function loadSettings() {
   document.querySelector("#settingVerifierPath").value = settings.verifier.path || "";
   document.querySelector("#settingVerifierMoveTime").value = settings.verifier.movetime_ms || 100;
   document.querySelector("#settingVerifierMaxLoss").value = settings.verifier.max_centipawn_loss || 180;
+  document.querySelector("#settingTablebase").checked = !!settings.verifier.tablebase_enabled;
+  document.querySelector("#settingTablebasePath").value = settings.verifier.tablebase_path || "";
+  document.querySelector("#settingTablebaseTimeout").value = settings.verifier.tablebase_timeout_ms || 1000;
   document.querySelector("#settingTraceEnabled").checked = !!settings.engine.trace_enabled;
   document.querySelector("#settingLogDir").value = settings.logging.output_dir || "logs";
   document.querySelector("#settingRaw").checked = !!settings.privacy.log_raw_prompts;
@@ -481,6 +484,9 @@ async function saveSettings() {
     settings.verifier.path = document.querySelector("#settingVerifierPath").value;
     settings.verifier.movetime_ms = Number(document.querySelector("#settingVerifierMoveTime").value) || settings.verifier.movetime_ms;
     settings.verifier.max_centipawn_loss = Number(document.querySelector("#settingVerifierMaxLoss").value) || settings.verifier.max_centipawn_loss;
+    settings.verifier.tablebase_enabled = document.querySelector("#settingTablebase").checked;
+    settings.verifier.tablebase_path = document.querySelector("#settingTablebasePath").value;
+    settings.verifier.tablebase_timeout_ms = Number(document.querySelector("#settingTablebaseTimeout").value) || settings.verifier.tablebase_timeout_ms || 1000;
     settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
     settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
     settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;

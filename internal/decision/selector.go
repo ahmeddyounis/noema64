@@ -133,7 +133,11 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 
 	verifyStage := stages.begin("verifying_tactics", "Run verifier or legal-only safety checks.")
 	verifierStart := time.Now()
-	verifyResult, err := req.Verifier.VerifyCandidates(ctx, verifier.Request{
+	activeVerifier := req.Verifier
+	if req.Mode == strategy.ModePure {
+		activeVerifier = verifier.LegalOnlyVerifier{}
+	}
+	verifyResult, err := activeVerifier.VerifyCandidates(ctx, verifier.Request{
 		Game:       req.Game.Clone(),
 		FEN:        snapshot.FEN,
 		Candidates: candidates,
@@ -141,7 +145,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	})
 	verifierMS := time.Since(verifierStart).Milliseconds()
 	if err != nil {
-		verifyResult = &verifier.Result{Enabled: req.Mode != strategy.ModePure, Used: false, Name: req.Verifier.Name(), Error: err.Error()}
+		verifyResult = &verifier.Result{Enabled: req.Mode != strategy.ModePure, Used: false, Name: activeVerifier.Name(), Error: err.Error()}
 		verifyStage.finish("failed", err.Error())
 	} else {
 		verifyStage.finish("completed", fmt.Sprintf("Verifier completed in %d ms.", verifierMS))

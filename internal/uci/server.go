@@ -37,6 +37,9 @@ type Server struct {
 	verifierPath     string
 	verifierMoveTime int
 	verifierMaxLoss  int
+	tablebaseEnabled bool
+	tablebasePath    string
+	tablebaseTimeout int
 	traceEnabled     bool
 	searchCancel     context.CancelFunc
 	searchDone       chan struct{}
@@ -62,6 +65,9 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		verifierPath:     settings.Verifier.Path,
 		verifierMoveTime: settings.Verifier.MoveTimeMS,
 		verifierMaxLoss:  settings.Verifier.MaxCentipawnLoss,
+		tablebaseEnabled: settings.Verifier.TablebaseEnabled,
+		tablebasePath:    settings.Verifier.TablebasePath,
+		tablebaseTimeout: settings.Verifier.TablebaseTimeoutMS,
 		traceEnabled:     settings.Engine.TraceEnabled,
 	}
 }
@@ -103,6 +109,9 @@ func (s *Server) handle(ctx context.Context, line string) error {
 		s.write("option name VerifierPath type string default")
 		s.write("option name VerifierMoveTime type spin default 100 min 10 max 5000")
 		s.write("option name VerifierMaxCentipawnLoss type spin default 180 min 0 max 2000")
+		s.write("option name TablebaseEnabled type check default false")
+		s.write("option name TablebasePath type string default")
+		s.write("option name TablebaseTimeoutMS type spin default 1000 min 50 max 10000")
 		s.write("option name TraceEnabled type check default true")
 		s.write("option name TraceFile type string default")
 		s.write("uciok")
@@ -173,6 +182,18 @@ func (s *Server) setOption(line string) error {
 			s.verifierMaxLoss = clampInt(n, 0, 2000)
 			s.refreshVerifierLocked(s.verifierEnabled)
 		}
+	case "tablebaseenabled":
+		s.tablebaseEnabled = strings.EqualFold(value, "true")
+		s.refreshVerifierLocked(s.verifierEnabled)
+	case "tablebasepath":
+		s.tablebasePath = value
+		s.refreshVerifierLocked(s.verifierEnabled)
+	case "tablebasetimeout", "tablebasetimeoutms":
+		n, err := strconv.Atoi(value)
+		if err == nil {
+			s.tablebaseTimeout = clampInt(n, 50, 10000)
+			s.refreshVerifierLocked(s.verifierEnabled)
+		}
 	case "tracefile":
 		if value != "" {
 			s.traceStore = storage.NewTraceFileStore(value)
@@ -193,6 +214,7 @@ func (s *Server) refreshProviderLocked() {
 }
 
 func (s *Server) refreshVerifierLocked(enabled bool) {
+	var active verifier.Verifier
 	if enabled && s.verifierPath != "" {
 		moveTime := s.verifierMoveTime
 		if moveTime <= 0 {
@@ -202,10 +224,22 @@ func (s *Server) refreshVerifierLocked(enabled bool) {
 		if maxLoss < 0 {
 			maxLoss = 180
 		}
-		s.opts.Verifier = verifier.ExternalUCI{Path: s.verifierPath, MoveTimeMS: moveTime, MaxCentipawnLoss: maxLoss}
-		return
+		active = verifier.ExternalUCI{Path: s.verifierPath, MoveTimeMS: moveTime, MaxCentipawnLoss: maxLoss}
+	} else {
+		active = verifier.StaticVerifier{Enabled: enabled}
 	}
-	s.opts.Verifier = verifier.StaticVerifier{Enabled: enabled}
+	if s.tablebaseEnabled && s.tablebasePath != "" {
+		timeout := s.tablebaseTimeout
+		if timeout <= 0 {
+			timeout = 1000
+		}
+		active = verifier.TablebaseVerifier{
+			Base:    active,
+			Probe:   verifier.ExternalTablebase{Path: s.tablebasePath, TimeoutMS: timeout},
+			Enabled: true,
+		}
+	}
+	s.opts.Verifier = active
 }
 
 func (s *Server) position(ctx context.Context, args []string) error {
@@ -439,6 +473,13 @@ func engineOptions(settings storage.Settings) engine.Options {
 			Path:             settings.Verifier.Path,
 			MoveTimeMS:       settings.Verifier.MoveTimeMS,
 			MaxCentipawnLoss: settings.Verifier.MaxCentipawnLoss,
+		}
+	}
+	if settings.Verifier.TablebaseEnabled && settings.Verifier.TablebasePath != "" {
+		v = verifier.TablebaseVerifier{
+			Base:    v,
+			Probe:   verifier.ExternalTablebase{Path: settings.Verifier.TablebasePath, TimeoutMS: settings.Verifier.TablebaseTimeoutMS},
+			Enabled: true,
 		}
 	}
 	timeout := time.Duration(settings.LLM.TimeoutMS) * time.Millisecond

@@ -60,6 +60,13 @@ func (a *Application) engineOptions() engine.Options {
 			MaxCentipawnLoss: a.settings.Verifier.MaxCentipawnLoss,
 		}
 	}
+	if a.settings.Verifier.TablebaseEnabled && a.settings.Verifier.TablebasePath != "" {
+		verify = verifier.TablebaseVerifier{
+			Base:    verify,
+			Probe:   verifier.ExternalTablebase{Path: a.settings.Verifier.TablebasePath, TimeoutMS: a.settings.Verifier.TablebaseTimeoutMS},
+			Enabled: true,
+		}
+	}
 	timeout := time.Duration(a.settings.LLM.TimeoutMS) * time.Millisecond
 	if timeout <= 0 {
 		timeout = 12 * time.Second

@@ -10,6 +10,7 @@ import (
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
+	"github.com/ahmedyounis/noema64/internal/verifier"
 )
 
 func newTestApplication(t *testing.T) (*Application, string) {
@@ -131,6 +132,26 @@ func TestSaveSettingsStoresSelectedProviderProfile(t *testing.T) {
 	}
 	if app.settings.LLM.Provider != "openai_compatible" || app.settings.LLM.Endpoint != "http://localhost:11434/v1" || app.settings.LLM.Model != "llama3.1" {
 		t.Fatalf("selected provider profile not stored: %+v", app.settings.LLM)
+	}
+}
+
+func TestEngineOptionsWrapsTablebaseVerifier(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Verifier.TablebaseEnabled = true
+	settings.Verifier.TablebasePath = "/usr/local/bin/noema64-tablebase"
+	settings.Verifier.TablebaseTimeoutMS = 750
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save tablebase settings: %v", err)
+	}
+
+	tb, ok := app.engineOptions().Verifier.(verifier.TablebaseVerifier)
+	if !ok {
+		t.Fatalf("verifier = %T, want TablebaseVerifier", app.engineOptions().Verifier)
+	}
+	probe, ok := tb.Probe.(verifier.ExternalTablebase)
+	if !ok || probe.Path != settings.Verifier.TablebasePath || probe.TimeoutMS != 750 {
+		t.Fatalf("tablebase probe = %#v, want configured external tablebase", tb.Probe)
 	}
 }
 

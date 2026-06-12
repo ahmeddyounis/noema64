@@ -3,37 +3,15 @@ package verifier
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 )
 
 func TestExternalUCIHealthCheck(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("test uses a POSIX shell wrapper")
-	}
-	enginePath := filepath.Join(t.TempDir(), "fake-uci")
-	script := `#!/bin/sh
-while IFS= read -r line; do
-	case "$line" in
-		uci)
-			printf 'id name fake-uci\n'
-			printf 'uciok\n'
-			;;
-		isready)
-			printf 'readyok\n'
-			;;
-		quit)
-			exit 0
-			;;
-	esac
-done
-`
-	if err := os.WriteFile(enginePath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake engine: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	enginePath := buildFakeUCIEngine(t, false)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := (ExternalUCI{Path: enginePath}).HealthCheck(ctx); err != nil {
 		t.Fatalf("HealthCheck() error = %v", err)
@@ -41,29 +19,8 @@ done
 }
 
 func TestExternalUCIHealthCheckDoesNotHangWhenEngineIgnoresQuit(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("test uses a POSIX shell wrapper")
-	}
-	enginePath := filepath.Join(t.TempDir(), "fake-uci-ignore-quit")
-	script := `#!/bin/sh
-while IFS= read -r line; do
-	case "$line" in
-		uci)
-			printf 'id name fake-uci\n'
-			printf 'uciok\n'
-			;;
-		isready)
-			printf 'readyok\n'
-			;;
-		quit)
-			;;
-	esac
-done
-`
-	if err := os.WriteFile(enginePath, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake engine: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	enginePath := buildFakeUCIEngine(t, true)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	if err := (ExternalUCI{Path: enginePath}).HealthCheck(ctx); err != nil {
@@ -71,6 +28,62 @@ done
 	}
 	if elapsed := time.Since(start); elapsed > 1500*time.Millisecond {
 		t.Fatalf("HealthCheck cleanup took %s, want bounded cleanup", elapsed)
+	}
+}
+
+func buildFakeUCIEngine(t *testing.T, ignoreQuit bool) string {
+	t.Helper()
+	goTool, err := exec.LookPath("go")
+	if err != nil {
+		t.Skip("go tool unavailable for fake UCI engine build")
+	}
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "main.go")
+	enginePath := filepath.Join(dir, "fake-uci")
+	quitAction := "return"
+	if ignoreQuit {
+		quitAction = "continue"
+	}
+	source := `package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		switch scanner.Text() {
+		case "uci":
+			fmt.Println("id name fake-uci")
+			fmt.Println("uciok")
+		case "isready":
+			fmt.Println("readyok")
+		case "quit":
+			` + quitAction + `
+		}
+	}
+}
+`
+	if err := os.WriteFile(sourcePath, []byte(source), 0o600); err != nil {
+		t.Fatalf("write fake engine source: %v", err)
+	}
+	cmd := exec.Command(goTool, "build", "-o", enginePath, sourcePath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build fake engine: %v\n%s", err, out)
+	}
+	warmTestExecutable(t, enginePath)
+	return enginePath
+}
+
+func warmTestExecutable(t *testing.T, path string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := exec.CommandContext(ctx, path).Run(); err != nil {
+		t.Fatalf("warm test executable %s: %v", path, err)
 	}
 }
 

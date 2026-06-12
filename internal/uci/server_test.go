@@ -179,6 +179,40 @@ func TestUCIVerifierEnabledControlsExternalPath(t *testing.T) {
 	}
 }
 
+func TestUCITablebaseOptionsWrapVerifier(t *testing.T) {
+	server := NewServer(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, storage.DefaultSettings())
+	if err := server.setOption("setoption name TablebasePath value /usr/bin/noema64-tablebase"); err != nil {
+		t.Fatalf("set tablebase path: %v", err)
+	}
+	if _, ok := server.opts.Verifier.(verifier.TablebaseVerifier); ok {
+		t.Fatal("tablebase path enabled wrapper without TablebaseEnabled=true")
+	}
+	if err := server.setOption("setoption name TablebaseEnabled value true"); err != nil {
+		t.Fatalf("enable tablebase: %v", err)
+	}
+	if err := server.setOption("setoption name TablebaseTimeoutMS value 99999"); err != nil {
+		t.Fatalf("set tablebase timeout: %v", err)
+	}
+	tb, ok := server.opts.Verifier.(verifier.TablebaseVerifier)
+	if !ok {
+		t.Fatalf("verifier = %T, want TablebaseVerifier", server.opts.Verifier)
+	}
+	probe, ok := tb.Probe.(verifier.ExternalTablebase)
+	if !ok || probe.TimeoutMS != 10000 || probe.Path != "/usr/bin/noema64-tablebase" {
+		t.Fatalf("tablebase probe = %#v", tb.Probe)
+	}
+	if err := server.setOption("setoption name VerifierPath value /usr/bin/stockfish"); err != nil {
+		t.Fatalf("set verifier path: %v", err)
+	}
+	if err := server.setOption("setoption name VerifierEnabled value true"); err != nil {
+		t.Fatalf("enable verifier: %v", err)
+	}
+	tb = server.opts.Verifier.(verifier.TablebaseVerifier)
+	if _, ok := tb.Base.(verifier.ExternalUCI); !ok {
+		t.Fatalf("tablebase base = %T, want ExternalUCI", tb.Base)
+	}
+}
+
 func TestUCIReadyAndStopDuringActiveSearch(t *testing.T) {
 	input := strings.Join([]string{
 		"uci",

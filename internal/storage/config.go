@@ -58,12 +58,15 @@ type ProviderProfile struct {
 }
 
 type VerifierSettings struct {
-	Enabled          bool   `json:"enabled" yaml:"enabled"`
-	Kind             string `json:"kind" yaml:"kind"`
-	Path             string `json:"path" yaml:"path"`
-	Depth            int    `json:"depth" yaml:"depth"`
-	MoveTimeMS       int    `json:"movetime_ms" yaml:"movetime_ms"`
-	MaxCentipawnLoss int    `json:"max_centipawn_loss" yaml:"max_centipawn_loss"`
+	Enabled            bool   `json:"enabled" yaml:"enabled"`
+	Kind               string `json:"kind" yaml:"kind"`
+	Path               string `json:"path" yaml:"path"`
+	Depth              int    `json:"depth" yaml:"depth"`
+	MoveTimeMS         int    `json:"movetime_ms" yaml:"movetime_ms"`
+	MaxCentipawnLoss   int    `json:"max_centipawn_loss" yaml:"max_centipawn_loss"`
+	TablebaseEnabled   bool   `json:"tablebase_enabled" yaml:"tablebase_enabled"`
+	TablebasePath      string `json:"tablebase_path" yaml:"tablebase_path"`
+	TablebaseTimeoutMS int    `json:"tablebase_timeout_ms" yaml:"tablebase_timeout_ms"`
 }
 
 type GUISettings struct {
@@ -109,11 +112,12 @@ func DefaultSettings() Settings {
 			Profiles:    DefaultProviderProfiles(),
 		},
 		Verifier: VerifierSettings{
-			Enabled:          false,
-			Kind:             "static",
-			MoveTimeMS:       100,
-			Depth:            8,
-			MaxCentipawnLoss: 180,
+			Enabled:            false,
+			Kind:               "static",
+			MoveTimeMS:         100,
+			Depth:              8,
+			MaxCentipawnLoss:   180,
+			TablebaseTimeoutMS: 1000,
 		},
 		GUI: GUISettings{
 			Theme:            "system",
@@ -277,6 +281,9 @@ func NormalizeSettings(settings Settings) Settings {
 	if settings.Verifier.MaxCentipawnLoss <= 0 {
 		settings.Verifier.MaxCentipawnLoss = defaults.Verifier.MaxCentipawnLoss
 	}
+	if settings.Verifier.TablebaseTimeoutMS <= 0 {
+		settings.Verifier.TablebaseTimeoutMS = defaults.Verifier.TablebaseTimeoutMS
+	}
 	if settings.GUI.Theme == "" {
 		settings.GUI.Theme = defaults.GUI.Theme
 	}
@@ -406,6 +413,12 @@ func validateSettings(settings Settings) error {
 	}
 	if settings.Verifier.MaxCentipawnLoss < 0 || settings.Verifier.MaxCentipawnLoss > 2000 {
 		return errors.New("settings verifier.max_centipawn_loss must be between 0 and 2000")
+	}
+	if settings.Verifier.TablebaseEnabled && settings.Verifier.TablebasePath == "" {
+		return errors.New("settings verifier.tablebase_path is required when tablebase is enabled")
+	}
+	if settings.Verifier.TablebaseTimeoutMS < 50 || settings.Verifier.TablebaseTimeoutMS > 10000 {
+		return errors.New("settings verifier.tablebase_timeout_ms must be between 50 and 10000")
 	}
 	switch settings.GUI.TimeControl {
 	case "untimed", "bullet", "blitz", "rapid", "classical", "custom":

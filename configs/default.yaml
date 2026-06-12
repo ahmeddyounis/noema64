@@ -21,6 +21,9 @@ verifier:
   depth: 8
   movetime_ms: 100
   max_centipawn_loss: 180
+  tablebase_enabled: false
+  tablebase_path: ""
+  tablebase_timeout_ms: 1000
 gui:
   theme: system
   show_raw_json: false
@@ -33,4 +36,3 @@ privacy:
   cloud_provider_warning_acknowledged: false
 logging:
   output_dir: logs
-

@@ -58,6 +58,9 @@ test("settings surface covers MVP and profile controls", () => {
     "settingModel",
     "settingKey",
     "settingVerifier",
+    "settingTablebase",
+    "settingTablebasePath",
+    "settingTablebaseTimeout",
     "settingTraceEnabled",
     "settingRaw",
     "settingRawResponses",
@@ -90,6 +93,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "raw_prompt",
     "raw_response",
     "applySelectedProviderProfile",
+    "tablebase_enabled",
+    "tablebase_timeout_ms",
     "search_score",
     "verifier_score",
   ]) {

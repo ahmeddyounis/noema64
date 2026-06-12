@@ -132,6 +132,9 @@
           <label>Verifier path <input id="settingVerifierPath" placeholder="stockfish" /></label>
           <label>Verifier movetime ms <input id="settingVerifierMoveTime" type="number" min="10" step="10" /></label>
           <label>Max centipawn loss <input id="settingVerifierMaxLoss" type="number" min="0" step="10" /></label>
+          <label><input id="settingTablebase" type="checkbox" /> External tablebase enabled</label>
+          <label>Tablebase probe path <input id="settingTablebasePath" placeholder="/usr/local/bin/noema64-tablebase" /></label>
+          <label>Tablebase timeout ms <input id="settingTablebaseTimeout" type="number" min="50" max="10000" step="50" /></label>
           <label><input id="settingTraceEnabled" type="checkbox" /> Decision trace logging</label>
           <label>Log output directory <input id="settingLogDir" placeholder="logs" /></label>
           <label><input id="settingRaw" type="checkbox" /> Raw prompt logging</label>

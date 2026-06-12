@@ -43,6 +43,9 @@ func TestLoadSettingsMergesDefaults(t *testing.T) {
 	if loaded.LLM.ProfileID != "mock-fast" || len(loaded.LLM.Profiles) < 3 {
 		t.Fatalf("provider profiles not merged: %+v", loaded.LLM)
 	}
+	if loaded.Verifier.TablebaseTimeoutMS != 1000 {
+		t.Fatalf("tablebase timeout default = %d, want 1000", loaded.Verifier.TablebaseTimeoutMS)
+	}
 }
 
 func TestSaveSettingsStoresSelectedProviderProfile(t *testing.T) {
@@ -156,6 +159,25 @@ func TestSaveSettingsValidatesRuntimeRanges(t *testing.T) {
 			name: "verifier loss",
 			mutate: func(settings *Settings) {
 				settings.Verifier.MaxCentipawnLoss = 2001
+			},
+		},
+		{
+			name: "tablebase path",
+			mutate: func(settings *Settings) {
+				settings.Verifier.TablebaseEnabled = true
+				settings.Verifier.TablebasePath = ""
+			},
+		},
+		{
+			name: "tablebase timeout low",
+			mutate: func(settings *Settings) {
+				settings.Verifier.TablebaseTimeoutMS = 49
+			},
+		},
+		{
+			name: "tablebase timeout high",
+			mutate: func(settings *Settings) {
+				settings.Verifier.TablebaseTimeoutMS = 10001
 			},
 		},
 	}

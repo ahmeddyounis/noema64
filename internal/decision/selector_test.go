@@ -134,6 +134,30 @@ func TestChooseMoveRawProviderLoggingIsOptIn(t *testing.T) {
 	}
 }
 
+func TestChooseMovePureModeBypassesConfiguredVerifier(t *testing.T) {
+	game := searchTestGame(t)
+	verifierCalls := 0
+	dec, err := ChooseMove(context.Background(), Request{
+		Game:          game,
+		Memory:        strategy.NewMemory(game.ID(), "white"),
+		Mode:          strategy.ModePure,
+		Provider:      scriptedProvider{moves: []strategy.CandidateMove{{UCI: "g3h4", Purpose: "Win the loose queen.", LLMConfidence: 0.7}}},
+		Verifier:      countingVerifier{calls: &verifierCalls},
+		Model:         "scripted",
+		MaxCandidates: 1,
+		Timeout:       time.Second,
+	})
+	if err != nil {
+		t.Fatalf("ChooseMove error = %v", err)
+	}
+	if verifierCalls != 0 {
+		t.Fatalf("pure mode called configured verifier %d times", verifierCalls)
+	}
+	if dec.VerifierTrace == nil || dec.VerifierTrace.Name != "legal_only" || dec.Assistance.VerifierUsed {
+		t.Fatalf("pure mode verifier trace = %+v assistance = %+v", dec.VerifierTrace, dec.Assistance)
+	}
+}
+
 func TestChooseMoveRecordsStagesAndProgressEvents(t *testing.T) {
 	game := searchTestGame(t)
 	provider := scriptedProvider{
@@ -228,6 +252,19 @@ func sameStrings(got, want []string) bool {
 
 type scriptedProvider struct {
 	moves []strategy.CandidateMove
+}
+
+type countingVerifier struct {
+	calls *int
+}
+
+func (v countingVerifier) Name() string {
+	return "counting_verifier"
+}
+
+func (v countingVerifier) VerifyCandidates(ctx context.Context, req verifier.Request) (*verifier.Result, error) {
+	*v.calls++
+	return (verifier.StaticVerifier{Enabled: true}).VerifyCandidates(ctx, req)
 }
 
 func (p scriptedProvider) Name() string {
