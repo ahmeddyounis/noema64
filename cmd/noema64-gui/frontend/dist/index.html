@@ -380,7 +380,7 @@
             <button id="exportProfilesBtn" value="none" type="button">Export</button>
             <button id="importProfilesBtn" value="none" type="button">Import</button>
           </menu>
-          <textarea id="profilesText" spellcheck="false"></textarea>
+          <textarea id="profilesText" aria-label="Provider profiles JSON" spellcheck="false"></textarea>
           <pre id="profilesOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
@@ -396,7 +396,7 @@
             <button id="multiAgentBtn" value="none" type="button">Agents</button>
             <button id="saveMemoryBtn" value="none" type="button">Save Memory</button>
           </menu>
-          <textarea id="studyMemoryText" spellcheck="false"></textarea>
+          <textarea id="studyMemoryText" aria-label="Strategy memory JSON" spellcheck="false"></textarea>
           <pre id="studyOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
@@ -452,7 +452,7 @@
             </label>
             <button id="refreshExportBtn" value="none" type="button">Refresh</button>
           </div>
-          <textarea id="exportText" readonly spellcheck="false"></textarea>
+          <textarea id="exportText" aria-label="Export output" readonly spellcheck="false"></textarea>
         </form>
       </dialog>
 
@@ -471,7 +471,7 @@
             </label>
             <button id="runImportBtn" value="none" type="button" title="Import (Ctrl+Enter)" aria-keyshortcuts="Control+Enter Meta+Enter">Import</button>
           </div>
-          <textarea id="importText" placeholder="Paste FEN or PGN" spellcheck="false"></textarea>
+          <textarea id="importText" aria-label="FEN or PGN input" placeholder="Paste FEN or PGN" spellcheck="false"></textarea>
           <pre id="importOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>

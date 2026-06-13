@@ -106,6 +106,10 @@ test("primary toolbar and dialogs expose expected controls", () => {
     assert.match(indexHTML, new RegExp(`aria-label="${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `missing aria-label for ${label}`);
   }
   assert.match(indexHTML, /aria-label="Close dialog"/);
+  assert.match(indexHTML, /id="profilesText" aria-label="Provider profiles JSON"/);
+  assert.match(indexHTML, /id="studyMemoryText" aria-label="Strategy memory JSON"/);
+  assert.match(indexHTML, /id="exportText" aria-label="Export output"/);
+  assert.match(indexHTML, /id="importText" aria-label="FEN or PGN input"/);
   assert.match(indexHTML, /role="toolbar" aria-label="Workspace actions"/);
   assert.match(indexHTML, /class="toolbar-group" data-action-scope="play" role="group" aria-label="Play actions"/);
   assert.match(indexHTML, /class="toolbar-group" data-action-scope="study" role="group" aria-label="Study actions"/);
