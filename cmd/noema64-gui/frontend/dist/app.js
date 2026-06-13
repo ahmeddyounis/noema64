@@ -2441,11 +2441,7 @@ function renderRecentGames(records) {
   list.setAttribute("role", "list");
   const items = asArray(records);
   if (!items.length) {
-    const empty = document.createElement("div");
-    empty.className = "recent-empty";
-    empty.setAttribute("role", "listitem");
-    empty.textContent = "No recent games.";
-    list.appendChild(empty);
+    renderRecentGamesEmpty("No recent games.");
     return;
   }
   for (const record of items) {
@@ -2482,6 +2478,17 @@ function renderRecentGames(records) {
   }
 }
 
+function renderRecentGamesEmpty(message) {
+  const list = document.querySelector("#recentList");
+  list.innerHTML = "";
+  list.setAttribute("role", "list");
+  const empty = document.createElement("div");
+  empty.className = "recent-empty";
+  empty.setAttribute("role", "listitem");
+  empty.textContent = message;
+  list.appendChild(empty);
+}
+
 async function openRecentGames() {
   try {
     document.querySelector("#recentOutput").textContent = "";
@@ -2491,8 +2498,9 @@ async function openRecentGames() {
     focusDialogInitialControl("#recentList button:not(:disabled)", "#recentDialog button[value='cancel']");
     showSuccess("Recent games loaded.");
   } catch (err) {
-    document.querySelector("#recentList").textContent = "Recent games could not be loaded.";
+    renderRecentGamesEmpty("Recent games could not be loaded.");
     showError(err, "#recentOutput");
+    focusDialogInitialControl("#recentDialog button[value='cancel']");
   }
 }
 
