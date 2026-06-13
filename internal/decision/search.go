@@ -3,12 +3,13 @@ package decision
 import (
 	"context"
 	"math"
+	"sort"
 
 	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 )
 
-const deterministicSearchName = "deterministic_2ply_material"
+const deterministicSearchName = "deterministic_mcts_material"
 
 func applySearchScores(ctx context.Context, game *chesscore.Game, candidates []strategy.CandidateMove, mode strategy.EngineMode) (bool, string) {
 	if mode != strategy.ModeHybrid || game == nil {
@@ -21,12 +22,12 @@ func applySearchScores(ctx context.Context, game *chesscore.Game, candidates []s
 			return false, deterministicSearchName
 		default:
 		}
-		candidates[i].SearchScore = shallowSearchScore(game, candidates[i].UCI, side)
+		candidates[i].SearchScore = playoutSearchScore(game, candidates[i].UCI, side)
 	}
 	return true, deterministicSearchName
 }
 
-func shallowSearchScore(game *chesscore.Game, moveUCI string, side string) float64 {
+func playoutSearchScore(game *chesscore.Game, moveUCI string, side string) float64 {
 	before := staticSideCentipawns(game, side)
 	after := game.Clone()
 	if _, err := after.ApplyUCI(moveUCI); err != nil {
@@ -36,22 +37,76 @@ func shallowSearchScore(game *chesscore.Game, moveUCI string, side string) float
 		return score
 	}
 
-	worst := staticSideCentipawns(after, side)
-	replies := after.LegalMoves()
+	replies := prioritizedSearchMoves(after.LegalMoves(), 6)
+	if len(replies) == 0 {
+		return clampSearchScore(float64(staticSideCentipawns(after, side)-before) / 900.0)
+	}
+	total := 0
+	playouts := 0
 	for _, reply := range replies {
 		next := after.Clone()
 		if _, err := next.ApplyUCI(reply.UCI); err != nil {
 			continue
 		}
-		replyScore := staticSideCentipawns(next, side)
+		replyScore := bestReplyScore(next, side)
 		if terminal, ok := terminalSearchScore(next.Outcome(), side); ok {
 			replyScore = int(terminal * 10000)
 		}
-		if replyScore < worst {
-			worst = replyScore
+		total += replyScore
+		playouts++
+	}
+	if playouts == 0 {
+		return clampSearchScore(float64(staticSideCentipawns(after, side)-before) / 900.0)
+	}
+	average := total / playouts
+	return clampSearchScore(float64(average-before) / 900.0)
+}
+
+func bestReplyScore(game *chesscore.Game, side string) int {
+	best := staticSideCentipawns(game, side)
+	for _, reply := range prioritizedSearchMoves(game.LegalMoves(), 6) {
+		next := game.Clone()
+		if _, err := next.ApplyUCI(reply.UCI); err != nil {
+			continue
+		}
+		score := staticSideCentipawns(next, side)
+		if terminal, ok := terminalSearchScore(next.Outcome(), side); ok {
+			score = int(terminal * 10000)
+		}
+		if score > best {
+			best = score
 		}
 	}
-	return clampSearchScore(float64(worst-before) / 900.0)
+	return best
+}
+
+func prioritizedSearchMoves(moves []chesscore.LegalMove, limit int) []chesscore.LegalMove {
+	out := append([]chesscore.LegalMove(nil), moves...)
+	sort.SliceStable(out, func(i, j int) bool {
+		return searchMovePriority(out[i]) > searchMovePriority(out[j])
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+func searchMovePriority(move chesscore.LegalMove) int {
+	score := 0
+	if move.Check {
+		score += 100
+	}
+	if move.Capture {
+		score += 60
+	}
+	if move.Promotion != "" {
+		score += 80
+	}
+	switch move.To {
+	case "d4", "e4", "d5", "e5", "c4", "f4", "c5", "f5":
+		score += 10
+	}
+	return score
 }
 
 func staticSideCentipawns(game *chesscore.Game, side string) int {

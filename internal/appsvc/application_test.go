@@ -649,6 +649,55 @@ func TestProviderProfileImportExportRedactsAndPreservesKeys(t *testing.T) {
 	}
 }
 
+func TestBackupRestoreFineTuneAndTournamentWorkflows(t *testing.T) {
+	app, logDir := newTestApplication(t)
+	if _, err := app.RequestEngineMove(); err != nil {
+		t.Fatalf("engine move: %v", err)
+	}
+	backupDir := filepath.Join(filepath.Dir(logDir), "backups")
+	manifest, err := app.CreateBackup(backupDir)
+	if err != nil {
+		t.Fatalf("create backup: %v", err)
+	}
+	if manifest.SchemaVersion != storage.BackupManifestSchemaVersion || manifest.ArchivePath == "" || len(manifest.Files) == 0 {
+		t.Fatalf("backup manifest incomplete: %+v", manifest)
+	}
+	restored, err := app.RestoreBackup(manifest.ArchivePath, filepath.Join(filepath.Dir(logDir), "restore"))
+	if err != nil {
+		t.Fatalf("restore backup: %v", err)
+	}
+	if len(restored.Files) != len(manifest.Files) {
+		t.Fatalf("restored files = %d, want %d", len(restored.Files), len(manifest.Files))
+	}
+
+	workflow, err := app.ExportFineTuneDataset()
+	if err != nil {
+		t.Fatalf("fine-tune export: %v", err)
+	}
+	if workflow.Workflow.ExampleCount == 0 || !strings.Contains(workflow.DatasetJSONL, "selected_move") {
+		t.Fatalf("fine-tune workflow incomplete: %+v", workflow.Workflow)
+	}
+
+	tournament, err := app.RunTournament(1, 64)
+	if err != nil {
+		t.Fatalf("tournament: %v", err)
+	}
+	if tournament.SchemaVersion != experiments.TournamentSchemaVersion || tournament.GamesPlayed == 0 || len(tournament.Ratings) < 2 {
+		t.Fatalf("tournament summary incomplete: %+v", tournament)
+	}
+}
+
+func TestExportFineTuneDatasetHandlesNoTrace(t *testing.T) {
+	app, _ := newTestApplication(t)
+	workflow, err := app.ExportFineTuneDataset()
+	if err != nil {
+		t.Fatalf("fine-tune export without trace: %v", err)
+	}
+	if workflow.Workflow.ExampleCount != 0 || strings.TrimSpace(workflow.DatasetJSONL) != "" {
+		t.Fatalf("unexpected empty workflow: %+v", workflow)
+	}
+}
+
 func TestPromptTemplatePackValidationAndSave(t *testing.T) {
 	app, _ := newTestApplication(t)
 	pack, err := app.PromptTemplatePack()

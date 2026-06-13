@@ -1,0 +1,76 @@
+package storage
+
+import (
+	"archive/zip"
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestCreateAndRestoreBackup(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	logDir := filepath.Join(dir, "logs")
+	if err := os.WriteFile(configPath, []byte("schema_version: \"1.0\"\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(logDir, "games"), 0o700); err != nil {
+		t.Fatalf("mkdir logs: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logDir, "trace.jsonl"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write trace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logDir, "games", "game.json"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write game: %v", err)
+	}
+
+	manifest, err := CreateBackup(context.Background(), BackupRequest{
+		SettingsPath: configPath,
+		LogDir:       logDir,
+		OutputDir:    filepath.Join(dir, "backups"),
+	})
+	if err != nil {
+		t.Fatalf("create backup: %v", err)
+	}
+	if manifest.SchemaVersion != BackupManifestSchemaVersion || manifest.ArchivePath == "" || manifest.SHA256 == "" || len(manifest.Files) != 3 {
+		t.Fatalf("unexpected manifest: %+v", manifest)
+	}
+	restoreDir := filepath.Join(dir, "restore")
+	restored, err := RestoreBackup(context.Background(), manifest.ArchivePath, restoreDir)
+	if err != nil {
+		t.Fatalf("restore backup: %v", err)
+	}
+	if len(restored.Files) != len(manifest.Files) {
+		t.Fatalf("restored files = %d, want %d", len(restored.Files), len(manifest.Files))
+	}
+	if _, err := os.Stat(filepath.Join(restoreDir, "logs", "games", "game.json")); err != nil {
+		t.Fatalf("restored game missing: %v", err)
+	}
+}
+
+func TestRestoreBackupRejectsPathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	archivePath := filepath.Join(dir, "bad.zip")
+	file, err := os.Create(archivePath)
+	if err != nil {
+		t.Fatalf("create archive: %v", err)
+	}
+	zw := zip.NewWriter(file)
+	w, err := zw.Create("../escape")
+	if err != nil {
+		t.Fatalf("create member: %v", err)
+	}
+	if _, err := w.Write([]byte("bad")); err != nil {
+		t.Fatalf("write member: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("close zip: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close archive: %v", err)
+	}
+	if _, err := RestoreBackup(context.Background(), archivePath, filepath.Join(dir, "restore")); err == nil {
+		t.Fatal("expected path traversal archive to fail")
+	}
+}

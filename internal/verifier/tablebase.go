@@ -10,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/ahmedyounis/noema64/internal/security"
 )
 
 type TablebaseProbe interface {
@@ -46,6 +48,10 @@ func (p ExternalTablebase) Probe(ctx context.Context, req Request) (*TablebaseRe
 	if p.Path == "" {
 		return nil, fmt.Errorf("tablebase probe path is empty")
 	}
+	commandPath, err := security.ValidateExternalCommand(p.Path, security.DefaultExternalCommandPolicy())
+	if err != nil {
+		return nil, err
+	}
 	timeout := time.Duration(p.TimeoutMS) * time.Millisecond
 	if timeout <= 0 {
 		timeout = time.Second
@@ -72,7 +78,7 @@ func (p ExternalTablebase) Probe(ctx context.Context, req Request) (*TablebaseRe
 	if _, err := stdinFile.Seek(0, 0); err != nil {
 		return nil, err
 	}
-	cmd := exec.CommandContext(probeCtx, p.Path)
+	cmd := exec.CommandContext(probeCtx, commandPath)
 	cmd.Stdin = stdinFile
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

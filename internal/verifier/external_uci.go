@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ahmedyounis/noema64/internal/security"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 )
 
@@ -32,9 +33,13 @@ func (v ExternalUCI) HealthCheck(ctx context.Context) error {
 	if v.Path == "" {
 		return fmt.Errorf("external verifier path is empty")
 	}
+	commandPath, err := security.ValidateExternalCommand(v.Path, security.DefaultExternalCommandPolicy())
+	if err != nil {
+		return err
+	}
 	healthCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(healthCtx, v.Path)
+	cmd := exec.CommandContext(healthCtx, commandPath)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return err
@@ -67,6 +72,10 @@ func (v ExternalUCI) VerifyCandidates(ctx context.Context, req Request) (*Result
 	if v.Path == "" {
 		return nil, fmt.Errorf("external verifier path is empty")
 	}
+	commandPath, err := security.ValidateExternalCommand(v.Path, security.DefaultExternalCommandPolicy())
+	if err != nil {
+		return nil, err
+	}
 	moveTime := v.MoveTimeMS
 	if moveTime <= 0 {
 		moveTime = 100
@@ -75,7 +84,7 @@ func (v ExternalUCI) VerifyCandidates(ctx context.Context, req Request) (*Result
 	if maxLoss < 0 {
 		maxLoss = 180
 	}
-	cmd := exec.CommandContext(ctx, v.Path)
+	cmd := exec.CommandContext(ctx, commandPath)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
