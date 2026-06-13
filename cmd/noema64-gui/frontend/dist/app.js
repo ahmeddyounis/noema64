@@ -2427,6 +2427,8 @@ async function loadPromptEditor() {
     document.querySelector("#promptSchema").value = promptPack.schema || "";
     document.querySelector("#promptOutput").textContent = "";
     clearFieldInvalid(document.querySelector("#promptManifest"));
+    clearFieldInvalid(document.querySelector("#promptSystem"));
+    clearFieldInvalid(document.querySelector("#promptUser"));
     clearFieldInvalid(document.querySelector("#promptSchema"));
     clearFieldInvalid(document.querySelector("#promptSaveDir"));
     renderWorkflowPanel();
@@ -2466,7 +2468,11 @@ function focusPromptValidationError(validation) {
     ? "#promptSchema"
     : message.includes("manifest")
       ? "#promptManifest"
-      : null;
+      : message.includes("system")
+        ? "#promptSystem"
+        : message.includes("user") || message.includes("template") || message.includes("placeholder")
+          ? "#promptUser"
+          : null;
   const field = selector ? document.querySelector(selector) : null;
   markFieldInvalid(field);
   field?.focus();
@@ -2481,6 +2487,8 @@ function renderPromptValidation(validation, successMessage) {
     return false;
   }
   clearFieldInvalid(document.querySelector("#promptManifest"));
+  clearFieldInvalid(document.querySelector("#promptSystem"));
+  clearFieldInvalid(document.querySelector("#promptUser"));
   clearFieldInvalid(document.querySelector("#promptSchema"));
   showSuccess(successMessage);
   return true;

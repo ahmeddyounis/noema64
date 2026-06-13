@@ -266,6 +266,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "parseJSONField(\"#promptSchema\", \"Prompt output schema\")",
     "promptValidationErrorMessage",
     "focusPromptValidationError",
+    "message.includes(\"system\")",
+    "message.includes(\"user\") || message.includes(\"template\") || message.includes(\"placeholder\")",
     "renderPromptValidation",
     "validation?.valid === false",
     "Prompt pack validation failed:",
