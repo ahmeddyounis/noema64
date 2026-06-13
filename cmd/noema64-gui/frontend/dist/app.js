@@ -2392,14 +2392,19 @@ async function enablePolicyPriorFromLab() {
 }
 
 async function importOpeningBookFromLab() {
+  const openingBookPath = document.querySelector("#openingBookPath");
   try {
     const path = requireField("#openingBookPath", "Enter an opening book path before importing.");
     const book = await call("ImportOpeningBook", path);
     const suggestions = await call("OpeningBook");
+    clearFieldInvalid(openingBookPath);
     document.querySelector("#labOutput").textContent = JSON.stringify({ imported: book, current_suggestions: suggestions }, null, 2);
     showSuccess("Opening book imported.");
   } catch (err) {
+    markFieldInvalid(openingBookPath);
     showError(err, "#labOutput");
+    openingBookPath?.focus();
+    openingBookPath?.select?.();
   }
 }
 
