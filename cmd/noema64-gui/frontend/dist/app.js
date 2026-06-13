@@ -2187,8 +2187,8 @@ async function refreshReview() {
 async function openStudy() {
   document.querySelector("#studyOutput").textContent = "Loading study tools...";
   document.querySelector("#studyDialog").showModal();
-  await refreshStudy();
-  focusDialogInitialControl("#studyMemoryText");
+  const loaded = await refreshStudy();
+  focusDialogInitialControl(loaded ? "#studyMemoryText" : "#refreshStudyBtn");
 }
 
 async function refreshStudy() {
@@ -2200,8 +2200,10 @@ async function refreshStudy() {
     clearFieldInvalid(memoryField);
     document.querySelector("#studyOutput").textContent = renderStudyDashboard(dashboard);
     showSuccess("Study dashboard ready.");
+    return true;
   } catch (err) {
     showError(err, "#studyOutput");
+    return false;
   }
 }
 

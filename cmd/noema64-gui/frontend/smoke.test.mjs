@@ -484,7 +484,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusDialogInitialControl(\"#saveSettingsBtn\")",
     "focusDialogInitialControl(\"#clearActivityBtn:not(:disabled)\", \"#activityDialog button[value='cancel']\")",
     "focusDialogInitialControl(\"#refreshReviewBtn\")",
-    "focusDialogInitialControl(\"#studyMemoryText\")",
+    "focusDialogInitialControl(loaded ? \"#studyMemoryText\" : \"#refreshStudyBtn\")",
     "focusDialogInitialControl(\"#providerDashboardBtn\")",
     "focusDialogInitialControl(\"#recentList button:not(:disabled)\", \"#recentDialog button[value='cancel']\")",
     "focusDialogInitialControl(\"#promotionGrid button\")",
