@@ -2207,6 +2207,7 @@ async function openPromptEditor() {
 
 function promptPackFromInputs() {
   const manifest = parseJSONField("#promptManifest", "Prompt manifest");
+  parseJSONField("#promptSchema", "Prompt output schema");
   return {
     schema_version: "prompt-template-pack.v1",
     source: document.querySelector("#promptSource").value || "editor",
@@ -2217,11 +2218,38 @@ function promptPackFromInputs() {
   };
 }
 
+function promptValidationErrorMessage(validation) {
+  const errors = asArray(validation?.errors).map((error) => String(error || "").trim()).filter(Boolean);
+  return errors.length ? `Prompt pack validation failed: ${errors.join(" ")}` : "Prompt pack validation failed.";
+}
+
+function focusPromptValidationError(validation) {
+  const message = asArray(validation?.errors).join(" ").toLowerCase();
+  const selector = message.includes("schema")
+    ? "#promptSchema"
+    : message.includes("manifest")
+      ? "#promptManifest"
+      : null;
+  const field = selector ? document.querySelector(selector) : null;
+  field?.focus();
+  field?.select?.();
+}
+
+function renderPromptValidation(validation, successMessage) {
+  document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
+  if (validation?.valid === false) {
+    showError(promptValidationErrorMessage(validation), "#promptOutput");
+    focusPromptValidationError(validation);
+    return false;
+  }
+  showSuccess(successMessage);
+  return true;
+}
+
 async function validatePromptEditor() {
   try {
     const validation = await call("ValidatePromptTemplatePack", promptPackFromInputs());
-    document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
-    showSuccess("Prompt pack validated.");
+    renderPromptValidation(validation, "Prompt pack validated.");
     return validation;
   } catch (err) {
     showError(err, "#promptOutput");
@@ -2233,8 +2261,7 @@ async function savePromptEditor() {
   try {
     const dir = requireField("#promptSaveDir", "Enter a save directory before saving the prompt pack.");
     const validation = await call("SavePromptTemplatePack", dir, promptPackFromInputs());
-    document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
-    showSuccess("Prompt pack saved.");
+    renderPromptValidation(validation, "Prompt pack saved.");
   } catch (err) {
     showError(err, "#promptOutput");
   }
