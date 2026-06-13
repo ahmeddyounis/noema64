@@ -1873,13 +1873,16 @@ async function saveSettings() {
 }
 
 async function saveProviderKeyToKeychain() {
-  const apiKey = document.querySelector("#settingKey").value.trim();
+  const keyField = document.querySelector("#settingKey");
+  const apiKey = keyField.value.trim();
   if (!apiKey || apiKey === "[REDACTED]") {
+    markFieldInvalid(keyField);
     showError("Enter an API key before saving it to the keychain.", "#settingsOutput");
-    document.querySelector("#settingKey").focus();
+    keyField.focus();
     return;
   }
   try {
+    clearFieldInvalid(keyField);
     settings = await call("SaveProviderAPIKeyToKeychain", document.querySelector("#settingProfile").value, apiKey);
     await loadSettings();
     showSuccess("API key saved to keychain reference.", "#settingsOutput");
