@@ -534,6 +534,9 @@ func TestStudyDashboardAndMultiAgentAnalysis(t *testing.T) {
 	if initial.MultiAgent.SchemaVersion == "" || initial.Lesson.Title == "" || initial.Puzzle.FEN == "" {
 		t.Fatalf("initial dashboard missing study tools: %+v", initial)
 	}
+	if len(initial.OpeningBook) == 0 || initial.Endgame.Theme == "" {
+		t.Fatalf("initial dashboard missing book/endgame data: %+v", initial)
+	}
 
 	if _, err := app.RequestEngineMove(); err != nil {
 		t.Fatalf("engine move: %v", err)
@@ -565,6 +568,44 @@ func TestStudyDashboardAndMultiAgentAnalysis(t *testing.T) {
 	}
 	if coherence.SchemaVersion != strategy.PlanCoherenceSchemaVersion {
 		t.Fatalf("bad coherence report: %+v", coherence)
+	}
+}
+
+func TestRoadmapComparisonAndBuilderAPIs(t *testing.T) {
+	app, _ := newTestApplication(t)
+	book, err := app.OpeningBook()
+	if err != nil {
+		t.Fatalf("opening book: %v", err)
+	}
+	if len(book) == 0 {
+		t.Fatalf("expected opening book suggestions")
+	}
+	comparison, err := app.ComparePureHybridAnalysis()
+	if err != nil {
+		t.Fatalf("compare pure/hybrid: %v", err)
+	}
+	if comparison.SchemaVersion == "" || comparison.Pure == nil || comparison.Hybrid == nil || comparison.Summary == "" {
+		t.Fatalf("analysis comparison incomplete: %+v", comparison)
+	}
+	pack, err := app.PromptTemplatePack()
+	if err != nil {
+		t.Fatalf("prompt pack: %v", err)
+	}
+	modified := pack
+	modified.User += "\nExtra comparison text.\n"
+	promptComparison, err := app.ComparePromptTemplatePacks(pack, modified)
+	if err != nil {
+		t.Fatalf("prompt comparison: %v", err)
+	}
+	if promptComparison.SchemaVersion == "" || promptComparison.LeftHash == promptComparison.RightHash || !containsString(promptComparison.ChangedFiles, "move_decision.md") {
+		t.Fatalf("prompt comparison incomplete: %+v", promptComparison)
+	}
+	profile, err := app.BuildCustomPersonalityProfile("sharp", "Sharp", 1.5, []string{"initiative", "initiative"}, []string{"Prefer active moves."})
+	if err != nil {
+		t.Fatalf("build personality: %v", err)
+	}
+	if profile.ID != "sharp" || profile.RiskTolerance != 1 || len(profile.StrategicBiases) != 1 {
+		t.Fatalf("custom profile not normalized: %+v", profile)
 	}
 }
 
@@ -903,6 +944,15 @@ func hasDecisionStage(stages []decision.StageTrace, name string) bool {
 func hasAgentRole(reviews []analysis.AgentReview, role string) bool {
 	for _, review := range reviews {
 		if review.Role == role {
+			return true
+		}
+	}
+	return false
+}
+
+func containsString(items []string, want string) bool {
+	for _, item := range items {
+		if item == want {
 			return true
 		}
 	}

@@ -68,6 +68,7 @@ test("settings surface covers MVP and profile controls", () => {
     "settingPersonality",
     "settingVariant",
     "settingVariantSeed",
+    "settingTheme",
     "settingTimeControl",
     "settingMaxCandidates",
     "settingProfile",
@@ -96,9 +97,13 @@ test("settings surface covers MVP and profile controls", () => {
     "restoreArchive",
     "restoreTarget",
     "tournamentGames",
+    "modeCompareBtn",
+    "promptCompareBtn",
+    "personalityBuilderBtn",
   ]) {
     expectMarkupID(id);
   }
+  assert.match(indexHTML, /high_contrast/);
 });
 
 test("bundle wires core actions and renders trace metadata", () => {
@@ -132,6 +137,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "CreateBackup",
     "RestoreBackup",
     "ExportFineTuneDataset",
+    "ComparePureHybridAnalysis",
+    "ComparePromptTemplatePacks",
+    "BuildCustomPersonalityProfile",
     "PromptTemplatePack",
     "ValidatePromptTemplatePack",
     "SavePromptTemplatePack",
@@ -147,6 +155,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "renderTournament",
     "renderFineTuneWorkflow",
     "newChess960Game",
+    "compareAnalysisModes",
+    "comparePromptPlayground",
+    "buildPersonalityFromLab",
     "promptPackFromInputs",
     "subscribeDecisionStageEvents",
     "stageSummary",
@@ -173,6 +184,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "api_key_ref",
     "variant",
     "chess960",
+    "applyTheme",
     "candidate_diversity",
     "multi_agent",
   ]) {

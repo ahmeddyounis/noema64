@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen, trace, debug-trace, study, agents, backup, restore-backup, finetune, tournament")
+	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen, trace, debug-trace, study, agents, book, compare, backup, restore-backup, finetune, tournament")
 	move := flag.String("move", "", "UCI move for -cmd move")
 	fen := flag.String("fen", "", "FEN to load before running the command")
 	pgn := flag.String("pgn", "", "PGN to load before running the command")
@@ -86,6 +86,14 @@ func main() {
 		review, err := app.MultiAgentAnalysis()
 		exitOnAppErr(err)
 		printJSON(review)
+	case "book":
+		book, err := app.OpeningBook()
+		exitOnAppErr(err)
+		printJSON(book)
+	case "compare":
+		comparison, err := app.ComparePureHybridAnalysis()
+		exitOnAppErr(err)
+		printJSON(comparison)
 	case "backup":
 		manifest, err := app.CreateBackup(*backupDir)
 		exitOnAppErr(err)

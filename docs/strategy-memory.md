@@ -29,6 +29,7 @@ Study tools also expose:
 - Candidate diversity scoring for move-family, destination, and purpose variety.
 - Deterministic multi-agent review roles: strategist, critic, tactician, and arbiter.
 - An editable strategy-memory JSON path through the app service and GUI Study dialog.
+- Opening-book suggestions and endgame trainer drills in the Study dashboard; these are advisory surfaces and do not override legal move generation.
 
 Public schema artifacts live under `schemas/`:
 

@@ -141,6 +141,42 @@ button:hover {
   background: #78936b;
 }
 
+body[data-theme="high_contrast"] {
+  background: #f7f7f7;
+  color: #0b0c0e;
+}
+
+body[data-theme="high_contrast"] .board-area,
+body[data-theme="high_contrast"] .panel,
+body[data-theme="high_contrast"] .topbar,
+body[data-theme="high_contrast"] dialog {
+  border-color: #0b0c0e;
+}
+
+body[data-theme="high_contrast"] .light {
+  background: #ffffff;
+}
+
+body[data-theme="high_contrast"] .dark {
+  background: #3a3f46;
+}
+
+body[data-theme="high_contrast"] .square {
+  color: #111111;
+}
+
+body[data-theme="high_contrast"] .dark {
+  color: #ffffff;
+}
+
+body[data-theme="classic"] .light {
+  background: #f0d9b5;
+}
+
+body[data-theme="classic"] .dark {
+  background: #b58863;
+}
+
 .selected {
   outline: 4px solid #2d7ff9;
   outline-offset: -4px;

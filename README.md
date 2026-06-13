@@ -79,12 +79,14 @@ The GUI toolbar includes Study and Lab dialogs. The same workflows are available
 ```sh
 go run ./cmd/noema64 -cmd study
 go run ./cmd/noema64 -cmd agents
+go run ./cmd/noema64 -cmd book
+go run ./cmd/noema64 -cmd compare
 go run ./cmd/noema64 -cmd backup -backup-dir runs/backups
 go run ./cmd/noema64 -cmd finetune
 go run ./cmd/noema64 -cmd tournament -games-per-pair 2
 ```
 
-Study returns compressed memory, plan coherence, candidate diversity, lesson/puzzle prompts, heatmap data, and deterministic strategist/critic/tactician/arbiter reviews. Lab workflows create local zip backups, restore backups into a target directory, export local fine-tune JSONL examples from sanitized traces, and run engine-vs-engine tournament ratings across core modes.
+Study returns compressed memory, opening-book suggestions, endgame trainer drills, plan coherence, candidate diversity, lesson/puzzle prompts, heatmap data, and deterministic strategist/critic/tactician/arbiter reviews. Lab workflows create local zip backups, restore backups into a target directory, compare pure vs hybrid analysis, compare prompt packs, build custom personality profile drafts, export local fine-tune JSONL examples from sanitized traces, and run engine-vs-engine tournament ratings across core modes.
 
 ## Provider Setup
 

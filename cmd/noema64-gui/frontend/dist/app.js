@@ -93,6 +93,11 @@ function formatClockMS(ms) {
   return `${minutes}:${seconds}`;
 }
 
+function applyTheme(theme) {
+  const value = theme && theme !== "system" ? theme : "";
+  document.body.dataset.theme = value;
+}
+
 function squareOrder() {
   const fs = flipped ? [...files].reverse() : files;
   const rs = flipped ? ranks : [...ranks].reverse();
@@ -457,6 +462,8 @@ async function loadSettings() {
   document.querySelector("#settingSide").value = playerSide;
   document.querySelector("#settingVariant").value = gameVariant;
   document.querySelector("#settingVariantSeed").value = chess960Seed;
+  document.querySelector("#settingTheme").value = settings.gui?.theme || "system";
+  applyTheme(settings.gui?.theme || "system");
   document.querySelector("#settingTimeControl").value = settings.gui?.time_control || "untimed";
   document.querySelector("#settingClockInitial").value = Math.max(1, Math.round((settings.gui?.clock_initial_ms || 300000) / 60000));
   document.querySelector("#settingClockIncrement").value = Math.max(0, Math.round((settings.gui?.clock_increment_ms || 0) / 1000));
@@ -547,6 +554,7 @@ async function saveSettings() {
     settings.engine.default_mode = document.querySelector("#settingMode").value;
     settings.engine.personality = document.querySelector("#settingPersonality").value;
     settings.engine.max_candidates = Number(document.querySelector("#settingMaxCandidates").value) || settings.engine.max_candidates;
+    settings.gui.theme = document.querySelector("#settingTheme").value || "system";
     settings.gui.time_control = document.querySelector("#settingTimeControl").value;
     settings.gui.clock_initial_ms = timeControl.initial_ms || Number(document.querySelector("#settingClockInitial").value) * 60000 || settings.gui.clock_initial_ms;
     settings.gui.clock_increment_ms = timeControl.increment_ms || Number(document.querySelector("#settingClockIncrement").value) * 1000 || 0;
@@ -577,6 +585,7 @@ async function saveSettings() {
     settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
     settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
     await call("SaveSettings", settings);
+    applyTheme(settings.gui.theme);
     document.querySelector("#settingsOutput").textContent = "Settings saved.";
   } catch (err) {
     showError(err, "#settingsOutput");
@@ -906,6 +915,43 @@ async function runTournamentFromLab() {
   }
 }
 
+async function compareAnalysisModes() {
+  try {
+    document.querySelector("#labOutput").textContent = "Comparing modes...";
+    const comparison = await call("ComparePureHybridAnalysis");
+    document.querySelector("#labOutput").textContent = [
+      comparison.summary || "No comparison summary.",
+      "",
+      "PURE",
+      `${comparison.pure?.selected_move?.san || comparison.pure?.selected_move?.uci || "none"} · ${comparison.pure?.explanation || ""}`,
+      "",
+      "HYBRID",
+      `${comparison.hybrid?.selected_move?.san || comparison.hybrid?.selected_move?.uci || "none"} · ${comparison.hybrid?.explanation || ""}`
+    ].join("\n");
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function comparePromptPlayground() {
+  try {
+    const base = await call("PromptTemplatePack");
+    const variant = { ...base, source: "playground", user: `${base.user || ""}\n\nPrefer concise contrast between the top two candidates.\n` };
+    document.querySelector("#labOutput").textContent = JSON.stringify(await call("ComparePromptTemplatePacks", base, variant), null, 2);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function buildPersonalityFromLab() {
+  try {
+    const profile = await call("BuildCustomPersonalityProfile", "lab-balanced", "Lab Balanced", 0.55, ["development", "king safety"], ["Prefer clear plans with tactical checks."]);
+    document.querySelector("#labOutput").textContent = JSON.stringify(profile, null, 2);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
 async function runExperiment(action, label, renderResult) {
   try {
     document.querySelector("#experimentsOutput").textContent = `${label}...`;
@@ -1067,6 +1113,7 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
   }
 });
 document.querySelector("#settingTimeControl").addEventListener("change", () => syncTimeControlInputsFromPreset(true));
+document.querySelector("#settingTheme").addEventListener("change", () => applyTheme(document.querySelector("#settingTheme").value));
 document.querySelector("#settingProfile").addEventListener("change", applySelectedProviderProfile);
 document.querySelector("#settingProvider").addEventListener("change", () => {
   markProviderProfileCustom();
@@ -1171,6 +1218,9 @@ document.querySelector("#createBackupBtn").addEventListener("click", createBacku
 document.querySelector("#restoreBackupBtn").addEventListener("click", restoreBackup);
 document.querySelector("#fineTuneBtn").addEventListener("click", exportFineTuneWorkflow);
 document.querySelector("#labTournamentBtn").addEventListener("click", runTournamentFromLab);
+document.querySelector("#modeCompareBtn").addEventListener("click", compareAnalysisModes);
+document.querySelector("#promptCompareBtn").addEventListener("click", comparePromptPlayground);
+document.querySelector("#personalityBuilderBtn").addEventListener("click", buildPersonalityFromLab);
 document.querySelector("#providerDashboardBtn").addEventListener("click", () => runExperiment(
   () => call("ProviderDashboard"),
   "Checking providers",

@@ -2,6 +2,12 @@ package appsvc
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/ahmedyounis/noema64/internal/analysis"
@@ -19,12 +25,14 @@ type StudyDashboard struct {
 	GameID             string                            `json:"game_id"`
 	Ply                int                               `json:"ply"`
 	Variant            chesscore.VariantStart            `json:"variant"`
+	OpeningBook        []chesscore.OpeningBookEntry      `json:"opening_book,omitempty"`
 	Memory             strategy.CompressedMemory         `json:"memory"`
 	Coherence          strategy.PlanCoherenceReport      `json:"coherence"`
 	CandidateDiversity strategy.CandidateDiversityReport `json:"candidate_diversity"`
 	MultiAgent         analysis.MultiAgentReview         `json:"multi_agent"`
 	Lesson             StudyLesson                       `json:"lesson"`
 	Puzzle             StudyPuzzle                       `json:"puzzle"`
+	Endgame            EndgameTrainer                    `json:"endgame"`
 	Heatmap            []StudyHeat                       `json:"heatmap,omitempty"`
 	Timeline           []StrategyTimelineItem            `json:"timeline,omitempty"`
 }
@@ -54,6 +62,40 @@ type StrategyTimelineItem struct {
 	Move    string `json:"move,omitempty"`
 	Status  string `json:"status"`
 	Summary string `json:"summary"`
+}
+
+type EndgameTrainer struct {
+	Active          bool     `json:"active"`
+	Theme           string   `json:"theme"`
+	MaterialBalance int      `json:"material_balance"`
+	Drills          []string `json:"drills,omitempty"`
+}
+
+type AnalysisComparison struct {
+	SchemaVersion string                 `json:"schema_version"`
+	GameID        string                 `json:"game_id"`
+	Ply           int                    `json:"ply"`
+	Pure          *decision.MoveDecision `json:"pure,omitempty"`
+	Hybrid        *decision.MoveDecision `json:"hybrid,omitempty"`
+	Summary       string                 `json:"summary"`
+}
+
+type PromptComparison struct {
+	SchemaVersion string   `json:"schema_version"`
+	LeftHash      string   `json:"left_hash"`
+	RightHash     string   `json:"right_hash"`
+	LeftValid     bool     `json:"left_valid"`
+	RightValid    bool     `json:"right_valid"`
+	ChangedFiles  []string `json:"changed_files,omitempty"`
+	Errors        []string `json:"errors,omitempty"`
+}
+
+type CustomPersonalityProfile struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	RiskTolerance   float64  `json:"risk_tolerance"`
+	StrategicBiases []string `json:"strategic_biases"`
+	PromptModifiers []string `json:"prompt_modifiers"`
 }
 
 func (a *Application) CompressedStrategyMemory(maxItems int) (strategy.CompressedMemory, error) {
@@ -99,6 +141,104 @@ func (a *Application) StudyDashboard() (StudyDashboard, error) {
 	return studyDashboardFromState(state), nil
 }
 
+func (a *Application) OpeningBook() ([]chesscore.OpeningBookEntry, error) {
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return nil, appErr("ERR_GAME_STATE", err, true)
+	}
+	game, err := gameForStudyState(state)
+	if err != nil {
+		return nil, appErr("ERR_GAME_STATE", err, true)
+	}
+	return chesscore.OpeningBookSuggestions(game), nil
+}
+
+func (a *Application) ComparePureHybridAnalysis() (AnalysisComparison, error) {
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return AnalysisComparison{}, appErr("ERR_GAME_STATE", err, true)
+	}
+	run := func(mode strategy.EngineMode) (*decision.MoveDecision, error) {
+		opts := a.engineOptions()
+		opts.Mode = mode
+		e := engine.New(opts)
+		if _, err := e.LoadState(context.Background(), *state); err != nil {
+			return nil, err
+		}
+		return e.AnalyzePosition(context.Background())
+	}
+	pure, pureErr := run(strategy.ModePure)
+	hybrid, hybridErr := run(strategy.ModeHybrid)
+	comparison := AnalysisComparison{
+		SchemaVersion: "analysis-comparison.v1",
+		GameID:        state.Snapshot.GameID,
+		Ply:           state.Snapshot.Ply,
+		Pure:          pure,
+		Hybrid:        hybrid,
+		Summary:       comparisonSummary(pure, hybrid, pureErr, hybridErr),
+	}
+	if pureErr != nil || hybridErr != nil {
+		return comparison, appErr("ERR_ANALYSIS", fmt.Errorf("pure=%v hybrid=%v", pureErr, hybridErr), true)
+	}
+	return comparison, nil
+}
+
+func (a *Application) ComparePromptTemplatePacks(left PromptTemplatePack, right PromptTemplatePack) (PromptComparison, error) {
+	leftValidation := validatePromptTemplatePack(left)
+	rightValidation := validatePromptTemplatePack(right)
+	out := PromptComparison{
+		SchemaVersion: "prompt-comparison.v1",
+		LeftHash:      promptPackHash(left),
+		RightHash:     promptPackHash(right),
+		LeftValid:     leftValidation.Valid,
+		RightValid:    rightValidation.Valid,
+	}
+	out.Errors = append(out.Errors, leftValidation.Errors...)
+	out.Errors = append(out.Errors, rightValidation.Errors...)
+	if left.System != right.System {
+		out.ChangedFiles = append(out.ChangedFiles, "system.md")
+	}
+	if left.User != right.User {
+		out.ChangedFiles = append(out.ChangedFiles, "move_decision.md")
+	}
+	if left.Schema != right.Schema {
+		out.ChangedFiles = append(out.ChangedFiles, "schema.json")
+	}
+	leftManifest, _ := json.Marshal(left.Manifest)
+	rightManifest, _ := json.Marshal(right.Manifest)
+	if string(leftManifest) != string(rightManifest) {
+		out.ChangedFiles = append(out.ChangedFiles, "manifest.json")
+	}
+	return out, nil
+}
+
+func (a *Application) BuildCustomPersonalityProfile(id string, name string, riskTolerance float64, biases []string, modifiers []string) (CustomPersonalityProfile, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = "custom"
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "Custom"
+	}
+	if math.IsNaN(riskTolerance) {
+		riskTolerance = 0.45
+	}
+	if riskTolerance < 0 {
+		riskTolerance = 0
+	}
+	if riskTolerance > 1 {
+		riskTolerance = 1
+	}
+	return CustomPersonalityProfile{
+		ID:              id,
+		Name:            name,
+		RiskTolerance:   math.Round(riskTolerance*100) / 100,
+		StrategicBiases: dedupeStrings(biases),
+		PromptModifiers: dedupeStrings(modifiers),
+	}, nil
+}
+
 func (a *Application) UpdateStrategyMemory(memory strategy.StrategyMemory) (*engine.GameState, error) {
 	state, err := a.engine.UpdateStrategyMemory(context.Background(), memory)
 	if err != nil {
@@ -119,12 +259,14 @@ func studyDashboardFromState(state *engine.GameState) StudyDashboard {
 		GameID:             state.Snapshot.GameID,
 		Ply:                state.Snapshot.Ply,
 		Variant:            state.Variant,
+		OpeningBook:        openingBookForState(state),
 		Memory:             strategy.CompressMemory(state.StrategyMemory, 5),
 		Coherence:          strategy.EvaluatePlanCoherence(state.StrategyMemory),
 		CandidateDiversity: strategy.EvaluateCandidateDiversity(candidates),
 		MultiAgent:         analysis.ReviewDecision(decision),
 		Lesson:             lessonForState(state),
 		Puzzle:             puzzleForState(state),
+		Endgame:            endgameForState(state),
 		Heatmap:            heatmapForDecision(decision),
 		Timeline:           timelineForState(state),
 	}
@@ -224,4 +366,74 @@ func timelineForState(state *engine.GameState) []StrategyTimelineItem {
 		})
 	}
 	return out
+}
+
+func openingBookForState(state *engine.GameState) []chesscore.OpeningBookEntry {
+	game, err := gameForStudyState(state)
+	if err != nil {
+		return nil
+	}
+	return chesscore.OpeningBookSuggestions(game)
+}
+
+func endgameForState(state *engine.GameState) EndgameTrainer {
+	active := state.Features.Phase == "endgame" || len(state.Snapshot.Board) <= 10
+	trainer := EndgameTrainer{
+		Active:          active,
+		Theme:           "not_endgame",
+		MaterialBalance: state.Features.MaterialBalance,
+	}
+	if !active {
+		return trainer
+	}
+	trainer.Drills = []string{
+		"Identify the passed pawns and king activity.",
+		"Check all forcing moves before pawn pushes.",
+		"Compare the engine candidate with a quiet improving move.",
+	}
+	switch {
+	case state.Features.MaterialBalance == 0:
+		trainer.Theme = "holding_draw"
+	case state.Features.MaterialBalance > 0:
+		trainer.Theme = "white_conversion"
+	default:
+		trainer.Theme = "black_conversion"
+	}
+	return trainer
+}
+
+func gameForStudyState(state *engine.GameState) (*chesscore.Game, error) {
+	initialFEN := strings.TrimSpace(state.InitialFEN)
+	if initialFEN == "" {
+		initialFEN = state.Snapshot.FEN
+	}
+	game, err := chesscore.FromFEN(initialFEN)
+	if err != nil {
+		return nil, err
+	}
+	for _, move := range state.AppliedMoves {
+		if _, err := game.ApplyUCI(move); err != nil {
+			return nil, err
+		}
+	}
+	return game, nil
+}
+
+func comparisonSummary(pure *decision.MoveDecision, hybrid *decision.MoveDecision, pureErr error, hybridErr error) string {
+	if pureErr != nil || hybridErr != nil {
+		return fmt.Sprintf("Comparison failed: pure=%v hybrid=%v", pureErr, hybridErr)
+	}
+	if pure == nil || hybrid == nil {
+		return "Comparison did not produce both decisions."
+	}
+	if pure.SelectedMove.UCI == hybrid.SelectedMove.UCI {
+		return "Pure and hybrid analysis selected the same move: " + pure.SelectedMove.UCI
+	}
+	return fmt.Sprintf("Pure selected %s; hybrid selected %s.", pure.SelectedMove.UCI, hybrid.SelectedMove.UCI)
+}
+
+func promptPackHash(pack PromptTemplatePack) string {
+	b, _ := json.Marshal(pack)
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])[:16]
 }

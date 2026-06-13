@@ -15,9 +15,10 @@ It exposes:
 - “Why not this move?” comparison for a typed move against the last engine decision trace.
 - Strategy memory quality, completeness, consistency, drift, and alert status.
 - Post-game review dialog with last-decision summary, strategy metrics, and review recommendations.
-- Study dialog for compressed memory, plan coherence, candidate diversity, lesson/puzzle prompts, candidate heatmap data, multi-agent strategist/critic/tactician/arbiter review, and JSON strategy-memory edits.
+- Study dialog for compressed memory, opening-book suggestions, endgame trainer drills, plan coherence, candidate diversity, lesson/puzzle prompts, candidate heatmap data, multi-agent strategist/critic/tactician/arbiter review, and JSON strategy-memory edits.
 - Experiment dashboard for provider health, random benchmark, mode benchmark, tournament ratings, position suite, and provider comparison runs.
-- Lab dialog for Chess960 starts, local backup/restore, fine-tune JSONL export, and tournament runs.
+- Lab dialog for Chess960 starts, local backup/restore, fine-tune JSONL export, tournament runs, pure-vs-hybrid comparison, prompt comparison, and custom personality profile drafts.
+- Theme selector with system, classic board, and high-contrast options.
 - Prompt editor dialog for loading, validating, and saving versioned prompt packs.
 - Provider profile import/export dialog with API-key redaction and redacted-key preservation on import.
 - Provider health, random benchmark, and mode benchmark actions from settings.

@@ -111,6 +111,13 @@
             </select>
           </label>
           <label>Chess960 seed <input id="settingVariantSeed" type="number" min="0" max="959" step="1" /></label>
+          <label>Theme
+            <select id="settingTheme">
+              <option value="system">System</option>
+              <option value="classic">Classic board</option>
+              <option value="high_contrast">High contrast</option>
+            </select>
+          </label>
           <label>Time control
             <select id="settingTimeControl">
               <option value="untimed">Untimed</option>
@@ -271,6 +278,9 @@
             <button id="restoreBackupBtn" value="none" type="button">Restore</button>
             <button id="fineTuneBtn" value="none" type="button">Fine Tune</button>
             <button id="labTournamentBtn" value="none" type="button">Tournament</button>
+            <button id="modeCompareBtn" value="none" type="button">Mode Compare</button>
+            <button id="promptCompareBtn" value="none" type="button">Prompt Compare</button>
+            <button id="personalityBuilderBtn" value="none" type="button">Personality</button>
           </menu>
           <pre id="labOutput"></pre>
         </form>
