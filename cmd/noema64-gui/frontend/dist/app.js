@@ -2753,6 +2753,7 @@ bindBusyButton("#settingsBtn", async () => {
 });
 document.querySelector("#importBtn").addEventListener("click", () => {
   document.querySelector("#importOutput").textContent = "";
+  clearFieldInvalid(document.querySelector("#importText"));
   document.querySelector("#importDialog").showModal();
   focusDialogInitialControl("#importText");
 });
@@ -2763,19 +2764,23 @@ document.querySelector("#importText").addEventListener("keydown", (event) => {
 });
 bindBusyButton("#runImportBtn", async () => {
   const type = document.querySelector("#importType").value;
-  const text = document.querySelector("#importText").value;
+  const importText = document.querySelector("#importText");
+  const text = importText.value;
   if (!text.trim()) {
+    markFieldInvalid(importText);
     showError("Paste a FEN or PGN before importing.", "#importOutput");
-    document.querySelector("#importText").focus();
+    importText.focus();
     return;
   }
   try {
+    clearFieldInvalid(importText);
     applyGameStateResult(type === "fen" ? await call("ImportFEN", text) : await call("ImportPGN", text));
     closeDialogAndRestoreFocus(document.querySelector("#importDialog"));
     showSuccess("Position imported.");
   } catch (err) {
+    markFieldInvalid(importText);
     showError(err, "#importOutput");
-    document.querySelector("#importText").focus();
+    importText.focus();
   }
 });
 document.querySelector("#promotionDialog").addEventListener("close", () => {
