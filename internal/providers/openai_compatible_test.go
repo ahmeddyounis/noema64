@@ -68,6 +68,36 @@ func TestOpenAICompatibleCompleteJSONRequestShape(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleUsesConfiguredModelWhenRequestModelEmpty(t *testing.T) {
+	var seen struct {
+		Model string `json:"model"`
+	}
+	server := openAITestServer(t, `{"move":"e2e4"}`, &seen)
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "configured-model"}
+	resp, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 16})
+	if err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
+	if seen.Model != "configured-model" {
+		t.Fatalf("request model = %q, want configured-model", seen.Model)
+	}
+	if resp.Model != "configured-model" {
+		t.Fatalf("response model = %q, want configured-model", resp.Model)
+	}
+}
+
+func TestOpenAICompatibleRejectsEmptyResponseContent(t *testing.T) {
+	server := openAITestServer(t, "   ", nil)
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "configured-model"}
+	if _, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 16}); err == nil {
+		t.Fatal("expected empty provider content to fail")
+	}
+}
+
 func TestOpenAICompatibleRetriesTransientFailure(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

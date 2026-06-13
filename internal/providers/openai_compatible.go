@@ -83,8 +83,12 @@ func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRe
 	if baseURL == "" {
 		return nil, fmt.Errorf("provider endpoint is empty")
 	}
+	model := firstNonEmpty(req.Model, p.Model)
+	if model == "" {
+		return nil, fmt.Errorf("provider model is empty")
+	}
 	body := map[string]any{
-		"model": req.Model,
+		"model": model,
 		"messages": []map[string]string{
 			{"role": "system", "content": req.System},
 			{"role": "user", "content": req.User},
@@ -116,6 +120,7 @@ func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRe
 		return nil, fmt.Errorf("provider returned HTTP %d", resp.StatusCode)
 	}
 	var decoded struct {
+		Model   string `json:"model"`
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
@@ -128,10 +133,14 @@ func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRe
 	if len(decoded.Choices) == 0 {
 		return nil, fmt.Errorf("provider returned no choices")
 	}
+	text := decoded.Choices[0].Message.Content
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("provider returned empty message")
+	}
 	return &CompletionResponse{
-		Text:         decoded.Choices[0].Message.Content,
+		Text:         text,
 		Provider:     p.Name(),
-		Model:        req.Model,
+		Model:        firstNonEmpty(decoded.Model, model),
 		Latency:      time.Since(start),
 		RawAvailable: true,
 	}, nil
