@@ -29,7 +29,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /id="appActivityMessage">Noema64 is ready\.</);
   assert.match(indexHTML, /id="activityHistoryBtn" class="activity-history-button" type="button" title="Activity history" aria-label="Activity history"/);
   assert.match(indexHTML, /dialog id="activityDialog" aria-labelledby="activityTitle"/);
-  assert.match(indexHTML, /id="activityLog" class="activity-log" role="list" aria-live="polite"/);
+  assert.match(indexHTML, /id="activityLog" class="activity-log" role="list" aria-label="Activity log" aria-live="polite"/);
   assert.match(indexHTML, /id="mainWorkspace" class="workspace" role="tabpanel" aria-labelledby="viewPlayBtn"/);
   assert.match(indexHTML, /id="workflowPanel" class="workflow-panel" aria-label="Workspace overview"/);
   assert.match(indexHTML, /data-workspace-card="play"/);
@@ -124,7 +124,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
   assert.match(indexHTML, /id="settingClockInitial" type="number" min="0"/);
   assert.match(indexHTML, /dialog id="settingsDialog" aria-labelledby="settingsTitle"/);
   assert.match(indexHTML, /dialog id="promotionDialog" aria-labelledby="promotionTitle"/);
-  assert.match(indexHTML, /id="recentList" class="recent-list" role="list"/);
+  assert.match(indexHTML, /id="recentList" class="recent-list" role="list" aria-label="Recent games"/);
   assert.match(indexHTML, /aria-keyshortcuts="N"/);
   assert.match(indexHTML, /aria-keyshortcuts="Space"/);
   assert.match(indexHTML, /id="moveBtn"[\s\S]*aria-keyshortcuts="Enter"/);
