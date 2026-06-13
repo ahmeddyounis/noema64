@@ -2515,6 +2515,7 @@ function activateTraceTab(btn, focus = false) {
     b.tabIndex = selectedTab ? 0 : -1;
   });
   activeTab = next?.dataset.tab || "summary";
+  document.querySelector("#tabContent")?.setAttribute("aria-labelledby", next?.id || "summaryTab");
   renderDecision();
   if (focus) next?.focus();
 }

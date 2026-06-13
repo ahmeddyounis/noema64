@@ -48,7 +48,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /role="tablist" aria-label="Decision trace views"/);
   assert.match(indexHTML, /id="summaryTab"[\s\S]*tabindex="0"/);
   assert.match(indexHTML, /id="diffTab"[\s\S]*tabindex="-1"/);
-  assert.match(indexHTML, /role="tabpanel" aria-live="polite"/);
+  assert.match(indexHTML, /role="tabpanel" aria-labelledby="summaryTab" aria-live="polite"/);
   assert.match(indexHTML, /board-empty-state/);
   assert.match(indexHTML, /Loading board/);
   assert.match(indexHTML, /data-tab="prompt"/);
@@ -263,6 +263,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "validation?.valid === false",
     "Prompt pack validation failed:",
     "availableTraceTabs",
+    "setAttribute(\"aria-labelledby\", next?.id || \"summaryTab\")",
     "activateTraceTab(availableTraceTabs()[0], true)",
     "activateTraceTab(availableTraceTabs().at(-1), true)",
     "subscribeDecisionStageEvents",
