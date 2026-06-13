@@ -18,5 +18,3 @@ go test ./...
 go run ./cmd/noema64-bench -games 100
 ```
 
-Behavior changes should name the relevant requirement IDs from the PRD, for example `MOVE-002` or `UCI-001`.
-
