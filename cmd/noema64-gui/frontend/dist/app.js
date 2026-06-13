@@ -2554,16 +2554,19 @@ async function exportProfiles() {
 }
 
 async function importProfiles() {
+  const profilesText = document.querySelector("#profilesText");
   try {
     const text = requireField("#profilesText", "Paste provider profiles before importing.");
-    parseJSONField("#profilesText", "Provider profiles");
     settings = normalizeSettingsShape(await call("ImportProviderProfiles", text));
+    clearFieldInvalid(profilesText);
     populateProviderProfiles(settings.llm?.profiles || []);
     document.querySelector("#profilesOutput").textContent = "Profiles imported.";
     renderWorkflowPanel();
     showSuccess("Provider profiles imported.");
   } catch (err) {
+    markFieldInvalid(profilesText);
     showError(err, "#profilesOutput");
+    profilesText.focus();
   }
 }
 

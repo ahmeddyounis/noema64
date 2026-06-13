@@ -112,7 +112,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
     assert.match(indexHTML, new RegExp(`aria-label="${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `missing aria-label for ${label}`);
   }
   assert.match(indexHTML, /aria-label="Close dialog"/);
-  assert.match(indexHTML, /id="profilesText" aria-label="Provider profiles JSON"/);
+  assert.match(indexHTML, /id="profilesText" aria-label="Provider profiles YAML or JSON"/);
   assert.match(indexHTML, /id="studyMemoryText" aria-label="Strategy memory JSON"/);
   assert.match(indexHTML, /id="exportText" aria-label="Export output" aria-describedby="exportOutput"/);
   assert.match(indexHTML, /id="exportOutput" role="status" aria-live="polite"/);
@@ -408,7 +408,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "markFieldInvalid(cloudAck)",
     "cloudAck.focus()",
     "Paste provider profiles before importing.",
-    "parseJSONField(\"#profilesText\", \"Provider profiles\")",
+    "markFieldInvalid(profilesText)",
+    "profilesText.focus()",
     "previousImportDisabled",
     "Move comparison ready.",
     "Game resigned.",
