@@ -13,12 +13,16 @@ import (
 )
 
 func main() {
-	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen, trace, debug-trace")
+	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen, trace, debug-trace, study, agents, backup, restore-backup, finetune, tournament")
 	move := flag.String("move", "", "UCI move for -cmd move")
 	fen := flag.String("fen", "", "FEN to load before running the command")
 	pgn := flag.String("pgn", "", "PGN to load before running the command")
 	variant := flag.String("variant", "", "starting variant for a new game: standard, chess960, or custom")
 	seed := flag.Int64("seed", 0, "Chess960 start index/seed; normalized to 0-959")
+	backupDir := flag.String("backup-dir", "", "Directory for -cmd backup output")
+	restoreArchive := flag.String("restore-archive", "", "Backup archive path for -cmd restore-backup")
+	restoreTarget := flag.String("restore-target", "", "Restore target directory for -cmd restore-backup")
+	gamesPerPair := flag.Int("games-per-pair", 1, "Tournament games per pairing for -cmd tournament")
 	flag.Parse()
 
 	app := appsvc.NewApplication("")
@@ -74,6 +78,34 @@ func main() {
 		trace, err := app.ExportDebugTrace()
 		exitOnAppErr(err)
 		fmt.Print(trace)
+	case "study":
+		dashboard, err := app.StudyDashboard()
+		exitOnAppErr(err)
+		printJSON(dashboard)
+	case "agents":
+		review, err := app.MultiAgentAnalysis()
+		exitOnAppErr(err)
+		printJSON(review)
+	case "backup":
+		manifest, err := app.CreateBackup(*backupDir)
+		exitOnAppErr(err)
+		printJSON(manifest)
+	case "restore-backup":
+		if *restoreArchive == "" || *restoreTarget == "" {
+			fmt.Fprintln(os.Stderr, "-restore-archive and -restore-target are required")
+			os.Exit(2)
+		}
+		manifest, err := app.RestoreBackup(*restoreArchive, *restoreTarget)
+		exitOnAppErr(err)
+		printJSON(manifest)
+	case "finetune":
+		workflow, err := app.ExportFineTuneDataset()
+		exitOnAppErr(err)
+		printJSON(workflow)
+	case "tournament":
+		summary, err := app.RunTournament(*gamesPerPair, *seed)
+		exitOnAppErr(err)
+		printJSON(summary)
 	default:
 		fmt.Fprintln(os.Stderr, "unknown command:", *cmd)
 		os.Exit(2)

@@ -16,9 +16,18 @@ go run ./cmd/noema64-bench -modes -games 20
 
 The mode benchmark runs pure, blunderguard, and hybrid with the same seed and game count per mode so their completion, fallback, adjudication, and error metrics are directly comparable.
 
+Run the tournament/rating workflow:
+
+```sh
+go run ./cmd/noema64 -cmd tournament -games-per-pair 2
+```
+
+The tournament manager plays engine-vs-engine games across pure, blunderguard, and hybrid entrants, swaps colors per pairing, adjudicates long games by material, and updates an Elo-style rating pool. It is an automation and regression tool, not a public strength rating.
+
 The GUI experiment dashboard also exposes:
 
 - Position suite runs over deterministic FEN positions covering opening development, king safety, tactical tension, and endgame conversion.
+- Tournament runs over core engine modes and reports rating-pool standings.
 - Provider comparison runs the same position suite across configured provider profiles. Cloud or local OpenAI-compatible profiles are skipped until the cloud-provider acknowledgement is enabled, so comparison does not silently transmit game data.
 - Provider dashboard health checks with provider capabilities, model, endpoint, timeout, retry, and privacy-gate status.
 

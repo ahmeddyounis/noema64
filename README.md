@@ -2,7 +2,7 @@
 
 Noema64 is an open-source explainable chess engine that uses a language model as a persistent strategic planner while deterministic Go code owns legal move validation, game state, fallback, UCI protocol behavior, traces, and local persistence.
 
-It is not a Stockfish replacement. The MVP is optimized for legal full-game play, inspectable strategy memory, provider failure recovery, and protocol-safe UCI use.
+It is not a Stockfish replacement. The project is optimized for legal full-game play, inspectable strategy memory, provider failure recovery, study workflows, and protocol-safe UCI use.
 
 ## MVP Status
 
@@ -15,6 +15,9 @@ Implemented in this repository:
 - Static blunderguard verifier plus optional external UCI verifier and external tablebase probe path support.
 - UCI binary with `uci`, `isready`, `ucinewgame`, `position`, `go`, `stop`, `quit`, and `setoption`.
 - Wails v2 GUI entrypoint with embedded board, time controls, recent games, settings, strategy, candidates, trace, resignation, PGN/FEN/JSONL trace export, and benchmark controls.
+- Study dashboard, compressed memory, plan coherence, candidate diversity, deterministic multi-agent review, and editable strategy memory APIs.
+- Chess960/custom-start metadata, including deterministic Chess960 start generation. Chess960 castling is intentionally disabled until the underlying move generator exposes full Chess960 castling semantics.
+- Local backup/restore archives, fine-tune JSONL dataset export, deterministic tournament/rating automation, and sandbox validation for configured external binaries.
 - CLI and benchmark commands with JSON or CSV benchmark output.
 - Local YAML settings, JSONL decision traces, redacted game snapshots with strategy memory, tests, prompts, configs, and docs.
 
@@ -34,6 +37,9 @@ npm --prefix cmd/noema64-gui/frontend test
 go run ./cmd/noema64 -cmd state
 go run ./cmd/noema64 -cmd engine
 go run ./cmd/noema64 -cmd analyze -fen 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3'
+go run ./cmd/noema64 -cmd state -variant chess960 -seed 42
+go run ./cmd/noema64 -cmd study
+go run ./cmd/noema64 -cmd tournament -games-per-pair 1
 go run ./cmd/noema64-bench -games 100
 go run ./cmd/noema64-bench -games 100 -format csv > benchmark.csv
 ```
@@ -64,6 +70,22 @@ CI runs Go format/vet/tests, race tests for the non-Wails packages, frontend smo
 
 Personality profiles are not display-only. Their risk tolerance is included in the arbiter as a small `personality_score` on each candidate, so aggressive profiles can break close ties toward safe forcing moves while positional and coach profiles lean toward clearer low-risk choices.
 
+Hybrid mode records `deterministic_mcts_material` search assistance in the decision trace. It is a bounded deterministic playout scorer, not a claim of engine-strength MCTS.
+
+## Study And Roadmap Workflows
+
+The GUI toolbar includes Study and Lab dialogs. The same workflows are available from the CLI:
+
+```sh
+go run ./cmd/noema64 -cmd study
+go run ./cmd/noema64 -cmd agents
+go run ./cmd/noema64 -cmd backup -backup-dir runs/backups
+go run ./cmd/noema64 -cmd finetune
+go run ./cmd/noema64 -cmd tournament -games-per-pair 2
+```
+
+Study returns compressed memory, plan coherence, candidate diversity, lesson/puzzle prompts, heatmap data, and deterministic strategist/critic/tactician/arbiter reviews. Lab workflows create local zip backups, restore backups into a target directory, export local fine-tune JSONL examples from sanitized traces, and run engine-vs-engine tournament ratings across core modes.
+
 ## Provider Setup
 
 Default config uses the offline mock provider. To use an OpenAI-compatible endpoint, set:
@@ -93,6 +115,8 @@ verifier:
 
 Noema64 does not bundle Stockfish in the MVP. When configured, the external UCI verifier analyzes LLM candidate moves with `searchmoves`, compares centipawn loss against the best candidate, and records verifier decisions in the trace.
 
+External verifier and tablebase paths are executed without a shell and are validated before launch. Simple PATH binary names such as `stockfish` are allowed; paths containing whitespace, control characters, path traversal, or non-executable absolute targets are rejected.
+
 External tablebase probing is also optional. Configure a probe executable that reads `{ "fen": "...", "candidates": ["e2e4"] }` JSON from stdin and returns exact tablebase JSON on stdout:
 
 ```yaml
@@ -120,6 +144,7 @@ For bot bridge usage, see [docs/lichess-bot.md](docs/lichess-bot.md).
 ## Limitations
 
 - The static verifier is intentionally shallow.
+- Chess960 starts are playable with castling disabled.
 - The GUI is a Wails MVP surface, not a polished app-store release.
 - LLM quality depends on the configured provider.
 - Raw prompts are not stored unless the user enables logging.

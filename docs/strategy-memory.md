@@ -22,6 +22,14 @@ Engine state also exposes computed strategy metrics:
 - `drift`: how sharply the current memory changed from the previous decision memory.
 - `alerts`: user-facing strategy quality and drift alerts for the GUI and post-game review.
 
+Study tools also expose:
+
+- Compressed memory with a source hash and bounded critical targets, commitments, warnings, triggers, and style notes.
+- Plan coherence scoring for missing phase, targets, commitments, triggers, and confidence gaps.
+- Candidate diversity scoring for move-family, destination, and purpose variety.
+- Deterministic multi-agent review roles: strategist, critic, tactician, and arbiter.
+- An editable strategy-memory JSON path through the app service and GUI Study dialog.
+
 Public schema artifacts live under `schemas/`:
 
 - `schemas/strategy_memory.schema.json`
