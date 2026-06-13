@@ -2678,6 +2678,7 @@ async function importProfiles() {
     markFieldInvalid(profilesText);
     showError(err, "#profilesOutput");
     profilesText.focus();
+    profilesText.select?.();
   }
 }
 

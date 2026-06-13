@@ -414,6 +414,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Paste provider profiles before importing.",
     "markFieldInvalid(profilesText)",
     "profilesText.focus()",
+    "profilesText.select?.()",
     "previousImportDisabled",
     "Move comparison ready.",
     "Game resigned.",
