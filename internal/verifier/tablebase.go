@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -35,6 +36,43 @@ type TablebaseResult struct {
 type ExternalTablebase struct {
 	Path      string
 	TimeoutMS int
+}
+
+type NativeSyzygyProbe struct {
+	Path string
+}
+
+func (p NativeSyzygyProbe) Name() string {
+	if p.Path == "" {
+		return "native_syzygy"
+	}
+	return "native_syzygy:" + p.Path
+}
+
+func (p NativeSyzygyProbe) Probe(ctx context.Context, req Request) (*TablebaseResult, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+	files := discoverSyzygyFiles(p.Path)
+	pieces := materialPieces(req.FEN)
+	if len(pieces) == 0 || len(pieces) > 7 {
+		return &TablebaseResult{Available: false, Category: "unsupported_piece_count"}, nil
+	}
+	if onlyKings(pieces) {
+		return &TablebaseResult{Available: true, BestMoves: candidateUCIs(req), WDL: "draw", Category: "native_kings_only"}, nil
+	}
+	if isBasicMateMaterial(pieces) {
+		best := bestBasicMateMoves(req)
+		if len(best) > 0 {
+			return &TablebaseResult{Available: true, BestMoves: best, WDL: "win", Category: "native_basic_mate"}, nil
+		}
+	}
+	if len(files) == 0 {
+		return &TablebaseResult{Available: false, Category: "no_syzygy_files"}, nil
+	}
+	return &TablebaseResult{Available: false, Category: "native_decoder_unavailable"}, nil
 }
 
 func (p ExternalTablebase) Name() string {
@@ -209,4 +247,127 @@ func cloneDetails(details map[string]string) map[string]string {
 
 func joinMoves(moves []string) string {
 	return strings.Join(moves, ",")
+}
+
+func discoverSyzygyFiles(path string) []string {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	if !info.IsDir() {
+		ext := strings.ToLower(filepath.Ext(path))
+		if ext == ".rtbw" || ext == ".rtbz" {
+			return []string{path}
+		}
+		return nil
+	}
+	files := []string{}
+	for _, pattern := range []string{"*.rtbw", "*.rtbz"} {
+		matches, _ := filepath.Glob(filepath.Join(path, pattern))
+		files = append(files, matches...)
+	}
+	sortStrings(files)
+	return files
+}
+
+func materialPieces(fen string) []rune {
+	fields := strings.Fields(fen)
+	if len(fields) == 0 {
+		return nil
+	}
+	out := []rune{}
+	for _, ch := range fields[0] {
+		if ch == '/' || (ch >= '1' && ch <= '8') {
+			continue
+		}
+		out = append(out, ch)
+	}
+	return out
+}
+
+func onlyKings(pieces []rune) bool {
+	if len(pieces) != 2 {
+		return false
+	}
+	hasWhiteKing := false
+	hasBlackKing := false
+	for _, piece := range pieces {
+		switch piece {
+		case 'K':
+			hasWhiteKing = true
+		case 'k':
+			hasBlackKing = true
+		default:
+			return false
+		}
+	}
+	return hasWhiteKing && hasBlackKing
+}
+
+func isBasicMateMaterial(pieces []rune) bool {
+	if len(pieces) != 3 {
+		return false
+	}
+	hasWhiteKing := false
+	hasBlackKing := false
+	hasMajor := false
+	for _, piece := range pieces {
+		switch piece {
+		case 'K':
+			hasWhiteKing = true
+		case 'k':
+			hasBlackKing = true
+		case 'Q', 'q', 'R', 'r':
+			hasMajor = true
+		default:
+			return false
+		}
+	}
+	return hasWhiteKing && hasBlackKing && hasMajor
+}
+
+func bestBasicMateMoves(req Request) []string {
+	if req.Game == nil {
+		return candidateUCIs(req)
+	}
+	checkmates := []string{}
+	checks := []string{}
+	for _, candidate := range req.Candidates {
+		clone := req.Game.Clone()
+		if _, err := clone.ApplyUCI(candidate.UCI); err != nil {
+			continue
+		}
+		if clone.Outcome().Status == "checkmate" {
+			checkmates = append(checkmates, candidate.UCI)
+			continue
+		}
+		for _, legal := range req.Game.LegalMoves() {
+			if legal.UCI == candidate.UCI && legal.Check {
+				checks = append(checks, candidate.UCI)
+				break
+			}
+		}
+	}
+	if len(checkmates) > 0 {
+		return checkmates
+	}
+	if len(checks) > 0 {
+		return checks
+	}
+	return candidateUCIs(req)
+}
+
+func candidateUCIs(req Request) []string {
+	out := make([]string, 0, len(req.Candidates))
+	for _, candidate := range req.Candidates {
+		out = append(out, candidate.UCI)
+	}
+	return out
+}
+
+func sortStrings(items []string) {
+	slices.Sort(items)
 }

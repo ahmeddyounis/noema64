@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
+	"github.com/ahmedyounis/noema64/internal/finetune"
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/security"
 	"github.com/ahmedyounis/noema64/internal/storage"
@@ -248,9 +250,27 @@ func (s *Server) setOption(line string) error {
 }
 
 func (s *Server) refreshProviderLocked() {
-	if strings.EqualFold(s.providerKind, "openai_compatible") && s.endpoint != "" {
+	switch strings.ToLower(s.providerKind) {
+	case "openai_compatible":
+		if s.endpoint == "" {
+			break
+		}
 		s.opts.Provider = providers.OpenAICompatible{BaseURL: s.endpoint, APIKey: s.apiKey, Model: s.opts.Model, Retries: s.providerRetries}
 		return
+	case "anthropic":
+		s.opts.Provider = providers.AnthropicProvider{BaseURL: s.endpoint, APIKey: s.apiKey, Model: s.opts.Model, Retries: s.providerRetries}
+		return
+	case "gemini":
+		s.opts.Provider = providers.GeminiProvider{BaseURL: s.endpoint, APIKey: s.apiKey, Model: s.opts.Model, Retries: s.providerRetries}
+		return
+	case "ollama":
+		s.opts.Provider = providers.OllamaProvider{BaseURL: s.endpoint, Model: s.opts.Model, Retries: s.providerRetries}
+		return
+	case "policy_prior":
+		if model, err := finetune.LoadPolicyPriorModel(s.opts.Model); err == nil {
+			s.opts.Provider = finetune.LocalPolicyPriorProvider{Model: model, Path: s.opts.Model}
+			return
+		}
 	}
 	s.opts.Provider = providers.MockProvider{}
 }
@@ -277,7 +297,7 @@ func (s *Server) refreshVerifierLocked(enabled bool) {
 		}
 		active = verifier.TablebaseVerifier{
 			Base:    active,
-			Probe:   verifier.ExternalTablebase{Path: s.tablebasePath, TimeoutMS: timeout},
+			Probe:   uciTablebaseProbeForPath(s.tablebasePath, timeout),
 			Enabled: true,
 		}
 	}
@@ -559,9 +579,8 @@ func sanitizeInfo(s string) string {
 
 func engineOptions(settings storage.Settings) engine.Options {
 	provider := providers.Provider(providers.MockProvider{})
-	if settings.LLM.Provider == "openai_compatible" && settings.LLM.Endpoint != "" {
-		apiKey, _ := security.ResolveAPIKey(settings.LLM.APIKey, settings.LLM.APIKeyRef)
-		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: apiKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
+	if built := uciProviderFromSettings(settings); built != nil {
+		provider = built
 	}
 	v := verifier.Verifier(verifier.StaticVerifier{Enabled: settings.Verifier.Enabled})
 	if settings.Verifier.Enabled && settings.Verifier.Path != "" {
@@ -574,7 +593,7 @@ func engineOptions(settings storage.Settings) engine.Options {
 	if settings.Verifier.TablebaseEnabled && settings.Verifier.TablebasePath != "" {
 		v = verifier.TablebaseVerifier{
 			Base:    v,
-			Probe:   verifier.ExternalTablebase{Path: settings.Verifier.TablebasePath, TimeoutMS: settings.Verifier.TablebaseTimeoutMS},
+			Probe:   uciTablebaseProbeForPath(settings.Verifier.TablebasePath, settings.Verifier.TablebaseTimeoutMS),
 			Enabled: true,
 		}
 	}
@@ -594,4 +613,36 @@ func engineOptions(settings storage.Settings) engine.Options {
 		MaxCandidates:   settings.Engine.MaxCandidates,
 		MoveTimeout:     timeout,
 	}
+}
+
+func uciProviderFromSettings(settings storage.Settings) providers.Provider {
+	apiKey, _ := security.ResolveAPIKey(settings.LLM.APIKey, settings.LLM.APIKeyRef)
+	switch settings.LLM.Provider {
+	case "openai_compatible":
+		if settings.LLM.Endpoint == "" {
+			return nil
+		}
+		return providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: apiKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
+	case "anthropic":
+		return providers.AnthropicProvider{BaseURL: settings.LLM.Endpoint, APIKey: apiKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
+	case "gemini":
+		return providers.GeminiProvider{BaseURL: settings.LLM.Endpoint, APIKey: apiKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
+	case "ollama":
+		return providers.OllamaProvider{BaseURL: settings.LLM.Endpoint, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
+	case "policy_prior":
+		model, err := finetune.LoadPolicyPriorModel(settings.LLM.Model)
+		if err != nil {
+			return nil
+		}
+		return finetune.LocalPolicyPriorProvider{Model: model, Path: settings.LLM.Model}
+	default:
+		return nil
+	}
+}
+
+func uciTablebaseProbeForPath(path string, timeoutMS int) verifier.TablebaseProbe {
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return verifier.NativeSyzygyProbe{Path: path}
+	}
+	return verifier.ExternalTablebase{Path: path, TimeoutMS: timeoutMS}
 }

@@ -151,7 +151,30 @@ func (a *Application) OpeningBook() ([]chesscore.OpeningBookEntry, error) {
 	if err != nil {
 		return nil, appErr("ERR_GAME_STATE", err, true)
 	}
-	return chesscore.OpeningBookSuggestions(game), nil
+	return chesscore.OpeningBookSuggestionsWithImports(game, a.openingBooks), nil
+}
+
+func (a *Application) ImportOpeningBook(path string) (chesscore.ImportedOpeningBook, error) {
+	book, err := chesscore.ImportOpeningBook(path)
+	if err != nil {
+		return chesscore.ImportedOpeningBook{}, appErr("ERR_OPENING_BOOK", err, true)
+	}
+	replaced := false
+	for i := range a.openingBooks {
+		if a.openingBooks[i].Path == book.Path {
+			a.openingBooks[i] = book
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		a.openingBooks = append(a.openingBooks, book)
+	}
+	return book, nil
+}
+
+func (a *Application) OpeningBookLibrary() ([]chesscore.ImportedOpeningBook, error) {
+	return append([]chesscore.ImportedOpeningBook(nil), a.openingBooks...), nil
 }
 
 func (a *Application) ComparePureHybridAnalysis() (AnalysisComparison, error) {
@@ -493,7 +516,14 @@ func gameForStudyState(state *engine.GameState) (*chesscore.Game, error) {
 	if initialFEN == "" {
 		initialFEN = state.Snapshot.FEN
 	}
-	game, err := chesscore.FromFEN(initialFEN)
+	var game *chesscore.Game
+	var err error
+	if state.Variant.Variant == chesscore.VariantChess960 {
+		start := chesscore.NormalizeVariantStart(state.Variant, initialFEN)
+		game, err = chesscore.FromVariantStart(start)
+	} else {
+		game, err = chesscore.FromFEN(initialFEN)
+	}
 	if err != nil {
 		return nil, err
 	}

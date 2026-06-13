@@ -10,10 +10,13 @@ import (
 )
 
 type Game struct {
-	id         string
-	g          *chess.Game
-	initialFEN string
-	appliedUCI []string
+	id              string
+	g               *chess.Game
+	initialFEN      string
+	appliedUCI      []string
+	history         []MoveRecord
+	castling        *variantCastlingState
+	initialCastling *variantCastlingState
 }
 
 func NewGame() *Game {
@@ -41,6 +44,34 @@ func FromFENWithID(fen, id string) (*Game, error) {
 	return game, nil
 }
 
+func FromVariantStart(start VariantStart) (*Game, error) {
+	start = NormalizeVariantStart(start, "")
+	game, err := FromFEN(start.FEN)
+	if err != nil {
+		return nil, err
+	}
+	if start.Variant == VariantChess960 && start.CastlingMode == CastlingModeChess960External {
+		castling, err := newVariantCastlingState(start.FEN, start.CastlingRights)
+		if err != nil {
+			return nil, err
+		}
+		game.castling = castling.clone()
+		game.initialCastling = castling.clone()
+	}
+	return game, nil
+}
+
+func FromVariantStartWithID(start VariantStart, id string) (*Game, error) {
+	game, err := FromVariantStart(start)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(id) != "" {
+		game.id = id
+	}
+	return game, nil
+}
+
 func FromPGN(r io.Reader) (*Game, error) {
 	opt, err := chess.PGN(r)
 	if err != nil {
@@ -52,7 +83,8 @@ func FromPGN(r io.Reader) (*Game, error) {
 	if len(positions) > 0 {
 		initialFEN = positions[0].String()
 	}
-	return &Game{id: uuid.NewString(), g: game, initialFEN: initialFEN, appliedUCI: appliedMoves(game)}, nil
+	applied := appliedMoves(game)
+	return &Game{id: uuid.NewString(), g: game, initialFEN: initialFEN, appliedUCI: applied, history: moveHistoryFromChessGame(game, applied)}, nil
 }
 
 func FromPGNWithID(r io.Reader, id string) (*Game, error) {
@@ -71,7 +103,15 @@ func (g *Game) ID() string {
 }
 
 func (g *Game) Clone() *Game {
-	return &Game{id: g.id, g: g.g.Clone(), initialFEN: g.initialFEN, appliedUCI: append([]string(nil), g.appliedUCI...)}
+	return &Game{
+		id:              g.id,
+		g:               g.g.Clone(),
+		initialFEN:      g.initialFEN,
+		appliedUCI:      append([]string(nil), g.appliedUCI...),
+		history:         append([]MoveRecord(nil), g.history...),
+		castling:        g.castling.clone(),
+		initialCastling: g.initialCastling.clone(),
+	}
 }
 
 func (g *Game) InitialFEN() string {
@@ -118,6 +158,7 @@ func (g *Game) LegalMoves() []LegalMove {
 		m := moves[i]
 		out = append(out, moveDTO(pos, &m))
 	}
+	out = append(out, g.variantCastleMoves()...)
 	return out
 }
 
@@ -145,7 +186,11 @@ func (g *Game) applyUCI(moveUCI string, record bool) (MoveRecord, error) {
 	if moveUCI == "" {
 		return MoveRecord{}, fmt.Errorf("empty move")
 	}
+	if rec, handled, err := g.applyVariantCastle(moveUCI, record); handled || err != nil {
+		return rec, err
+	}
 	pos := g.g.Position()
+	boardBefore := boardFromFEN(g.FEN())
 	move, err := chess.UCINotation{}.Decode(pos, moveUCI)
 	if err != nil {
 		return MoveRecord{}, err
@@ -158,15 +203,20 @@ func (g *Game) applyUCI(moveUCI string, record bool) (MoveRecord, error) {
 	if err := g.g.Move(move, nil); err != nil {
 		return MoveRecord{}, err
 	}
+	g.updateVariantCastlingRights(uci, boardBefore)
 	if record {
 		g.appliedUCI = append(g.appliedUCI, uci)
 	}
-	return MoveRecord{
+	rec := MoveRecord{
 		Ply:      len(g.g.Moves()),
 		UCI:      uci,
 		SAN:      san,
 		FENAfter: g.g.FEN(),
-	}, nil
+	}
+	if record {
+		g.history = append(g.history, rec)
+	}
+	return rec, nil
 }
 
 func (g *Game) IsLegalUCI(moveUCI string) bool {
@@ -197,17 +247,24 @@ func (g *Game) Snapshot() Snapshot {
 }
 
 func (g *Game) MoveHistory() []MoveRecord {
-	if len(g.appliedUCI) == 0 {
+	if len(g.history) == len(g.appliedUCI) {
+		return append([]MoveRecord(nil), g.history...)
+	}
+	return moveHistoryFromChessGame(g.g, g.appliedUCI)
+}
+
+func moveHistoryFromChessGame(game *chess.Game, appliedUCI []string) []MoveRecord {
+	if len(appliedUCI) == 0 {
 		return []MoveRecord{}
 	}
-	moves := g.g.Moves()
-	if len(moves) > len(g.appliedUCI) {
-		moves = moves[:len(g.appliedUCI)]
+	moves := game.Moves()
+	if len(moves) > len(appliedUCI) {
+		moves = moves[:len(appliedUCI)]
 	}
-	positions := g.g.Positions()
+	positions := game.Positions()
 	history := make([]MoveRecord, 0, len(moves))
 	for i, mv := range moves {
-		before := g.g.Position()
+		before := game.Position()
 		if i < len(positions) {
 			before = positions[i]
 		}
@@ -217,7 +274,7 @@ func (g *Game) MoveHistory() []MoveRecord {
 		}
 		history = append(history, MoveRecord{
 			Ply:      i + 1,
-			UCI:      g.appliedUCI[i],
+			UCI:      appliedUCI[i],
 			SAN:      chess.AlgebraicNotation{}.Encode(before, mv),
 			FENAfter: fenAfter,
 			Comment:  mv.Comments(),
@@ -238,6 +295,9 @@ func (g *Game) BoardMap() map[string]string {
 }
 
 func (g *Game) AnnotateLastMove(comment string) {
+	if len(g.history) > 0 {
+		g.history[len(g.history)-1].Comment = sanitizePGNComment(comment)
+	}
 	moves := g.g.Moves()
 	if len(moves) == 0 {
 		return
@@ -260,6 +320,8 @@ func (g *Game) Undo(plies int) int {
 	kept := append([]string(nil), g.appliedUCI[:target]...)
 	g.g = replayed
 	g.appliedUCI = nil
+	g.history = nil
+	g.castling = g.initialCastling.clone()
 	for _, moveUCI := range kept {
 		if _, err := g.applyUCI(moveUCI, true); err != nil {
 			return 0

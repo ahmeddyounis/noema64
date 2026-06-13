@@ -3,10 +3,12 @@ package appsvc
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/experiments"
@@ -22,6 +24,7 @@ type Application struct {
 	engine          *engine.Engine
 	traces          *storage.TraceStore
 	games           *storage.GameStore
+	openingBooks    []chesscore.ImportedOpeningBook
 	eventSink       EventSink
 	settingsLoadErr error
 }
@@ -78,7 +81,7 @@ func (a *Application) engineOptions() engine.Options {
 	if a.settings.Verifier.TablebaseEnabled && a.settings.Verifier.TablebasePath != "" {
 		verify = verifier.TablebaseVerifier{
 			Base:    verify,
-			Probe:   verifier.ExternalTablebase{Path: a.settings.Verifier.TablebasePath, TimeoutMS: a.settings.Verifier.TablebaseTimeoutMS},
+			Probe:   tablebaseProbeForPath(a.settings.Verifier.TablebasePath, a.settings.Verifier.TablebaseTimeoutMS),
 			Enabled: true,
 		}
 	}
@@ -427,6 +430,13 @@ func providerRequiresPrivacyAck(provider string) bool {
 	default:
 		return false
 	}
+}
+
+func tablebaseProbeForPath(path string, timeoutMS int) verifier.TablebaseProbe {
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return verifier.NativeSyzygyProbe{Path: path}
+	}
+	return verifier.ExternalTablebase{Path: path, TimeoutMS: timeoutMS}
 }
 
 func (a *Application) RecentGames(limit int) ([]storage.GameRecord, error) {

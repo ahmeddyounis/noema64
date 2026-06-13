@@ -575,12 +575,16 @@ func newVariantGame(opts NewGameOptions) (*chesscore.Game, chesscore.VariantStar
 				return nil, chesscore.VariantStart{}, err
 			}
 			custom.Variant = chesscore.VariantChess960
+			custom.RuleSet = "chess960"
 			custom.Seed = opts.Seed
-			custom.CastlingEnabled = false
+			custom.CastlingEnabled = true
+			custom.CastlingMode = chesscore.CastlingModeChess960External
+			custom.CastlingRights = chess960RightsFromFEN(fen)
+			custom.FEN = fenWithoutCastlingRights(custom.FEN)
 			custom.Notes = append(custom.Notes, "Loaded as a Chess960-compatible custom start.")
 			start = custom
 		}
-		game, err := chesscore.FromFEN(start.FEN)
+		game, err := chesscore.FromVariantStart(start)
 		if err != nil {
 			return nil, chesscore.VariantStart{}, err
 		}
@@ -709,7 +713,17 @@ func gameFromReplayState(ctx context.Context, state GameState) (*chesscore.Game,
 	if initialFEN == "" {
 		return nil, fmt.Errorf("saved game state is missing FEN")
 	}
-	game, err := chesscore.FromFENWithID(initialFEN, gameID)
+	var game *chesscore.Game
+	var err error
+	if state.Variant.Variant == chesscore.VariantChess960 {
+		start := chesscore.NormalizeVariantStart(state.Variant, initialFEN)
+		if strings.TrimSpace(start.FEN) == "" {
+			start.FEN = initialFEN
+		}
+		game, err = chesscore.FromVariantStartWithID(start, gameID)
+	} else {
+		game, err = chesscore.FromFENWithID(initialFEN, gameID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -733,6 +747,23 @@ func gameFromReplayState(ctx context.Context, state GameState) (*chesscore.Game,
 		}
 	}
 	return game, nil
+}
+
+func chess960RightsFromFEN(fen string) string {
+	fields := strings.Fields(fen)
+	if len(fields) >= 3 && fields[2] != "-" {
+		return fields[2]
+	}
+	return "KQkq"
+}
+
+func fenWithoutCastlingRights(fen string) string {
+	fields := strings.Fields(fen)
+	if len(fields) >= 3 {
+		fields[2] = "-"
+		return strings.Join(fields, " ")
+	}
+	return fen
 }
 
 func resigningSideFromOutcome(outcome chesscore.Outcome) (string, error) {

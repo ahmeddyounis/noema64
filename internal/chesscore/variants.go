@@ -14,16 +14,50 @@ const (
 )
 
 const VariantStartSchemaVersion = "variant-start.v1"
+const CustomBoardDefinitionSchemaVersion = "custom-board-definition.v1"
+
+const (
+	CastlingModeNone             = "none"
+	CastlingModeStandard         = "standard"
+	CastlingModeChess960External = "chess960_external"
+)
 
 const standardStartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 type VariantStart struct {
-	SchemaVersion   string   `json:"schema_version"`
-	Variant         Variant  `json:"variant"`
-	Seed            int64    `json:"seed,omitempty"`
-	FEN             string   `json:"fen"`
-	CastlingEnabled bool     `json:"castling_enabled"`
-	Notes           []string `json:"notes,omitempty"`
+	SchemaVersion    string                 `json:"schema_version"`
+	Variant          Variant                `json:"variant"`
+	Seed             int64                  `json:"seed,omitempty"`
+	FEN              string                 `json:"fen"`
+	RuleSet          string                 `json:"rule_set,omitempty"`
+	CastlingEnabled  bool                   `json:"castling_enabled"`
+	CastlingMode     string                 `json:"castling_mode,omitempty"`
+	CastlingRights   string                 `json:"castling_rights,omitempty"`
+	BoardDefinition  *CustomBoardDefinition `json:"board_definition,omitempty"`
+	UnsupportedRules []string               `json:"unsupported_rules,omitempty"`
+	Notes            []string               `json:"notes,omitempty"`
+}
+
+type CustomBoardDefinition struct {
+	SchemaVersion string            `json:"schema_version"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	InitialFEN    string            `json:"initial_fen"`
+	RuleSet       string            `json:"rule_set"`
+	BoardWidth    int               `json:"board_width"`
+	BoardHeight   int               `json:"board_height"`
+	PieceRules    []CustomPieceRule `json:"piece_rules,omitempty"`
+	Tags          []string          `json:"tags,omitempty"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
+}
+
+type CustomPieceRule struct {
+	Symbol        string   `json:"symbol"`
+	Name          string   `json:"name"`
+	Move          string   `json:"move"`
+	LeaperOffsets []string `json:"leaper_offsets,omitempty"`
+	Royal         bool     `json:"royal,omitempty"`
+	PromotesTo    []string `json:"promotes_to,omitempty"`
 }
 
 func StandardStart(fen string) VariantStart {
@@ -35,7 +69,10 @@ func StandardStart(fen string) VariantStart {
 		SchemaVersion:   VariantStartSchemaVersion,
 		Variant:         VariantStandard,
 		FEN:             fen,
+		RuleSet:         "standard",
 		CastlingEnabled: true,
+		CastlingMode:    CastlingModeStandard,
+		CastlingRights:  fenCastlingField(fen),
 	}
 }
 
@@ -51,10 +88,13 @@ func Chess960Start(seed int64) VariantStart {
 		Variant:         VariantChess960,
 		Seed:            index,
 		FEN:             fen,
-		CastlingEnabled: false,
+		RuleSet:         "chess960",
+		CastlingEnabled: true,
+		CastlingMode:    CastlingModeChess960External,
+		CastlingRights:  "KQkq",
 		Notes: []string{
 			"Generated from a deterministic Chess960 start index.",
-			"Castling is disabled until the move generator exposes Chess960 castling semantics.",
+			"Chess960 castling is generated and applied by Noema64's compatibility layer.",
 		},
 	}
 }
@@ -71,9 +111,75 @@ func CustomBoardStart(fen string) (VariantStart, error) {
 		SchemaVersion:   VariantStartSchemaVersion,
 		Variant:         VariantCustom,
 		FEN:             fen,
+		RuleSet:         "standard",
 		CastlingEnabled: fenCastlingField(fen) != "-",
+		CastlingMode:    customCastlingMode(fen),
+		CastlingRights:  fenCastlingField(fen),
 		Notes:           []string{"Custom board loaded from validated FEN."},
 	}, nil
+}
+
+func CustomBoardStartFromDefinition(def CustomBoardDefinition) (VariantStart, error) {
+	def, err := ValidateCustomBoardDefinition(def)
+	if err != nil {
+		return VariantStart{}, err
+	}
+	start, err := CustomBoardStart(def.InitialFEN)
+	if err != nil {
+		return VariantStart{}, err
+	}
+	start.BoardDefinition = &def
+	start.RuleSet = def.RuleSet
+	if def.RuleSet != "standard" && def.RuleSet != "chess960" {
+		start.UnsupportedRules = append(start.UnsupportedRules, "custom_rule_execution")
+		start.Notes = append(start.Notes, "Custom rule metadata is persisted for tooling; live play uses validated FEN and standard legal move generation.")
+	}
+	if len(def.PieceRules) > 0 {
+		start.UnsupportedRules = append(start.UnsupportedRules, "custom_piece_move_generation")
+	}
+	return start, nil
+}
+
+func ValidateCustomBoardDefinition(def CustomBoardDefinition) (CustomBoardDefinition, error) {
+	if def.SchemaVersion == "" {
+		def.SchemaVersion = CustomBoardDefinitionSchemaVersion
+	}
+	if def.SchemaVersion != CustomBoardDefinitionSchemaVersion {
+		return CustomBoardDefinition{}, fmt.Errorf("unsupported custom board schema_version %q", def.SchemaVersion)
+	}
+	def.ID = strings.TrimSpace(def.ID)
+	if def.ID == "" {
+		return CustomBoardDefinition{}, fmt.Errorf("custom board id is required")
+	}
+	def.Name = strings.TrimSpace(def.Name)
+	if def.Name == "" {
+		def.Name = def.ID
+	}
+	def.InitialFEN = strings.TrimSpace(def.InitialFEN)
+	if def.InitialFEN == "" {
+		return CustomBoardDefinition{}, fmt.Errorf("custom board initial_fen is required")
+	}
+	if _, err := FromFEN(def.InitialFEN); err != nil {
+		return CustomBoardDefinition{}, err
+	}
+	if def.RuleSet == "" {
+		def.RuleSet = "standard"
+	}
+	if def.BoardWidth == 0 {
+		def.BoardWidth = 8
+	}
+	if def.BoardHeight == 0 {
+		def.BoardHeight = 8
+	}
+	if def.BoardWidth != 8 || def.BoardHeight != 8 {
+		return CustomBoardDefinition{}, fmt.Errorf("only 8x8 custom boards are playable in this release")
+	}
+	for _, rule := range def.PieceRules {
+		if strings.TrimSpace(rule.Symbol) == "" || strings.TrimSpace(rule.Name) == "" {
+			return CustomBoardDefinition{}, fmt.Errorf("custom piece rules require symbol and name")
+		}
+	}
+	return def, nil
 }
 
 func NormalizeVariantStart(start VariantStart, fallbackFEN string) VariantStart {
@@ -93,6 +199,19 @@ func NormalizeVariantStart(start VariantStart, fallbackFEN string) VariantStart 
 	}
 	if start.Variant == VariantStandard && start.FEN == standardStartFEN {
 		start.CastlingEnabled = true
+	}
+	if start.RuleSet == "" {
+		start.RuleSet = string(start.Variant)
+	}
+	if start.CastlingMode == "" {
+		if start.CastlingEnabled {
+			start.CastlingMode = CastlingModeStandard
+		} else {
+			start.CastlingMode = CastlingModeNone
+		}
+	}
+	if start.CastlingRights == "" {
+		start.CastlingRights = fenCastlingField(start.FEN)
 	}
 	return start
 }
@@ -146,4 +265,11 @@ func fenCastlingField(fen string) string {
 		return ""
 	}
 	return fields[2]
+}
+
+func customCastlingMode(fen string) string {
+	if fenCastlingField(fen) == "-" {
+		return CastlingModeNone
+	}
+	return CastlingModeStandard
 }

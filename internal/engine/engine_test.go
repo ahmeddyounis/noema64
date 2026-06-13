@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"github.com/ahmedyounis/noema64/internal/verifier"
@@ -125,7 +126,7 @@ func TestEngineNewGamePersistsVariantMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new Chess960 game: %v", err)
 	}
-	if state.Variant.Variant != "chess960" || state.Variant.FEN != state.InitialFEN || state.Variant.CastlingEnabled {
+	if state.Variant.Variant != "chess960" || state.Variant.FEN != state.InitialFEN || !state.Variant.CastlingEnabled || state.Variant.CastlingMode != chesscore.CastlingModeChess960External {
 		t.Fatalf("unexpected Chess960 metadata: %+v initial=%s", state.Variant, state.InitialFEN)
 	}
 	if state.Snapshot.FEN == "" || len(state.Snapshot.LegalMoves) == 0 {

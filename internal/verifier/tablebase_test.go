@@ -93,6 +93,19 @@ func TestExternalTablebaseProbe(t *testing.T) {
 	}
 }
 
+func TestNativeSyzygyProbeHandlesKingsOnlyDraw(t *testing.T) {
+	result, err := (NativeSyzygyProbe{Path: t.TempDir()}).Probe(context.Background(), Request{
+		FEN:        tablebaseTestFEN,
+		Candidates: tablebaseCandidates("a1a2", "a1b1"),
+	})
+	if err != nil {
+		t.Fatalf("native probe: %v", err)
+	}
+	if !result.Available || result.WDL != "draw" || result.Category != "native_kings_only" || len(result.BestMoves) != 2 {
+		t.Fatalf("unexpected native result: %+v", result)
+	}
+}
+
 func buildFakeTablebaseProbe(t *testing.T) string {
 	t.Helper()
 	goTool, err := exec.LookPath("go")
