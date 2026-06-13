@@ -119,7 +119,7 @@ func BuildPromptWithTemplates(req StrategyRequest, templates PromptTemplates) (s
 		schema, _ := json.MarshalIndent(ExampleSchema(), "", "  ")
 		templates.Schema = string(schema)
 	}
-	personality, _ := json.MarshalIndent(req.Personality, "", "  ")
+	personality, _ := json.MarshalIndent(ProfileForPersonality(req.Personality), "", "  ")
 	user, err = renderPromptTemplate(templates.User, map[string]string{
 		"fen":                  req.FEN,
 		"pgn":                  redactUntrusted(req.PGN),

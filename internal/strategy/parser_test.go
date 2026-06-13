@@ -127,6 +127,30 @@ func TestBuildPromptBoundsUntrustedPGN(t *testing.T) {
 	}
 }
 
+func TestBuildPromptIncludesStructuredPersonalityProfile(t *testing.T) {
+	game := chesscore.NewGame()
+	_, user, err := BuildPrompt(StrategyRequest{
+		GameID:         game.ID(),
+		FEN:            game.FEN(),
+		PGN:            game.PGN(),
+		SideToMove:     game.SideToMove(),
+		MoveNumber:     1,
+		LegalMoves:     game.LegalMoves(),
+		Features:       game.Features(),
+		PreviousMemory: NewMemory(game.ID(), game.SideToMove()),
+		Mode:           ModeBlunderguard,
+		Personality:    PersonalityAggressive,
+	})
+	if err != nil {
+		t.Fatalf("build prompt: %v", err)
+	}
+	for _, want := range []string{`"id": "aggressive"`, `"risk_tolerance": 0.75`, "Prefer active piece play and initiative."} {
+		if !strings.Contains(user, want) {
+			t.Fatalf("prompt missing personality profile token %q:\n%s", want, user)
+		}
+	}
+}
+
 func TestBuildPromptUsesEditableTemplateDirectory(t *testing.T) {
 	dir := t.TempDir()
 	writePromptFile(t, dir, "system.md", "custom system")

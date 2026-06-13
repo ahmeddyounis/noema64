@@ -26,6 +26,14 @@ const (
 	PersonalityBeginnerCoach Personality = "beginner_coach"
 )
 
+type PersonalityProfile struct {
+	ID              Personality `json:"id"`
+	Name            string      `json:"name"`
+	RiskTolerance   float64     `json:"risk_tolerance"`
+	StrategicBiases []string    `json:"strategic_biases"`
+	PromptModifiers []string    `json:"prompt_modifiers"`
+}
+
 type StrategyMemory struct {
 	SchemaVersion      string              `json:"schema_version"`
 	MemoryID           string              `json:"memory_id"`
