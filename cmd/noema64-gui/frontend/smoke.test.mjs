@@ -549,6 +549,7 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /--board-ranks/);
   assert.match(appJS, /aria-rowcount/);
   assert.match(appJS, /aria-colindex/);
+  assert.match(appJS, /row\.className = "board-row"/);
   assert.match(appJS, /row\.setAttribute\("role", "row"\)/);
   assert.match(appJS, /row\.setAttribute\("aria-rowindex", "1"\)/);
   assert.match(appJS, /empty\.setAttribute\("role", "gridcell"\)/);
@@ -596,7 +597,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /body:not\(\[data-workspace-view="lab"\]\) \[data-lab-only="true"\]/);
   assert.match(stylesCSS, /\.toolbar-group-global/);
   assert.match(stylesCSS, /\.board-empty-state/);
-  assert.match(stylesCSS, /\.board-empty-row \{[\s\S]*display: contents;/);
+  assert.match(stylesCSS, /\.board-row,\n\.board-empty-row \{[\s\S]*display: contents;/);
   assert.match(stylesCSS, /\.empty-copy/);
   assert.match(stylesCSS, /\.trace-panel \{[\s\S]*grid-template-rows:/);
   assert.match(stylesCSS, /\.top-candidate/);

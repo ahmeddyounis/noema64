@@ -470,6 +470,7 @@ body[data-workspace-view="lab"] [data-workspace-card="study"] {
   place-items: center;
 }
 
+.board-row,
 .board-empty-row {
   display: contents;
 }

@@ -963,14 +963,21 @@ function renderBoard() {
     : [];
   const last = asArray(state.snapshot.move_history).at(-1);
   const lastSquares = splitUCIMoveSquares(last?.uci);
+  let row = null;
   for (const [index, sq] of order.entries()) {
+    if (index % dims.width === 0) {
+      row = document.createElement("div");
+      row.className = "board-row";
+      row.setAttribute("role", "row");
+      row.setAttribute("aria-rowindex", String(Math.floor(index / dims.width) + 1));
+      board.appendChild(row);
+    }
     const parsed = parseBoardSquare(sq, dims);
     const file = dims.files.indexOf(parsed?.file);
     const rank = dims.ranks.indexOf(parsed?.rank);
     const div = document.createElement("button");
     div.className = `square ${(file + rank) % 2 === 0 ? "dark" : "light"}`;
     div.setAttribute("role", "gridcell");
-    div.setAttribute("aria-rowindex", String(Math.floor(index / dims.width) + 1));
     div.setAttribute("aria-colindex", String((index % dims.width) + 1));
     div.setAttribute("aria-label", `${sq} ${state.snapshot.board[sq] || "empty"}`);
     div.dataset.square = sq;
@@ -991,7 +998,7 @@ function renderBoard() {
     div.addEventListener("dragstart", (event) => dragStarted(event, sq));
     div.addEventListener("dragover", (event) => dragOver(event, sq));
     div.addEventListener("drop", (event) => dropOnSquare(event, sq));
-    board.appendChild(div);
+    row.appendChild(div);
   }
   renderBoardOverlay(board);
 }
