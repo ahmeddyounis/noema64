@@ -120,6 +120,55 @@ func TestCustomBoardDefinitionPersistsRuleMetadata(t *testing.T) {
 	}
 }
 
+func TestCustomBoardDefinitionRejectsUndefinedPiecesAndMissingRoyals(t *testing.T) {
+	base := CustomBoardDefinition{
+		SchemaVersion: CustomBoardDefinitionSchemaVersion,
+		ID:            "bad-custom",
+		Name:          "Bad Custom",
+		InitialFEN:    "4k3/8/8/8/3A4/8/8/4K3 w - - 0 1",
+		RuleSet:       "custom-piece-lab",
+		BoardWidth:    8,
+		BoardHeight:   8,
+	}
+	if _, err := CustomBoardStartFromDefinition(base); err == nil || !strings.Contains(err.Error(), "requires a piece_rules entry") {
+		t.Fatalf("expected undefined custom piece failure, got %v", err)
+	}
+
+	base.InitialFEN = "8/8/8/8/3A4/8/8/4K3 w - - 0 1"
+	base.PieceRules = []CustomPieceRule{{Symbol: "A", Name: "Archbishop", Move: "bishop+knight"}}
+	if _, err := CustomBoardStartFromDefinition(base); err == nil || !strings.Contains(err.Error(), "royal piece") {
+		t.Fatalf("expected missing royal failure, got %v", err)
+	}
+}
+
+func TestCustomBoardDefinitionSupportsCustomRoyalPieces(t *testing.T) {
+	start, err := CustomBoardStartFromDefinition(CustomBoardDefinition{
+		SchemaVersion: CustomBoardDefinitionSchemaVersion,
+		ID:            "duke-lab",
+		Name:          "Duke Lab",
+		InitialFEN:    "4x3/8/8/8/8/8/8/4X3 w - - 0 1",
+		RuleSet:       "custom-royal-lab",
+		BoardWidth:    8,
+		BoardHeight:   8,
+		PieceRules: []CustomPieceRule{{
+			Symbol: "X",
+			Name:   "Duke",
+			Move:   "king",
+			Royal:  true,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("custom royal board: %v", err)
+	}
+	game, err := FromVariantStart(start)
+	if err != nil {
+		t.Fatalf("custom royal game: %v", err)
+	}
+	if !game.IsLegalUCI("e1d1") || game.Outcome().Status != "ongoing" {
+		t.Fatalf("custom royal game not playable: outcome=%+v moves=%+v", game.Outcome(), game.LegalMoves())
+	}
+}
+
 func backRankFromFEN(fen string) string {
 	for i, r := range fen {
 		if r == '/' {

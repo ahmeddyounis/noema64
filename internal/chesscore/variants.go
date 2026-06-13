@@ -141,7 +141,7 @@ func HasCustomRules(start VariantStart) bool {
 	if start.BoardDefinition == nil {
 		return false
 	}
-	return start.BoardDefinition.RuleSet != "" && start.BoardDefinition.RuleSet != "standard" || len(start.BoardDefinition.PieceRules) > 0
+	return (start.BoardDefinition.RuleSet != "" && start.BoardDefinition.RuleSet != "standard") || len(start.BoardDefinition.PieceRules) > 0
 }
 
 func ValidateCustomBoardDefinition(def CustomBoardDefinition) (CustomBoardDefinition, error) {
@@ -180,10 +180,45 @@ func ValidateCustomBoardDefinition(def CustomBoardDefinition) (CustomBoardDefini
 		return CustomBoardDefinition{}, err
 	}
 	def.PieceRules = rules
-	if _, _, _, _, err := parseCustomFEN(def.InitialFEN, def.BoardWidth, def.BoardHeight); err != nil {
+	board, _, _, _, err := parseCustomFEN(def.InitialFEN, def.BoardWidth, def.BoardHeight)
+	if err != nil {
+		return CustomBoardDefinition{}, err
+	}
+	if err := validateCustomBoardPieces(def, board); err != nil {
 		return CustomBoardDefinition{}, err
 	}
 	return def, nil
+}
+
+func validateCustomBoardPieces(def CustomBoardDefinition, board map[string]rune) error {
+	rules := map[string]CustomPieceRule{}
+	for _, rule := range def.PieceRules {
+		rules[strings.ToUpper(strings.TrimSpace(rule.Symbol))] = rule
+	}
+	royals := map[string]int{"w": 0, "b": 0}
+	for square, piece := range board {
+		symbol := customPieceSymbol(piece)
+		rule, hasRule := rules[symbol]
+		if !isStandardCustomSymbol(symbol) && !hasRule {
+			return fmt.Errorf("custom piece %s on %s requires a piece_rules entry", symbol, square)
+		}
+		if symbol == "K" || rule.Royal {
+			royals[customPieceSide(piece)]++
+		}
+	}
+	if royals["w"] == 0 || royals["b"] == 0 {
+		return fmt.Errorf("custom board requires at least one royal piece for each side")
+	}
+	return nil
+}
+
+func isStandardCustomSymbol(symbol string) bool {
+	switch strings.ToUpper(strings.TrimSpace(symbol)) {
+	case "K", "Q", "R", "B", "N", "P":
+		return true
+	default:
+		return false
+	}
 }
 
 func NormalizeVariantStart(start VariantStart, fallbackFEN string) VariantStart {
