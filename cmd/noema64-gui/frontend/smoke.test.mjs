@@ -446,6 +446,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusDialogInitialControl(\"#promptSaveDir\")",
     "focusDialogInitialControl(\"#profilesText\")",
     "focusDialogInitialControl(\"#backupDir\")",
+    "focusDialogInitialControl(\"#saveSettingsBtn\")",
     "focusDialogInitialControl(\"#clearActivityBtn\")",
     "focusDialogInitialControl(\"#refreshReviewBtn\")",
     "focusDialogInitialControl(\"#studyMemoryText\")",

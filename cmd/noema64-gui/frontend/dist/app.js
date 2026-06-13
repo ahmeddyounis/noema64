@@ -1730,8 +1730,10 @@ async function saveSettings() {
       applyTheme(settings.gui.theme);
       showSuccess("Settings saved.", "#settingsOutput");
       renderWorkflowPanel();
+      focusDialogInitialControl("#saveSettingsBtn");
     } catch (err) {
       showError(err, "#settingsOutput");
+      focusDialogInitialControl("#saveSettingsBtn");
     }
   });
 }
