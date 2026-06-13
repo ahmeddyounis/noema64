@@ -662,9 +662,9 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.brand span \{[\s\S]*display: none;/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.workflow-cards \{[\s\S]*display: none;/);
   assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.workflow-card-actions \{[\s\S]*grid-template-columns: 1fr 1fr;/);
-  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.toolbar \{[\s\S]*flex-wrap: nowrap;[\s\S]*overflow-x: auto;/);
-  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.toolbar-group \{[\s\S]*display: inline-flex;[\s\S]*flex: 0 0 auto;/);
-  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.toolbar-group button \{[\s\S]*min-width: max-content;[\s\S]*white-space: nowrap;/);
+  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.toolbar \{[\s\S]*flex-wrap: wrap;[\s\S]*overflow-x: visible;/);
+  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.toolbar-group \{[\s\S]*display: inline-flex;[\s\S]*flex: 1 1 100%;[\s\S]*border-bottom: 1px solid #d9dee7;/);
+  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.toolbar-group button \{[\s\S]*flex: 1 1 calc\(50% - 6px\);[\s\S]*white-space: normal;/);
   assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.activity-row \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto;/);
   assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.app-activity \{[\s\S]*grid-template-columns: auto minmax\(0, 1fr\);/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.board-area \{[\s\S]*grid-template-rows: auto auto auto minmax\(96px, auto\);[\s\S]*min-height: 0;/);
