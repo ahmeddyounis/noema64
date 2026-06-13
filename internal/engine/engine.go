@@ -43,6 +43,8 @@ type TimeControl struct {
 	IncrementMS int64 `json:"increment_ms"`
 }
 
+const GameStateSchemaVersion = "game-state.v1"
+
 type ClockState struct {
 	Enabled     bool  `json:"enabled"`
 	WhiteMS     int64 `json:"white_ms"`
@@ -51,6 +53,7 @@ type ClockState struct {
 }
 
 type GameState struct {
+	SchemaVersion  string                  `json:"schema_version"`
 	Snapshot       chesscore.Snapshot      `json:"snapshot"`
 	InitialFEN     string                  `json:"initial_fen"`
 	AppliedMoves   []string                `json:"applied_moves"`
@@ -160,6 +163,9 @@ func (e *Engine) LoadState(ctx context.Context, state GameState) (*GameState, er
 		e.cancel()
 		e.cancel = nil
 		e.activeID = ""
+	}
+	if version := strings.TrimSpace(state.SchemaVersion); version != "" && version != GameStateSchemaVersion {
+		return nil, fmt.Errorf("game state schema_version %q is unsupported by this release", state.SchemaVersion)
 	}
 	game, err := gameFromState(ctx, state)
 	if err != nil {
@@ -403,6 +409,7 @@ func (e *Engine) stateLocked() *GameState {
 		snapshot.LegalMoves = []chesscore.LegalMove{}
 	}
 	return &GameState{
+		SchemaVersion:  GameStateSchemaVersion,
 		Snapshot:       snapshot,
 		InitialFEN:     e.game.InitialFEN(),
 		AppliedMoves:   e.game.AppliedUCI(),

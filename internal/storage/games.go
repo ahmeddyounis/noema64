@@ -51,11 +51,15 @@ func (s *GameStore) Save(ctx context.Context, state *engine.GameState) error {
 	if err := os.MkdirAll(s.dir, 0o700); err != nil {
 		return err
 	}
+	recordState := *state
+	if strings.TrimSpace(recordState.SchemaVersion) == "" {
+		recordState.SchemaVersion = engine.GameStateSchemaVersion
+	}
 	record := GameRecord{
 		SchemaVersion: gameRecordSchemaVersion,
 		SavedAt:       time.Now().UTC().Format(time.RFC3339Nano),
 		GameID:        state.Snapshot.GameID,
-		State:         *state,
+		State:         recordState,
 	}
 	b, err := json.MarshalIndent(record, "", "  ")
 	if err != nil {

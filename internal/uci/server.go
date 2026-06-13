@@ -117,6 +117,7 @@ func (s *Server) handle(ctx context.Context, line string) error {
 		s.write("option name TablebaseTimeoutMS type spin default 1000 min 50 max 10000")
 		s.write("option name TraceEnabled type check default true")
 		s.write("option name TraceFile type string default")
+		s.write("option name LogPath type string default")
 		s.write("uciok")
 	case "isready":
 		s.write("readyok")
@@ -204,7 +205,7 @@ func (s *Server) setOption(line string) error {
 			s.tablebaseTimeout = clampInt(n, 50, 10000)
 			s.refreshVerifierLocked(s.verifierEnabled)
 		}
-	case "tracefile":
+	case "tracefile", "logpath":
 		if value != "" {
 			s.traceStore = storage.NewTraceFileStore(value)
 		}

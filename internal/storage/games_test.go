@@ -44,6 +44,9 @@ func TestGameStoreWritesRedactedSnapshotAndListsRecentGames(t *testing.T) {
 	if strings.Contains(string(b), "secret-value") {
 		t.Fatalf("snapshot leaked secret: %s", string(b))
 	}
+	if !strings.Contains(string(b), `"schema_version": "game-state.v1"`) {
+		t.Fatalf("snapshot missing game state schema version: %s", string(b))
+	}
 
 	records, err := store.List(context.Background(), 10)
 	if err != nil {

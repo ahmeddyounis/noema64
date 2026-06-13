@@ -45,6 +45,9 @@ func TestEngineFallbackOnProviderFaults(t *testing.T) {
 			if state.Snapshot.Ply != 1 {
 				t.Fatalf("ply = %d, want 1", state.Snapshot.Ply)
 			}
+			if state.SchemaVersion != GameStateSchemaVersion {
+				t.Fatalf("state schema_version = %q, want %q", state.SchemaVersion, GameStateSchemaVersion)
+			}
 			if state.Snapshot.MoveHistory[0].UCI == "" {
 				t.Fatalf("selected invalid UCI: %+v", state.Snapshot.MoveHistory[0])
 			}
@@ -268,6 +271,9 @@ func TestEngineLoadStateRestoresMovesAndStrategyMemory(t *testing.T) {
 	if state.Snapshot.GameID != saved.Snapshot.GameID {
 		t.Fatalf("game id = %s, want %s", state.Snapshot.GameID, saved.Snapshot.GameID)
 	}
+	if saved.SchemaVersion != GameStateSchemaVersion || state.SchemaVersion != GameStateSchemaVersion {
+		t.Fatalf("schema versions saved=%q restored=%q, want %q", saved.SchemaVersion, state.SchemaVersion, GameStateSchemaVersion)
+	}
 	if len(state.Snapshot.MoveHistory) != len(saved.Snapshot.MoveHistory) {
 		t.Fatalf("history length = %d, want %d", len(state.Snapshot.MoveHistory), len(saved.Snapshot.MoveHistory))
 	}
@@ -276,6 +282,18 @@ func TestEngineLoadStateRestoresMovesAndStrategyMemory(t *testing.T) {
 	}
 	if len(state.Snapshot.LegalMoves) == 0 && state.Snapshot.Outcome.Status == "ongoing" {
 		t.Fatalf("ongoing restored game has no legal moves")
+	}
+}
+
+func TestEngineLoadStateRejectsUnsupportedGameStateSchema(t *testing.T) {
+	e := New(Options{})
+	state, err := e.State(context.Background())
+	if err != nil {
+		t.Fatalf("state: %v", err)
+	}
+	state.SchemaVersion = "game-state.v99"
+	if _, err := e.LoadState(context.Background(), *state); err == nil {
+		t.Fatal("expected unsupported game state schema to fail")
 	}
 }
 

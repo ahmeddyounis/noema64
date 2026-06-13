@@ -32,7 +32,7 @@ func TestUCISmoke(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	text := out.String()
-	for _, want := range []string{"id name Noema64", "uciok", "readyok", "bestmove ", "option name TablebaseEnabled", "option name TablebasePath", "option name TablebaseTimeoutMS"} {
+	for _, want := range []string{"id name Noema64", "uciok", "readyok", "bestmove ", "option name TablebaseEnabled", "option name TablebasePath", "option name TablebaseTimeoutMS", "option name LogPath"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("output missing %q:\n%s", want, text)
 		}
@@ -78,26 +78,30 @@ func TestUCIHundredScriptedSessions(t *testing.T) {
 	}
 }
 
-func TestUCITraceFileOption(t *testing.T) {
-	tracePath := filepath.Join(t.TempDir(), "trace.jsonl")
-	input := strings.Join([]string{
-		"uci",
-		"setoption name TraceFile value " + tracePath,
-		"position startpos moves e2e4 e7e5",
-		"go movetime 100",
-		"quit",
-		"",
-	}, "\n")
-	var out bytes.Buffer
-	server := NewServer(strings.NewReader(input), &out, &bytes.Buffer{}, storage.DefaultSettings())
-	if err := server.Run(context.Background()); err != nil {
-		t.Fatalf("run: %v", err)
-	}
-	if !strings.Contains(out.String(), "bestmove ") {
-		t.Fatalf("missing bestmove:\n%s", out.String())
-	}
-	if _, err := os.Stat(tracePath); err != nil {
-		t.Fatalf("trace file not written: %v", err)
+func TestUCITracePathOptions(t *testing.T) {
+	for _, optionName := range []string{"TraceFile", "LogPath"} {
+		t.Run(optionName, func(t *testing.T) {
+			tracePath := filepath.Join(t.TempDir(), "trace.jsonl")
+			input := strings.Join([]string{
+				"uci",
+				"setoption name " + optionName + " value " + tracePath,
+				"position startpos moves e2e4 e7e5",
+				"go movetime 100",
+				"quit",
+				"",
+			}, "\n")
+			var out bytes.Buffer
+			server := NewServer(strings.NewReader(input), &out, &bytes.Buffer{}, storage.DefaultSettings())
+			if err := server.Run(context.Background()); err != nil {
+				t.Fatalf("run: %v", err)
+			}
+			if !strings.Contains(out.String(), "bestmove ") {
+				t.Fatalf("missing bestmove:\n%s", out.String())
+			}
+			if _, err := os.Stat(tracePath); err != nil {
+				t.Fatalf("trace file not written: %v", err)
+			}
+		})
 	}
 }
 

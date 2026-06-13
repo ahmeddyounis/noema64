@@ -43,7 +43,8 @@ Additional Noema64 options:
 - `TablebaseTimeoutMS`
 - `TraceEnabled`
 - `TraceFile`
+- `LogPath`
 
-`Temperature` is exposed as a UCI spin value from `0` to `200`, mapped to runtime temperatures `0.0` through `2.0`. `TraceFile` points at a specific JSONL trace file; if unset, Noema64 writes decision traces under the configured local log directory.
+`Temperature` is exposed as a UCI spin value from `0` to `200`, mapped to runtime temperatures `0.0` through `2.0`. `TraceFile` points at a specific JSONL trace file; `LogPath` is accepted as a compatibility alias for the same setting. If neither is set, Noema64 writes decision traces under the configured local log directory.
 
 For Lichess bot bridge usage, see [lichess-bot.md](lichess-bot.md). Noema64 stays a local UCI engine; it does not implement or bundle a Lichess API client.
