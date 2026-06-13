@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -72,6 +73,8 @@ func TestLoadSettingsRejectsUnknownFutureSchema(t *testing.T) {
 	}
 	if _, err := LoadSettings(path); err == nil {
 		t.Fatal("expected unknown future settings schema to fail")
+	} else if !errors.Is(err, ErrUnsupportedSchema) {
+		t.Fatalf("error = %v, want ErrUnsupportedSchema", err)
 	}
 }
 

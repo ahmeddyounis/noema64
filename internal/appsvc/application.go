@@ -2,6 +2,7 @@ package appsvc
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,12 +17,13 @@ import (
 )
 
 type Application struct {
-	settingsPath string
-	settings     storage.Settings
-	engine       *engine.Engine
-	traces       *storage.TraceStore
-	games        *storage.GameStore
-	eventSink    EventSink
+	settingsPath    string
+	settings        storage.Settings
+	engine          *engine.Engine
+	traces          *storage.TraceStore
+	games           *storage.GameStore
+	eventSink       EventSink
+	settingsLoadErr error
 }
 
 const (
@@ -41,14 +43,19 @@ type MoveComparison struct {
 
 func NewApplication(settingsPath string) *Application {
 	settings, err := storage.LoadSettings(settingsPath)
+	var settingsLoadErr error
 	if err != nil {
+		if errors.Is(err, storage.ErrUnsupportedSchema) {
+			settingsLoadErr = appErr("ERR_SETTINGS_UNSUPPORTED_SCHEMA", err, true)
+		}
 		settings = storage.DefaultSettings()
 	}
 	app := &Application{
-		settingsPath: settingsPath,
-		settings:     settings,
-		traces:       storage.NewTraceStore(settings.Logging.OutputDir),
-		games:        storage.NewGameStore(gameStoreDir(settings)),
+		settingsPath:    settingsPath,
+		settings:        settings,
+		traces:          storage.NewTraceStore(settings.Logging.OutputDir),
+		games:           storage.NewGameStore(gameStoreDir(settings)),
+		settingsLoadErr: settingsLoadErr,
 	}
 	app.engine = engine.New(app.engineOptions())
 	app.restoreLatestGame()
@@ -328,6 +335,9 @@ func (a *Application) GetSettings() (storage.Settings, error) {
 			settings.LLM.Profiles[i].APIKey = "[REDACTED]"
 		}
 	}
+	if a.settingsLoadErr != nil {
+		return settings, a.settingsLoadErr
+	}
 	return settings, nil
 }
 
@@ -345,6 +355,7 @@ func (a *Application) SaveSettings(settings storage.Settings) error {
 	}
 	settings = storage.NormalizeSettings(settings)
 	a.settings = settings
+	a.settingsLoadErr = nil
 	a.engine.SetOptions(a.engineOptions())
 	a.traces = storage.NewTraceStore(settings.Logging.OutputDir)
 	a.games = storage.NewGameStore(gameStoreDir(settings))

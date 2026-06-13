@@ -185,6 +185,24 @@ func TestNewApplicationRecoversFromCorruptSettings(t *testing.T) {
 	}
 }
 
+func TestNewApplicationReportsUnsupportedFutureSettingsSchema(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(configPath, []byte("schema_version: \"99.0\"\n"), 0o600); err != nil {
+		t.Fatalf("write future config: %v", err)
+	}
+	app := NewApplication(configPath)
+	if _, err := app.GetSettings(); err == nil {
+		t.Fatal("expected future settings schema to be reported")
+	}
+	state, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get game should still recover with defaults: %v", err)
+	}
+	if state.Snapshot.FEN == "" {
+		t.Fatalf("recovered app has empty game state: %+v", state.Snapshot)
+	}
+}
+
 func TestSaveSettingsKeepsNormalizedRuntimeSettings(t *testing.T) {
 	app, _ := newTestApplication(t)
 	settings := storage.Settings{}

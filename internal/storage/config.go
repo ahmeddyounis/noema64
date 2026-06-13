@@ -13,6 +13,8 @@ import (
 
 const settingsSchemaVersion = "1.0"
 
+var ErrUnsupportedSchema = errors.New("unsupported schema version")
+
 type Settings struct {
 	SchemaVersion string           `json:"schema_version" yaml:"schema_version"`
 	CreatedAt     string           `json:"created_at" yaml:"created_at"`
@@ -385,7 +387,7 @@ func validateSettings(settings Settings) error {
 		return errors.New("settings schema_version is required")
 	}
 	if settings.SchemaVersion != settingsSchemaVersion {
-		return fmt.Errorf("settings schema_version %q is unsupported by this release", settings.SchemaVersion)
+		return fmt.Errorf("%w: settings schema_version %q is unsupported by this release", ErrUnsupportedSchema, settings.SchemaVersion)
 	}
 	switch settings.Engine.DefaultMode {
 	case "pure", "blunderguard", "hybrid", "coach":
