@@ -105,6 +105,20 @@ const operationLabels = {
   "#trainPolicyPriorBtn": "Policy training",
   "#validatePromptBtn": "Prompt validation"
 };
+const dialogReturnFocusTargets = {
+  activityDialog: "#activityHistoryBtn",
+  exportDialog: "#exportBtn",
+  experimentsDialog: "#experimentsBtn",
+  importDialog: "#importBtn",
+  labDialog: "#labBtn",
+  profilesDialog: "#profilesBtn",
+  promptDialog: "#promptEditorBtn",
+  promotionDialog: "#moveInput",
+  recentDialog: "#recentBtn",
+  reviewDialog: "#reviewBtn",
+  settingsDialog: "#settingsBtn",
+  studyDialog: "#studyBtn"
+};
 const knownHumanizedTokens = {
   api: "API",
   fen: "FEN",
@@ -430,6 +444,9 @@ function bindBusyButton(selector, action) {
 }
 
 function bindDialogCloseButtons() {
+  document.querySelectorAll("dialog").forEach((dialog) => {
+    dialog.addEventListener("close", () => restoreDialogFocus(dialog));
+  });
   document.querySelectorAll("dialog button[value='cancel']").forEach((button) => {
     button.type = "button";
     button.addEventListener("click", () => {
@@ -437,6 +454,19 @@ function bindDialogCloseButtons() {
       if (dialog?.open) dialog.close("cancel");
     });
   });
+}
+
+function restoreDialogFocus(dialog) {
+  window.setTimeout(() => {
+    const preferred = document.querySelector(dialogReturnFocusTargets[dialog?.id]);
+    const fallback = document.querySelector("[role='tab'][aria-selected='true']");
+    const target = [preferred, fallback].find((element) => element && !element.disabled && isElementVisible(element));
+    try {
+      target?.focus({ preventScroll: true });
+    } catch {
+      target?.focus();
+    }
+  }, 0);
 }
 
 function setWorkspaceView(view, focus = false) {
