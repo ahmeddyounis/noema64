@@ -577,6 +577,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /\.top-candidate/);
   assert.match(stylesCSS, /\.settings \.check-label/);
   assert.match(stylesCSS, /\.import-controls select,\n\.export-controls select \{[\s\S]*min-height: 34px;/);
+  assert.match(stylesCSS, /\.lab-grid label,\n\.lab-tools > label \{[\s\S]*display: grid;[\s\S]*gap: 4px;/);
   assert.match(stylesCSS, /\.settings-section/);
   assert.match(stylesCSS, /button:focus-visible/);
   assert.match(stylesCSS, /-webkit-line-clamp: 2/);

@@ -886,9 +886,15 @@ dialog header button {
   padding: 0 12px;
 }
 
-.lab-grid label {
+.lab-grid label,
+.lab-tools > label {
   display: grid;
   gap: 4px;
+}
+
+.lab-tools > label {
+  min-width: 0;
+  padding: 0 12px;
 }
 
 .lab-grid input {
