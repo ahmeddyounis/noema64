@@ -14,6 +14,8 @@ Imported PGN/comments are treated as untrusted chess data, not instructions.
 
 Personality is rendered as structured profile JSON with `id`, `name`, `risk_tolerance`, strategic biases, and prompt modifiers, so style presets affect the strategist context instead of acting as display-only labels.
 
+The selected profile also contributes a bounded `personality_score` to each candidate during deterministic scoring. This keeps personality influence visible in traces and subordinate to legality, verifier, and search signals.
+
 Versioned editable templates live under `prompts/v1`:
 
 - `system.md`

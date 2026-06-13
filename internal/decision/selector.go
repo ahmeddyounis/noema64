@@ -159,7 +159,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	searchStart := time.Now()
 	searchUsed, searchName := applySearchScores(ctx, req.Game, candidates, req.Mode)
 	searchMS := time.Since(searchStart).Milliseconds()
-	scoreCandidates(candidates, req.Memory, req.Mode)
+	scoreCandidates(candidates, req.Memory, req.Mode, req.Personality)
 	chosen, ok := selectCandidate(candidates, req.Mode)
 	if !ok {
 		scoreStage.finish("failed", "No acceptable candidate after scoring.")
@@ -311,10 +311,12 @@ func applyVerifierScores(candidates []strategy.CandidateMove, result *verifier.R
 	}
 }
 
-func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyMemory, mode strategy.EngineMode) {
+func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyMemory, mode strategy.EngineMode, personality strategy.Personality) {
 	for i := range candidates {
 		plan := planAlignment(candidates[i], mem)
 		candidates[i].PlanAlignmentScore = plan
+		personalityFit := personalityAlignment(candidates[i], personality)
+		candidates[i].PersonalityScore = personalityFit
 		tactical := 0.5
 		switch candidates[i].VerifierScore.Status {
 		case "accepted":
@@ -327,11 +329,11 @@ func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyM
 		llm := candidates[i].LLMConfidence
 		switch mode {
 		case strategy.ModeHybrid:
-			candidates[i].FinalScore = 0.20*llm + 0.20*plan + 0.20*tactical + 0.35*candidates[i].SearchScore
+			candidates[i].FinalScore = 0.20*llm + 0.20*plan + 0.20*tactical + 0.35*candidates[i].SearchScore + 0.03*personalityFit
 		case strategy.ModeBlunderguard:
-			candidates[i].FinalScore = 0.35*llm + 0.25*plan + 0.30*tactical
+			candidates[i].FinalScore = 0.35*llm + 0.25*plan + 0.30*tactical + 0.05*personalityFit
 		default:
-			candidates[i].FinalScore = 0.55*llm + 0.35*plan
+			candidates[i].FinalScore = 0.55*llm + 0.35*plan + 0.05*personalityFit
 		}
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
@@ -350,6 +352,55 @@ func selectCandidate(candidates []strategy.CandidateMove, mode strategy.EngineMo
 		return candidate, true
 	}
 	return strategy.CandidateMove{}, false
+}
+
+func personalityAlignment(candidate strategy.CandidateMove, personality strategy.Personality) float64 {
+	profile := strategy.ProfileForPersonality(personality)
+	riskDelta := profile.RiskTolerance - 0.45
+	score := 0.0
+	forcing := candidate.LegalMove.Capture || candidate.LegalMove.Check
+	if candidate.LegalMove.Capture {
+		score += riskDelta * 0.9
+	}
+	if candidate.LegalMove.Check {
+		score += riskDelta * 0.7
+	}
+	if !forcing {
+		score += -riskDelta * 0.4
+	}
+	switch candidate.VerifierScore.Status {
+	case "warning":
+		score -= math.Max(0, 0.60-profile.RiskTolerance) * 0.5
+	case "rejected":
+		score -= math.Max(0.20, 0.80-profile.RiskTolerance)
+	}
+	switch profile.ID {
+	case strategy.PersonalityAggressive:
+		if forcing {
+			score += 0.25
+		} else {
+			score -= 0.05
+		}
+	case strategy.PersonalityPositional:
+		if candidate.PlanAlignmentScore >= 0.30 {
+			score += 0.20
+		}
+		if forcing {
+			score -= 0.10
+		}
+	case strategy.PersonalityBeginnerCoach:
+		if !forcing {
+			score += 0.15
+		}
+		riskText := strings.ToLower(candidate.Risk + " " + candidate.Purpose)
+		for _, word := range []string{"sacrifice", "speculative", "unclear", "complex"} {
+			if strings.Contains(riskText, word) {
+				score -= 0.15
+				break
+			}
+		}
+	}
+	return math.Max(-1, math.Min(1, score))
 }
 
 func planAlignment(candidate strategy.CandidateMove, mem strategy.StrategyMemory) float64 {

@@ -139,6 +139,7 @@ type CandidateMove struct {
 	PlanAlignmentScore float64             `json:"plan_alignment_score"`
 	VerifierScore      VerifierScore       `json:"verifier_score"`
 	SearchScore        float64             `json:"search_score"`
+	PersonalityScore   float64             `json:"personality_score"`
 	FinalScore         float64             `json:"final_score"`
 	Rank               int                 `json:"rank"`
 	LegalMove          chesscore.LegalMove `json:"legal_move"`

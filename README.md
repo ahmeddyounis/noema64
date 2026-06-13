@@ -60,6 +60,8 @@ The embedded frontend is static and works with Wails bindings. The mock provider
 - `hybrid`: scoring reserves more weight for verifier/search-style signals.
 - `coach`: uses the same legal pipeline with teaching-oriented personality settings.
 
+Personality profiles are not display-only. Their risk tolerance is included in the arbiter as a small `personality_score` on each candidate, so aggressive profiles can break close ties toward safe forcing moves while positional and coach profiles lean toward clearer low-risk choices.
+
 ## Provider Setup
 
 Default config uses the offline mock provider. To use an OpenAI-compatible endpoint, set:

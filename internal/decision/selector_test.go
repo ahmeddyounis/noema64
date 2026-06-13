@@ -31,7 +31,7 @@ func TestHybridSearchScoresMaterialWin(t *testing.T) {
 		t.Fatalf("queen capture search score = %.2f, quiet move = %.2f", candidates[1].SearchScore, candidates[0].SearchScore)
 	}
 
-	scoreCandidates(candidates, strategy.StrategyMemory{}, strategy.ModeHybrid)
+	scoreCandidates(candidates, strategy.StrategyMemory{}, strategy.ModeHybrid, strategy.PersonalityBalanced)
 	if candidates[0].UCI != "g3h4" {
 		t.Fatalf("top hybrid candidate = %s, want g3h4", candidates[0].UCI)
 	}
@@ -43,9 +43,37 @@ func TestPureScoringIgnoresSearchScore(t *testing.T) {
 		{UCI: "a2a4", Purpose: "low confidence", LLMConfidence: 0.1, SearchScore: 1},
 	}
 
-	scoreCandidates(candidates, strategy.StrategyMemory{}, strategy.ModePure)
+	scoreCandidates(candidates, strategy.StrategyMemory{}, strategy.ModePure, strategy.PersonalityBalanced)
 	if candidates[0].UCI != "a2a3" {
 		t.Fatalf("pure top candidate = %s, want a2a3", candidates[0].UCI)
+	}
+}
+
+func TestPersonalityScoreInfluencesCloseCandidateRanking(t *testing.T) {
+	game := searchTestGame(t)
+	closeRace := func() []strategy.CandidateMove {
+		return []strategy.CandidateMove{
+			searchTestCandidate(t, game, "e1e2", 0.76),
+			searchTestCandidate(t, game, "g3h4", 0.72),
+		}
+	}
+
+	aggressive := closeRace()
+	scoreCandidates(aggressive, strategy.StrategyMemory{}, strategy.ModePure, strategy.PersonalityAggressive)
+	if aggressive[0].UCI != "g3h4" {
+		t.Fatalf("aggressive top candidate = %s, want forcing capture g3h4; candidates=%+v", aggressive[0].UCI, aggressive)
+	}
+	if aggressive[0].PersonalityScore <= 0 {
+		t.Fatalf("aggressive capture personality score = %.2f, want positive", aggressive[0].PersonalityScore)
+	}
+
+	positional := closeRace()
+	scoreCandidates(positional, strategy.StrategyMemory{}, strategy.ModePure, strategy.PersonalityPositional)
+	if positional[0].UCI != "e1e2" {
+		t.Fatalf("positional top candidate = %s, want quiet move e1e2; candidates=%+v", positional[0].UCI, positional)
+	}
+	if positional[0].PersonalityScore <= 0 {
+		t.Fatalf("positional quiet personality score = %.2f, want positive", positional[0].PersonalityScore)
 	}
 }
 
