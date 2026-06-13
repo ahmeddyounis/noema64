@@ -8,6 +8,8 @@ import (
 	"os"
 
 	"github.com/ahmedyounis/noema64/internal/appsvc"
+	"github.com/ahmedyounis/noema64/internal/chesscore"
+	"github.com/ahmedyounis/noema64/internal/engine"
 )
 
 func main() {
@@ -15,10 +17,19 @@ func main() {
 	move := flag.String("move", "", "UCI move for -cmd move")
 	fen := flag.String("fen", "", "FEN to load before running the command")
 	pgn := flag.String("pgn", "", "PGN to load before running the command")
+	variant := flag.String("variant", "", "starting variant for a new game: standard, chess960, or custom")
+	seed := flag.Int64("seed", 0, "Chess960 start index/seed; normalized to 0-959")
 	flag.Parse()
 
 	app := appsvc.NewApplication("")
-	if *fen != "" {
+	if *variant != "" {
+		state, err := app.NewGame(engine.NewGameOptions{Variant: chesscore.Variant(*variant), Seed: *seed, FEN: *fen, Side: "auto"})
+		exitOnAppErr(err)
+		if *cmd == "state" {
+			printJSON(state)
+			return
+		}
+	} else if *fen != "" {
 		_, err := app.ImportFEN(*fen)
 		exitOnAppErr(err)
 	}

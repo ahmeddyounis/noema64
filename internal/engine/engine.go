@@ -33,6 +33,8 @@ type Options struct {
 type NewGameOptions struct {
 	Side        string               `json:"side"`
 	FEN         string               `json:"fen,omitempty"`
+	Variant     chesscore.Variant    `json:"variant,omitempty"`
+	Seed        int64                `json:"seed,omitempty"`
 	TimeControl TimeControl          `json:"time_control,omitempty"`
 	Mode        strategy.EngineMode  `json:"mode,omitempty"`
 	Personality strategy.Personality `json:"personality,omitempty"`
@@ -57,6 +59,7 @@ type GameState struct {
 	Snapshot        chesscore.Snapshot       `json:"snapshot"`
 	Features        chesscore.FeatureSummary `json:"features"`
 	InitialFEN      string                   `json:"initial_fen"`
+	Variant         chesscore.VariantStart   `json:"variant"`
 	AppliedMoves    []string                 `json:"applied_moves"`
 	Clock           ClockState               `json:"clock"`
 	StrategyMemory  strategy.StrategyMemory  `json:"strategy_memory"`
@@ -67,6 +70,7 @@ type GameState struct {
 type Engine struct {
 	mu           sync.Mutex
 	game         *chesscore.Game
+	variant      chesscore.VariantStart
 	memory       strategy.StrategyMemory
 	lastDecision *decision.MoveDecision
 	clock        ClockState
@@ -79,9 +83,10 @@ func New(opts Options) *Engine {
 	opts = normalizeOptions(opts)
 	game := chesscore.NewGame()
 	return &Engine{
-		game:   game,
-		memory: strategy.NewMemory(game.ID(), "white"),
-		opts:   opts,
+		game:    game,
+		variant: chesscore.StandardStart(game.InitialFEN()),
+		memory:  strategy.NewMemory(game.ID(), "white"),
+		opts:    opts,
 	}
 }
 
@@ -93,17 +98,12 @@ func (e *Engine) NewGame(ctx context.Context, opts NewGameOptions) (*GameState, 
 		e.cancel = nil
 		e.activeID = ""
 	}
-	var game *chesscore.Game
-	var err error
-	if opts.FEN != "" {
-		game, err = chesscore.FromFEN(opts.FEN)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		game = chesscore.NewGame()
+	game, variant, err := newVariantGame(opts)
+	if err != nil {
+		return nil, err
 	}
 	e.game = game
+	e.variant = variant
 	e.clock = newClock(opts.TimeControl)
 	if opts.Mode != "" {
 		e.opts.Mode = opts.Mode
@@ -147,6 +147,7 @@ func (e *Engine) LoadPGN(ctx context.Context, pgn string) (*GameState, error) {
 		return nil, err
 	}
 	e.game = game
+	e.variant = chesscore.StandardStart(game.InitialFEN())
 	e.clock = ClockState{}
 	e.memory = strategy.NewMemory(game.ID(), game.SideToMove())
 	e.lastDecision = nil
@@ -174,6 +175,7 @@ func (e *Engine) LoadState(ctx context.Context, state GameState) (*GameState, er
 		return nil, err
 	}
 	e.game = game
+	e.variant = chesscore.NormalizeVariantStart(state.Variant, game.InitialFEN())
 	e.clock = state.Clock
 	e.memory = state.StrategyMemory
 	if strings.TrimSpace(e.memory.SchemaVersion) == "" {
@@ -386,7 +388,7 @@ func (e *Engine) LegalMoves(ctx context.Context) ([]chesscore.LegalMove, error) 
 func (e *Engine) ExportPGN(ctx context.Context) (string, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	return pgnWithMetadata(e.game.PGN(), e.opts, e.lastDecision), nil
+	return pgnWithMetadata(e.game.PGN(), e.opts, e.lastDecision, e.variant), nil
 }
 
 func (e *Engine) ExportFEN(ctx context.Context) (string, error) {
@@ -419,6 +421,7 @@ func (e *Engine) stateLocked() *GameState {
 		Snapshot:        snapshot,
 		Features:        e.game.Features(),
 		InitialFEN:      e.game.InitialFEN(),
+		Variant:         chesscore.NormalizeVariantStart(e.variant, e.game.InitialFEN()),
 		AppliedMoves:    e.game.AppliedUCI(),
 		Clock:           e.clock,
 		StrategyMemory:  e.memory,
@@ -448,13 +451,13 @@ type pgnTag struct {
 	Value string
 }
 
-func pgnWithMetadata(pgn string, opts Options, dec *decision.MoveDecision) string {
+func pgnWithMetadata(pgn string, opts Options, dec *decision.MoveDecision, variant chesscore.VariantStart) string {
 	body := strings.TrimSpace(pgn)
 	if body == "" {
 		body = "*"
 	}
 	added := []string{}
-	for _, tag := range noemaPGNTags(opts, dec) {
+	for _, tag := range noemaPGNTags(opts, dec, variant) {
 		if hasPGNTag(body, tag.Name) {
 			continue
 		}
@@ -480,7 +483,7 @@ func pgnWithMetadata(pgn string, opts Options, dec *decision.MoveDecision) strin
 	return tagBlock + "\n\n" + body
 }
 
-func noemaPGNTags(opts Options, dec *decision.MoveDecision) []pgnTag {
+func noemaPGNTags(opts Options, dec *decision.MoveDecision, variant chesscore.VariantStart) []pgnTag {
 	mode := opts.Mode
 	if dec != nil && dec.Mode != "" {
 		mode = dec.Mode
@@ -499,12 +502,72 @@ func noemaPGNTags(opts Options, dec *decision.MoveDecision) []pgnTag {
 	} else if opts.Verifier != nil {
 		verifierName = opts.Verifier.Name()
 	}
-	return []pgnTag{
+	variant = chesscore.NormalizeVariantStart(variant, "")
+	tags := []pgnTag{
 		{Name: "Annotator", Value: "Noema64"},
+		{Name: "Variant", Value: string(variant.Variant)},
 		{Name: "EngineMode", Value: string(mode)},
 		{Name: "LLMProvider", Value: providerName},
 		{Name: "PromptVersion", Value: strategy.PromptVersion},
 		{Name: "Verifier", Value: verifierName},
+	}
+	if variant.Variant != chesscore.VariantStandard {
+		tags = append(tags, pgnTag{Name: "InitialFEN", Value: variant.FEN})
+	}
+	return tags
+}
+
+func newVariantGame(opts NewGameOptions) (*chesscore.Game, chesscore.VariantStart, error) {
+	fen := strings.TrimSpace(opts.FEN)
+	variant := opts.Variant
+	if variant == "" {
+		if fen == "" {
+			variant = chesscore.VariantStandard
+		} else {
+			variant = chesscore.VariantCustom
+		}
+	}
+	switch variant {
+	case chesscore.VariantStandard:
+		if fen != "" {
+			game, err := chesscore.FromFEN(fen)
+			if err != nil {
+				return nil, chesscore.VariantStart{}, err
+			}
+			return game, chesscore.StandardStart(game.InitialFEN()), nil
+		}
+		game := chesscore.NewGame()
+		return game, chesscore.StandardStart(game.InitialFEN()), nil
+	case chesscore.VariantChess960:
+		start := chesscore.Chess960Start(opts.Seed)
+		if fen != "" {
+			custom, err := chesscore.CustomBoardStart(fen)
+			if err != nil {
+				return nil, chesscore.VariantStart{}, err
+			}
+			custom.Variant = chesscore.VariantChess960
+			custom.Seed = opts.Seed
+			custom.CastlingEnabled = false
+			custom.Notes = append(custom.Notes, "Loaded as a Chess960-compatible custom start.")
+			start = custom
+		}
+		game, err := chesscore.FromFEN(start.FEN)
+		if err != nil {
+			return nil, chesscore.VariantStart{}, err
+		}
+		return game, start, nil
+	case chesscore.VariantCustom:
+		start, err := chesscore.CustomBoardStart(fen)
+		if err != nil {
+			return nil, chesscore.VariantStart{}, err
+		}
+		game, err := chesscore.FromFEN(start.FEN)
+		if err != nil {
+			return nil, chesscore.VariantStart{}, err
+		}
+		return game, start, nil
+	default:
+		return nil, chesscore.VariantStart{}, fmt.Errorf("unsupported chess variant %q", opts.Variant)
 	}
 }
 

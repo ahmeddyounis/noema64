@@ -661,6 +661,29 @@ func TestNewGameAcceptsTimeControl(t *testing.T) {
 	}
 }
 
+func TestNewGameAcceptsChess960Variant(t *testing.T) {
+	app, _ := newTestApplication(t)
+	state, err := app.NewGame(engine.NewGameOptions{Side: "white", Variant: "chess960", Seed: 17})
+	if err != nil {
+		t.Fatalf("new Chess960 game: %v", err)
+	}
+	if state.Variant.Variant != "chess960" || state.InitialFEN == "" {
+		t.Fatalf("missing Chess960 state metadata: %+v", state.Variant)
+	}
+	if len(state.Snapshot.LegalMoves) == 0 {
+		t.Fatalf("Chess960 start has no legal moves: %+v", state.Snapshot)
+	}
+
+	restored := NewApplication(filepath.Join(filepath.Dir(app.settingsPath), "config.yaml"))
+	restoredState, err := restored.GetGame()
+	if err != nil {
+		t.Fatalf("restored state: %v", err)
+	}
+	if restoredState.Variant.Variant != "chess960" || restoredState.InitialFEN != state.InitialFEN {
+		t.Fatalf("Chess960 metadata did not persist: got %+v initial=%s want %+v initial=%s", restoredState.Variant, restoredState.InitialFEN, state.Variant, state.InitialFEN)
+	}
+}
+
 func TestResignPersistsTerminalOutcome(t *testing.T) {
 	app, _ := newTestApplication(t)
 	state, err := app.NewGame(engine.NewGameOptions{Side: "white"})

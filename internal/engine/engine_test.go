@@ -115,6 +115,33 @@ func TestEngineClockStateAndTimeoutOutcome(t *testing.T) {
 	}
 }
 
+func TestEngineNewGamePersistsVariantMetadata(t *testing.T) {
+	e := New(Options{})
+	state, err := e.NewGame(context.Background(), NewGameOptions{
+		Side:    "white",
+		Variant: "chess960",
+		Seed:    42,
+	})
+	if err != nil {
+		t.Fatalf("new Chess960 game: %v", err)
+	}
+	if state.Variant.Variant != "chess960" || state.Variant.FEN != state.InitialFEN || state.Variant.CastlingEnabled {
+		t.Fatalf("unexpected Chess960 metadata: %+v initial=%s", state.Variant, state.InitialFEN)
+	}
+	if state.Snapshot.FEN == "" || len(state.Snapshot.LegalMoves) == 0 {
+		t.Fatalf("Chess960 state not playable: %+v", state.Snapshot)
+	}
+
+	restored := New(Options{})
+	restoredState, err := restored.LoadState(context.Background(), *state)
+	if err != nil {
+		t.Fatalf("load Chess960 state: %v", err)
+	}
+	if restoredState.Variant.Variant != "chess960" || restoredState.InitialFEN != state.InitialFEN {
+		t.Fatalf("restored variant mismatch: got %+v initial=%s want %+v initial=%s", restoredState.Variant, restoredState.InitialFEN, state.Variant, state.InitialFEN)
+	}
+}
+
 func TestEngineExportPGNIncludesNoema64MetadataAndComments(t *testing.T) {
 	e := New(Options{
 		Mode:     strategy.ModeHybrid,
