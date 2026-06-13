@@ -7,6 +7,7 @@ const pieces = {
 let state = null;
 let selected = null;
 let focusedSquare = "e2";
+let boardKeyboardMode = false;
 let flipped = false;
 let activeTab = "summary";
 let settings = null;
@@ -18,6 +19,7 @@ let pendingPromotion = null;
 let applyingProviderProfile = false;
 let lastStageEvent = null;
 let promptPack = null;
+const busyControls = new Set();
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -43,7 +45,13 @@ function isAppErrorValue(value) {
 
 function showError(err, selector = "#statusText") {
   const target = document.querySelector(selector) || document.querySelector("#statusText");
-  target.textContent = appErrorMessage(err);
+  const message = appErrorMessage(err);
+  if ("value" in target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT")) {
+    target.value = message;
+  } else {
+    target.textContent = message;
+  }
+  target.title = message;
 }
 
 async function call(name, ...args) {
@@ -54,22 +62,129 @@ async function call(name, ...args) {
   return result;
 }
 
+function controlFrom(controlOrSelector) {
+  return typeof controlOrSelector === "string" ? document.querySelector(controlOrSelector) : controlOrSelector;
+}
+
+function busyKey(controlOrSelector, control) {
+  return typeof controlOrSelector === "string" ? controlOrSelector : control;
+}
+
+function setControlBusy(controlOrSelector, busy) {
+  const control = controlFrom(controlOrSelector);
+  if (!control) return;
+  const key = busyKey(controlOrSelector, control);
+  if (busy) {
+    busyControls.add(key);
+    control.disabled = true;
+    control.setAttribute("aria-busy", "true");
+  } else {
+    busyControls.delete(key);
+    control.disabled = false;
+    control.removeAttribute("aria-busy");
+  }
+}
+
+async function withBusyControl(controlOrSelector, action) {
+  const control = controlFrom(controlOrSelector);
+  const key = busyKey(controlOrSelector, control);
+  if (!control || busyControls.has(key)) return undefined;
+  setControlBusy(controlOrSelector, true);
+  try {
+    return await action();
+  } finally {
+    setControlBusy(controlOrSelector, false);
+  }
+}
+
+function bindBusyButton(selector, action) {
+  document.querySelector(selector).addEventListener("click", (event) => {
+    event.preventDefault();
+    withBusyControl(selector, () => action(event));
+  });
+}
+
+function resetBoardEntry() {
+  selected = null;
+  document.querySelector("#moveInput").value = "";
+}
+
+function parseJSONField(selector, label) {
+  const field = document.querySelector(selector);
+  try {
+    return JSON.parse(field.value);
+  } catch (err) {
+    field.focus();
+    field.select?.();
+    throw new Error(`${label} must be valid JSON. ${appErrorMessage(err)}`);
+  }
+}
+
+function requireField(selector, message) {
+  const field = document.querySelector(selector);
+  const value = String(field?.value || "").trim();
+  if (value) return value;
+  field?.focus();
+  throw new Error(message);
+}
+
 async function refresh() {
   try {
     state = await call("GetGame");
     render();
   } catch (err) {
-    document.querySelector("#statusText").textContent = String(err);
+    renderUnavailableState(appErrorMessage(err));
   }
 }
 
 function render() {
-  if (!state?.snapshot) return;
+  if (!state?.snapshot) {
+    renderUnavailableState("No game state is available.");
+    return;
+  }
   renderBoard();
   renderStatus();
   renderMoves();
   renderStrategy();
   renderDecision();
+}
+
+function renderUnavailableState(message) {
+  selected = null;
+  renderBoardEmpty("Board unavailable", "Open Noema64 through the desktop app to connect the game service.");
+  const status = document.querySelector("#statusText");
+  status.textContent = message || "Game service unavailable.";
+  status.title = status.textContent;
+  document.querySelector("#clockText").textContent = "Untimed";
+  document.querySelector("#modeText").textContent = settings?.engine?.default_mode || "offline";
+  document.querySelector("#thinkingStage").textContent = "Unavailable";
+  const tab = document.querySelector("#tabContent");
+  tab.textContent = "Decision traces will appear after the game service is connected and the engine makes a decision.";
+  tab.classList.add("empty-copy");
+  const candidates = document.querySelector("#candidates");
+  candidates.textContent = "Candidate moves are unavailable until a game is loaded.";
+  candidates.classList.add("empty-copy");
+  document.querySelector("#confidence").textContent = "0.00";
+  renderStrategyRows([
+    ["Status", "Unavailable"],
+    ["Plan", "Connect the desktop game service to load strategy memory."]
+  ]);
+  renderMoveListEmpty("No moves loaded.");
+}
+
+function renderBoardEmpty(title, detail) {
+  const board = document.querySelector("#board");
+  board.innerHTML = "";
+  board.classList.add("board-empty-state");
+  board.style.setProperty("--board-files", 8);
+  board.style.setProperty("--board-ranks", 8);
+  board.style.aspectRatio = "1 / 1";
+  board.setAttribute("aria-rowcount", "8");
+  board.setAttribute("aria-colcount", "8");
+  const empty = document.createElement("div");
+  empty.className = "board-empty";
+  empty.textContent = detail ? `${title}. ${detail}` : title;
+  board.appendChild(empty);
 }
 
 function renderStatus() {
@@ -86,10 +201,9 @@ function statusSummary(snapshot, variant) {
   const parts = [
     `${snapshot.side_to_move || "unknown"} to move`,
     snapshot.outcome?.status || "unknown",
-    variant || "standard"
+    variant || "standard",
+    `ply ${snapshot.ply || 0}`
   ];
-  const fen = compactFen(snapshot.fen);
-  if (fen) parts.push(`FEN ${fen}`);
   return parts.join(" · ");
 }
 
@@ -157,29 +271,34 @@ function squareOrder() {
 function renderBoard() {
   const board = document.querySelector("#board");
   board.innerHTML = "";
+  board.classList.remove("board-empty-state");
   const dims = boardDimensions();
   const order = squareOrder();
   if (!order.includes(focusedSquare)) focusedSquare = order[0] || "a1";
   board.style.setProperty("--board-files", dims.width);
   board.style.setProperty("--board-ranks", dims.height);
   board.style.aspectRatio = `${dims.width} / ${dims.height}`;
+  board.setAttribute("aria-rowcount", String(dims.height));
+  board.setAttribute("aria-colcount", String(dims.width));
   const legalTargets = selected
     ? state.snapshot.legal_moves.filter((m) => m.from === selected).map((m) => m.to)
     : [];
   const last = state.snapshot.move_history.at(-1);
   const lastSquares = splitUCIMoveSquares(last?.uci);
-  for (const sq of order) {
+  for (const [index, sq] of order.entries()) {
     const parsed = parseBoardSquare(sq, dims);
     const file = dims.files.indexOf(parsed?.file);
     const rank = dims.ranks.indexOf(parsed?.rank);
     const div = document.createElement("button");
     div.className = `square ${(file + rank) % 2 === 0 ? "dark" : "light"}`;
     div.setAttribute("role", "gridcell");
+    div.setAttribute("aria-rowindex", String(Math.floor(index / dims.width) + 1));
+    div.setAttribute("aria-colindex", String((index % dims.width) + 1));
     div.setAttribute("aria-label", `${sq} ${state.snapshot.board[sq] || "empty"}`);
     div.dataset.square = sq;
     div.tabIndex = sq === focusedSquare ? 0 : -1;
     if (selected === sq) div.classList.add("selected");
-    if (focusedSquare === sq) div.classList.add("keyboard-focus");
+    if (boardKeyboardMode && focusedSquare === sq) div.classList.add("keyboard-focus");
     if (legalTargets.includes(sq)) div.classList.add("target");
     if (lastSquares && (lastSquares.from === sq || lastSquares.to === sq)) div.classList.add("last-move");
     div.draggable = !!state.snapshot.board[sq] && state.snapshot.outcome?.status === "ongoing";
@@ -188,7 +307,8 @@ function renderBoard() {
     coord.className = "coord";
     coord.textContent = sq;
     div.appendChild(coord);
-    div.addEventListener("click", () => squareClicked(sq));
+    div.addEventListener("click", () => squareClicked(sq, false));
+    div.addEventListener("mousedown", () => { boardKeyboardMode = false; });
     div.addEventListener("focus", () => { focusedSquare = sq; });
     div.addEventListener("dragstart", (event) => dragStarted(event, sq));
     div.addEventListener("dragover", (event) => dragOver(event, sq));
@@ -239,6 +359,7 @@ function arrowGeometry(start, end) {
   const uy = dy / length;
   const headLength = Math.min(4.6, length * 0.32);
   const headWidth = Math.min(2.6, length * 0.18);
+  const startPad = Math.min(3.6, length * 0.18);
   const lineEnd = {
     x: end.x - ux * headLength * 0.72,
     y: end.y - uy * headLength * 0.72
@@ -250,7 +371,10 @@ function arrowGeometry(start, end) {
   const px = -uy;
   const py = ux;
   return {
-    lineStart: start,
+    lineStart: {
+      x: start.x + ux * startPad,
+      y: start.y + uy * startPad
+    },
     lineEnd,
     headPoints: [
       `${end.x.toFixed(2)},${end.y.toFixed(2)}`,
@@ -271,8 +395,9 @@ function squareCenter(square) {
   return { x: (col + 0.5) * (100 / dims.width), y: (row + 0.5) * (100 / dims.height) };
 }
 
-async function squareClicked(sq) {
+async function squareClicked(sq, fromKeyboard = false) {
   if (!state?.snapshot) return;
+  boardKeyboardMode = !!fromKeyboard;
   if (!selected) {
     if (state.snapshot.board[sq]) selected = sq;
     renderBoard();
@@ -328,6 +453,7 @@ async function dropOnSquare(event, sq) {
 function handleBoardKeyboard(event) {
   const active = document.activeElement;
   if (!active?.closest?.("#board")) return false;
+  boardKeyboardMode = true;
   const delta = {
     ArrowLeft: [-1, 0],
     ArrowRight: [1, 0],
@@ -341,7 +467,7 @@ function handleBoardKeyboard(event) {
   }
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
-    squareClicked(focusedSquare);
+    squareClicked(focusedSquare, true);
     return true;
   }
   if (event.key === "Escape") {
@@ -353,6 +479,7 @@ function handleBoardKeyboard(event) {
 }
 
 function moveBoardFocus(df, dr) {
+  boardKeyboardMode = true;
   const dims = boardDimensions();
   const current = parseBoardSquare(focusedSquare, dims) || { file: dims.files[0], rank: dims.ranks[0] };
   const file = Math.max(0, Math.min(dims.width - 1, dims.files.indexOf(current.file) + (flipped ? -df : df)));
@@ -454,6 +581,11 @@ function finishPromotion(promotion) {
 function renderMoves() {
   const list = document.querySelector("#moveList");
   list.innerHTML = "";
+  list.classList.remove("move-list-empty");
+  if (!state.snapshot.move_history.length) {
+    renderMoveListEmpty("No moves yet.");
+    return;
+  }
   for (const move of state.snapshot.move_history) {
     const item = document.createElement("li");
     item.textContent = `${move.san} (${move.uci})`;
@@ -461,12 +593,19 @@ function renderMoves() {
   }
 }
 
+function renderMoveListEmpty(message) {
+  const list = document.querySelector("#moveList");
+  list.innerHTML = "";
+  list.classList.add("move-list-empty");
+  const item = document.createElement("li");
+  item.textContent = message;
+  list.appendChild(item);
+}
+
 function renderStrategy() {
   const mem = state.strategy_memory || {};
   const metrics = state.strategy_metrics || {};
   document.querySelector("#confidence").textContent = Number(mem.plan?.confidence || 0).toFixed(2);
-  const dl = document.querySelector("#strategyMemory");
-  dl.innerHTML = "";
   const rows = [
     ["Plan", mem.plan?.summary],
     ["Status", mem.plan?.status],
@@ -481,6 +620,12 @@ function renderStrategy() {
     ["Triggers", (mem.refutation_triggers || []).map((t) => t.condition || t).join("; ")],
     ["Last", mem.last_update?.summary]
   ];
+  renderStrategyRows(rows);
+}
+
+function renderStrategyRows(rows) {
+  const dl = document.querySelector("#strategyMemory");
+  dl.innerHTML = "";
   for (const [label, value] of rows) {
     const dt = document.createElement("dt");
     dt.textContent = label;
@@ -517,25 +662,29 @@ function humanizeToken(value) {
 }
 
 function renderDecision() {
-  const dec = state.last_decision;
+  const dec = state?.last_decision;
   document.querySelector("#thinkingStage").textContent = dec ? stageStatusText(lastDecisionStage(dec), "Decision finished") : "Idle";
-  document.querySelector("#tabContent").textContent = tabText(dec);
+  const tab = document.querySelector("#tabContent");
+  tab.textContent = tabText(dec);
+  tab.classList.toggle("empty-copy", !dec);
   const box = document.querySelector("#candidates");
   box.innerHTML = "";
   if (!dec?.candidate_moves?.length) {
     box.textContent = "Candidate moves will appear here while the engine is thinking.";
+    box.classList.add("empty-copy");
     return;
   }
+  box.classList.remove("empty-copy");
   for (const c of dec.candidate_moves) {
     const div = document.createElement("div");
-    div.className = "candidate";
+    div.className = c.rank === 1 ? "candidate top-candidate" : "candidate";
     const move = document.createElement("strong");
     move.textContent = c.san || c.uci;
     const detail = document.createElement("span");
     detail.append(document.createTextNode(candidatePurpose(c)));
     detail.append(document.createElement("br"));
     const meta = document.createElement("small");
-    meta.textContent = `confidence ${formatScore(c.confidence)} · plan ${formatScore(c.plan_alignment_score)} · personality ${formatScore(c.personality_score)} · search ${formatScore(c.search_score)} · verifier ${c.verifier_score?.status || "not_checked"}`;
+    meta.textContent = `conf ${formatScore(c.confidence)} · plan ${formatScore(c.plan_alignment_score)} · style ${formatScore(c.personality_score)} · search ${formatScore(c.search_score)} · verifier ${c.verifier_score?.status || "not_checked"}`;
     detail.append(meta);
     if (c.risk) {
       detail.append(document.createElement("br"));
@@ -545,7 +694,7 @@ function renderDecision() {
     }
     const score = document.createElement("small");
     score.className = "candidate-score";
-    score.textContent = `#${c.rank || "-"} · final ${formatScore(c.final_score)}`;
+    score.textContent = `#${c.rank || "-"} ${formatScore(c.final_score)}`;
     div.append(move, detail, score);
     box.appendChild(div);
   }
@@ -633,46 +782,60 @@ function stageLabel(value) {
 }
 
 async function makeMove(move) {
-  try {
-    document.querySelector("#thinkingStage").textContent = "Applying user move";
-    state = await call("MakeUserMove", move);
-    render();
-    if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
-      await askEngine();
-    }
-  } catch (err) {
-    showError(err);
-    document.querySelector("#thinkingStage").textContent = "Move failed";
+  const normalizedMove = String(move || "").trim();
+  if (!normalizedMove) {
+    showError("Enter a UCI move before playing.");
+    document.querySelector("#moveInput").focus();
+    return;
   }
+  return withBusyControl("#moveBtn", async () => {
+    try {
+      document.querySelector("#thinkingStage").textContent = "Applying user move";
+      state = await call("MakeUserMove", normalizedMove);
+      resetBoardEntry();
+      render();
+      if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
+        await askEngine();
+      }
+    } catch (err) {
+      showError(err);
+      document.querySelector("#thinkingStage").textContent = "Move failed";
+    }
+  });
 }
 
 async function askEngine() {
-  try {
-    lastStageEvent = null;
-    document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
-    const result = await call("RequestEngineMove");
-    state = result.state;
-    render();
-  } catch (err) {
-    showError(err);
-    document.querySelector("#thinkingStage").textContent = "Engine stopped";
-  }
+  return withBusyControl("#engineBtn", async () => {
+    try {
+      lastStageEvent = null;
+      document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
+      const result = await call("RequestEngineMove");
+      state = result.state;
+      resetBoardEntry();
+      render();
+    } catch (err) {
+      showError(err);
+      document.querySelector("#thinkingStage").textContent = "Engine stopped";
+    }
+  });
 }
 
 async function analyzeCurrentPosition() {
-  try {
-    lastStageEvent = null;
-    document.querySelector("#thinkingStage").textContent = "Analyzing current position";
-    const decision = await call("AnalyzeCurrentPosition");
-    if (state) {
-      state.last_decision = decision;
+  return withBusyControl("#analyzeBtn", async () => {
+    try {
+      lastStageEvent = null;
+      document.querySelector("#thinkingStage").textContent = "Analyzing current position";
+      const decision = await call("AnalyzeCurrentPosition");
+      if (state) {
+        state.last_decision = decision;
+      }
+      renderStatus();
+      renderDecision();
+    } catch (err) {
+      showError(err);
+      document.querySelector("#thinkingStage").textContent = "Analysis failed";
     }
-    renderStatus();
-    renderDecision();
-  } catch (err) {
-    showError(err);
-    document.querySelector("#thinkingStage").textContent = "Analysis failed";
-  }
+  });
 }
 
 async function whyNotMove() {
@@ -681,12 +844,14 @@ async function whyNotMove() {
     document.querySelector("#tabContent").textContent = "Enter a move to compare.";
     return;
   }
-  try {
-    const comparison = await call("WhyNotMove", move);
-    document.querySelector("#tabContent").textContent = whyNotText(comparison);
-  } catch (err) {
-    showError(err);
-  }
+  return withBusyControl("#whyBtn", async () => {
+    try {
+      const comparison = await call("WhyNotMove", move);
+      document.querySelector("#tabContent").textContent = whyNotText(comparison);
+    } catch (err) {
+      showError(err);
+    }
+  });
 }
 
 function whyNotText(comparison) {
@@ -716,13 +881,15 @@ async function resignGame() {
   if (!state?.snapshot || state.snapshot.outcome?.status !== "ongoing") return;
   const side = playerSide || state.snapshot.side_to_move || "white";
   if (!window.confirm(`Resign as ${side}?`)) return;
-  try {
-    state = await call("Resign", side);
-    selected = null;
-    render();
-  } catch (err) {
-    showError(err);
-  }
+  return withBusyControl("#resignBtn", async () => {
+    try {
+      state = await call("Resign", side);
+      resetBoardEntry();
+      render();
+    } catch (err) {
+      showError(err);
+    }
+  });
 }
 
 async function loadSettings() {
@@ -738,8 +905,10 @@ async function loadSettings() {
   document.querySelector("#settingTheme").value = settings.gui?.theme || "system";
   applyTheme(settings.gui?.theme || "system");
   document.querySelector("#settingTimeControl").value = settings.gui?.time_control || "untimed";
-  document.querySelector("#settingClockInitial").value = Math.max(1, Math.round((settings.gui?.clock_initial_ms || 300000) / 60000));
-  document.querySelector("#settingClockIncrement").value = Math.max(0, Math.round((settings.gui?.clock_increment_ms || 0) / 1000));
+  const clockInitialMS = Number(settings.gui?.clock_initial_ms);
+  const clockIncrementMS = Number(settings.gui?.clock_increment_ms);
+  document.querySelector("#settingClockInitial").value = Math.max(0, Math.round((Number.isFinite(clockInitialMS) ? clockInitialMS : 300000) / 60000));
+  document.querySelector("#settingClockIncrement").value = Math.max(0, Math.round((Number.isFinite(clockIncrementMS) ? clockIncrementMS : 0) / 1000));
   document.querySelector("#settingAutoReply").checked = autoReply;
   document.querySelector("#settingMaxCandidates").value = settings.engine.max_candidates || 5;
   document.querySelector("#settingProfile").value = providerProfileValue(settings.llm?.profile_id);
@@ -833,53 +1002,55 @@ function markProviderProfileCustom() {
 }
 
 async function saveSettings() {
-  try {
-    playerSide = document.querySelector("#settingSide").value;
-    if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
-    autoReply = document.querySelector("#settingAutoReply").checked;
-    gameVariant = document.querySelector("#settingVariant").value || "standard";
-    chess960Seed = Number(document.querySelector("#settingVariantSeed").value) || 0;
-    const timeControl = timeControlForNewGame();
-    settings.engine.default_mode = document.querySelector("#settingMode").value;
-    settings.engine.personality = document.querySelector("#settingPersonality").value;
-    settings.engine.custom_personality_id = document.querySelector("#settingCustomPersonality").value;
-    settings.engine.max_candidates = Number(document.querySelector("#settingMaxCandidates").value) || settings.engine.max_candidates;
-    settings.gui.theme = document.querySelector("#settingTheme").value || "system";
-    settings.gui.time_control = document.querySelector("#settingTimeControl").value;
-    settings.gui.clock_initial_ms = timeControl.initial_ms || Number(document.querySelector("#settingClockInitial").value) * 60000 || settings.gui.clock_initial_ms;
-    settings.gui.clock_increment_ms = timeControl.increment_ms || Number(document.querySelector("#settingClockIncrement").value) * 1000 || 0;
-    settings.llm.profile_id = document.querySelector("#settingProfile").value || "custom";
-    settings.llm.provider = document.querySelector("#settingProvider").value;
-    settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
-    settings.llm.model = document.querySelector("#settingModel").value;
-    settings.llm.temperature = Number(document.querySelector("#settingTemperature").value);
-    settings.llm.max_tokens = Number(document.querySelector("#settingMaxTokens").value) || settings.llm.max_tokens;
-    settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
-    settings.llm.retries = Number(document.querySelector("#settingRetries").value) || 0;
-    settings.llm.api_key = document.querySelector("#settingKey").value;
-    settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
-    settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
-    if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
-      document.querySelector("#settingsOutput").textContent = "Acknowledge cloud provider data sharing before saving.";
-      return;
+  return withBusyControl("#saveSettingsBtn", async () => {
+    try {
+      playerSide = document.querySelector("#settingSide").value;
+      if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
+      autoReply = document.querySelector("#settingAutoReply").checked;
+      gameVariant = document.querySelector("#settingVariant").value || "standard";
+      chess960Seed = Number(document.querySelector("#settingVariantSeed").value) || 0;
+      const timeControl = timeControlForNewGame();
+      settings.engine.default_mode = document.querySelector("#settingMode").value;
+      settings.engine.personality = document.querySelector("#settingPersonality").value;
+      settings.engine.custom_personality_id = document.querySelector("#settingCustomPersonality").value;
+      settings.engine.max_candidates = Number(document.querySelector("#settingMaxCandidates").value) || settings.engine.max_candidates;
+      settings.gui.theme = document.querySelector("#settingTheme").value || "system";
+      settings.gui.time_control = document.querySelector("#settingTimeControl").value;
+      settings.gui.clock_initial_ms = timeControl.initial_ms;
+      settings.gui.clock_increment_ms = timeControl.increment_ms;
+      settings.llm.profile_id = document.querySelector("#settingProfile").value || "custom";
+      settings.llm.provider = document.querySelector("#settingProvider").value;
+      settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
+      settings.llm.model = document.querySelector("#settingModel").value;
+      settings.llm.temperature = Number(document.querySelector("#settingTemperature").value);
+      settings.llm.max_tokens = Number(document.querySelector("#settingMaxTokens").value) || settings.llm.max_tokens;
+      settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
+      settings.llm.retries = Number(document.querySelector("#settingRetries").value) || 0;
+      settings.llm.api_key = document.querySelector("#settingKey").value;
+      settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
+      settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
+      if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
+        document.querySelector("#settingsOutput").textContent = "Acknowledge provider endpoint data sharing before saving.";
+        return;
+      }
+      settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
+      settings.verifier.path = document.querySelector("#settingVerifierPath").value;
+      settings.verifier.movetime_ms = Number(document.querySelector("#settingVerifierMoveTime").value) || settings.verifier.movetime_ms;
+      settings.verifier.max_centipawn_loss = Number(document.querySelector("#settingVerifierMaxLoss").value) || settings.verifier.max_centipawn_loss;
+      settings.verifier.tablebase_enabled = document.querySelector("#settingTablebase").checked;
+      settings.verifier.tablebase_path = document.querySelector("#settingTablebasePath").value;
+      settings.verifier.tablebase_timeout_ms = Number(document.querySelector("#settingTablebaseTimeout").value) || settings.verifier.tablebase_timeout_ms || 1000;
+      settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
+      settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
+      settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
+      settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
+      await call("SaveSettings", settings);
+      applyTheme(settings.gui.theme);
+      document.querySelector("#settingsOutput").textContent = "Settings saved.";
+    } catch (err) {
+      showError(err, "#settingsOutput");
     }
-    settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
-    settings.verifier.path = document.querySelector("#settingVerifierPath").value;
-    settings.verifier.movetime_ms = Number(document.querySelector("#settingVerifierMoveTime").value) || settings.verifier.movetime_ms;
-    settings.verifier.max_centipawn_loss = Number(document.querySelector("#settingVerifierMaxLoss").value) || settings.verifier.max_centipawn_loss;
-    settings.verifier.tablebase_enabled = document.querySelector("#settingTablebase").checked;
-    settings.verifier.tablebase_path = document.querySelector("#settingTablebasePath").value;
-    settings.verifier.tablebase_timeout_ms = Number(document.querySelector("#settingTablebaseTimeout").value) || settings.verifier.tablebase_timeout_ms || 1000;
-    settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
-    settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
-    settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
-    settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
-    await call("SaveSettings", settings);
-    applyTheme(settings.gui.theme);
-    document.querySelector("#settingsOutput").textContent = "Settings saved.";
-  } catch (err) {
-    showError(err, "#settingsOutput");
-  }
+  });
 }
 
 async function saveProviderKeyToKeychain() {
@@ -904,17 +1075,22 @@ function syncProviderDisclosure() {
 }
 
 function providerRequiresAck(provider) {
-  return ["openai_compatible", "anthropic", "gemini"].includes(provider);
+  return ["openai_compatible", "anthropic", "gemini", "ollama"].includes(provider);
 }
 
 function syncTimeControlInputsFromPreset(overwrite) {
   const preset = document.querySelector("#settingTimeControl").value;
-  if (preset === "custom") return;
+  const initialInput = document.querySelector("#settingClockInitial");
+  const incrementInput = document.querySelector("#settingClockIncrement");
+  const custom = preset === "custom";
+  initialInput.disabled = !custom;
+  incrementInput.disabled = !custom;
+  initialInput.title = custom ? "" : "Choose Custom to edit the clock values.";
+  incrementInput.title = custom ? "" : "Choose Custom to edit the clock values.";
+  if (custom) return;
   const tc = timeControlPresets[preset] || timeControlPresets.untimed;
-  if (overwrite || preset === "untimed") {
-    document.querySelector("#settingClockInitial").value = Math.max(1, Math.round((tc.initial_ms || 300000) / 60000));
-    document.querySelector("#settingClockIncrement").value = Math.round((tc.increment_ms || 0) / 1000);
-  }
+  initialInput.value = Math.max(0, Math.round((tc.initial_ms || 0) / 60000));
+  incrementInput.value = Math.round((tc.increment_ms || 0) / 1000);
 }
 
 function timeControlForNewGame() {
@@ -1153,7 +1329,7 @@ async function refreshMultiAgent() {
 
 async function saveStudyMemory() {
   try {
-    const memory = JSON.parse(document.querySelector("#studyMemoryText").value);
+    const memory = parseJSONField("#studyMemoryText", "Strategy memory");
     state = await call("UpdateStrategyMemory", memory);
     render();
     await refreshStudy();
@@ -1208,6 +1384,7 @@ async function newChess960Game() {
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     });
+    resetBoardEntry();
     render();
     document.querySelector("#labOutput").textContent = JSON.stringify(state.variant || {}, null, 2);
   } catch (err) {
@@ -1217,7 +1394,7 @@ async function newChess960Game() {
 
 async function startCustomBoardFromLab() {
   try {
-    const definition = JSON.parse(document.querySelector("#customBoardDefinition").value);
+    const definition = parseJSONField("#customBoardDefinition", "Custom board definition");
     let side = document.querySelector("#settingSide")?.value || playerSide || "white";
     if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
     playerSide = side;
@@ -1230,6 +1407,7 @@ async function startCustomBoardFromLab() {
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     });
+    resetBoardEntry();
     render();
     document.querySelector("#labOutput").textContent = JSON.stringify(state.variant || {}, null, 2);
     if (autoReply && side === "black") await askEngine();
@@ -1250,7 +1428,8 @@ async function createBackup() {
 
 async function restoreBackup() {
   try {
-    const manifest = await call("RestoreBackup", document.querySelector("#restoreArchive").value.trim(), document.querySelector("#restoreTarget").value.trim());
+    const archive = requireField("#restoreArchive", "Choose a backup archive before restoring.");
+    const manifest = await call("RestoreBackup", archive, document.querySelector("#restoreTarget").value.trim());
     document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
   } catch (err) {
     showError(err, "#labOutput");
@@ -1338,7 +1517,8 @@ async function trainPolicyPriorFromLab() {
 
 async function enablePolicyPriorFromLab() {
   try {
-    settings = await call("EnablePolicyPriorModel", document.querySelector("#policyModelPath").value.trim());
+    const path = requireField("#policyModelPath", "Enter a policy model path before enabling the prior.");
+    settings = await call("EnablePolicyPriorModel", path);
     await loadSettings();
     document.querySelector("#labOutput").textContent = `Policy prior enabled: ${settings.llm?.model || ""}`;
   } catch (err) {
@@ -1348,7 +1528,8 @@ async function enablePolicyPriorFromLab() {
 
 async function importOpeningBookFromLab() {
   try {
-    const book = await call("ImportOpeningBook", document.querySelector("#openingBookPath").value.trim());
+    const path = requireField("#openingBookPath", "Enter an opening book path before importing.");
+    const book = await call("ImportOpeningBook", path);
     const suggestions = await call("OpeningBook");
     document.querySelector("#labOutput").textContent = JSON.stringify({ imported: book, current_suggestions: suggestions }, null, 2);
   } catch (err) {
@@ -1393,8 +1574,7 @@ async function openPromptEditor() {
 }
 
 function promptPackFromInputs() {
-  const manifestText = document.querySelector("#promptManifest").value;
-  const manifest = JSON.parse(manifestText);
+  const manifest = parseJSONField("#promptManifest", "Prompt manifest");
   return {
     schema_version: "prompt-template-pack.v1",
     source: document.querySelector("#promptSource").value || "editor",
@@ -1418,7 +1598,7 @@ async function validatePromptEditor() {
 
 async function savePromptEditor() {
   try {
-    const dir = document.querySelector("#promptSaveDir").value.trim();
+    const dir = requireField("#promptSaveDir", "Enter a save directory before saving the prompt pack.");
     const validation = await call("SavePromptTemplatePack", dir, promptPackFromInputs());
     document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
   } catch (err) {
@@ -1442,7 +1622,8 @@ async function exportProfiles() {
 
 async function importProfiles() {
   try {
-    settings = await call("ImportProviderProfiles", document.querySelector("#profilesText").value);
+    const text = requireField("#profilesText", "Paste provider profiles before importing.");
+    settings = await call("ImportProviderProfiles", text);
     populateProviderProfiles(settings.llm?.profiles || []);
     document.querySelector("#profilesOutput").textContent = "Profiles imported.";
   } catch (err) {
@@ -1453,6 +1634,7 @@ async function importProfiles() {
 function renderRecentGames(records) {
   const list = document.querySelector("#recentList");
   list.innerHTML = "";
+  list.setAttribute("role", "list");
   if (!records?.length) {
     list.textContent = "No recent games.";
     return;
@@ -1461,25 +1643,28 @@ function renderRecentGames(records) {
     const { gameID, savedAt, snapshot } = gameRecordFields(record);
     const row = document.createElement("div");
     row.className = "recent-game";
+    row.setAttribute("role", "listitem");
     const detail = document.createElement("div");
     const title = document.createElement("strong");
     title.textContent = snapshot.ply ? `${snapshot.ply} plies · ${snapshot.side_to_move || "unknown"} to move` : "New game";
     const meta = document.createElement("small");
-    meta.textContent = `${formatSavedAt(savedAt)} · ${snapshot.outcome?.status || "ongoing"}`;
+    const outcomeStatus = snapshot.outcome?.status || "ongoing";
+    meta.textContent = `${formatSavedAt(savedAt)} · ${outcomeStatus}`;
     detail.append(title, meta);
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = "Load";
-    button.addEventListener("click", async () => {
+    button.setAttribute("aria-label", `Load ${title.textContent} from ${formatSavedAt(savedAt)}, ${outcomeStatus}`);
+    button.addEventListener("click", () => withBusyControl(button, async () => {
       try {
         state = await call("LoadRecentGame", gameID);
-        selected = null;
+        resetBoardEntry();
         render();
         document.querySelector("#recentDialog").close();
       } catch (err) {
         showError(err, "#recentOutput");
       }
-    });
+    }));
     row.append(detail, button);
     list.appendChild(row);
   }
@@ -1492,20 +1677,54 @@ async function openRecentGames() {
     document.querySelector("#recentDialog").showModal();
     renderRecentGames(await call("RecentGames", 10));
   } catch (err) {
+    document.querySelector("#recentList").textContent = "Recent games could not be loaded.";
     showError(err, "#recentOutput");
   }
 }
 
+function activateTraceTab(btn, focus = false) {
+  document.querySelectorAll(".tabs button").forEach((b) => {
+    const selectedTab = b === btn;
+    b.classList.toggle("active", selectedTab);
+    b.setAttribute("aria-selected", selectedTab ? "true" : "false");
+    b.tabIndex = selectedTab ? 0 : -1;
+  });
+  activeTab = btn.dataset.tab;
+  renderDecision();
+  if (focus) btn.focus();
+}
+
+function moveTraceTabFocus(current, delta) {
+  const tabs = [...document.querySelectorAll(".tabs button")];
+  const index = tabs.indexOf(current);
+  if (index < 0) return;
+  const next = tabs[(index + delta + tabs.length) % tabs.length];
+  activateTraceTab(next, true);
+}
+
 document.querySelectorAll(".tabs button").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    activeTab = btn.dataset.tab;
-    renderDecision();
+  btn.addEventListener("click", () => activateTraceTab(btn));
+  btn.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault();
+      moveTraceTabFocus(btn, 1);
+    }
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveTraceTabFocus(btn, -1);
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      activateTraceTab(document.querySelector(".tabs button"), true);
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      activateTraceTab([...document.querySelectorAll(".tabs button")].at(-1), true);
+    }
   });
 });
 
-document.querySelector("#newGameBtn").addEventListener("click", async () => {
+bindBusyButton("#newGameBtn", async () => {
   try {
     let side = document.querySelector("#settingSide")?.value || playerSide;
     if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
@@ -1518,6 +1737,7 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     });
+    resetBoardEntry();
     render();
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
@@ -1534,10 +1754,10 @@ document.querySelector("#settingProvider").addEventListener("change", () => {
 ["#settingEndpoint", "#settingModel", "#settingTemperature", "#settingMaxTokens", "#settingTimeout", "#settingRetries", "#settingKey", "#settingKeyRef"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", markProviderProfileCustom);
 });
-document.querySelector("#recentBtn").addEventListener("click", openRecentGames);
+bindBusyButton("#recentBtn", openRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#analyzeBtn").addEventListener("click", analyzeCurrentPosition);
-document.querySelector("#stopBtn").addEventListener("click", async () => {
+bindBusyButton("#stopBtn", async () => {
   try {
     await call("StopEngine");
     document.querySelector("#thinkingStage").textContent = "Stop requested";
@@ -1546,23 +1766,29 @@ document.querySelector("#stopBtn").addEventListener("click", async () => {
   }
 });
 document.querySelector("#resignBtn").addEventListener("click", resignGame);
-document.querySelector("#undoBtn").addEventListener("click", async () => {
+bindBusyButton("#undoBtn", async () => {
   try {
     state = await call("Undo", 1);
+    resetBoardEntry();
     render();
   } catch (err) {
     showError(err);
   }
 });
 document.querySelector("#flipBtn").addEventListener("click", () => { flipped = !flipped; renderBoard(); });
-document.querySelector("#reviewBtn").addEventListener("click", openReview);
-document.querySelector("#studyBtn").addEventListener("click", openStudy);
+bindBusyButton("#reviewBtn", openReview);
+bindBusyButton("#studyBtn", openStudy);
 document.querySelector("#experimentsBtn").addEventListener("click", openExperiments);
 document.querySelector("#labBtn").addEventListener("click", openLab);
-document.querySelector("#promptEditorBtn").addEventListener("click", openPromptEditor);
+bindBusyButton("#promptEditorBtn", openPromptEditor);
 document.querySelector("#moveBtn").addEventListener("click", () => makeMove(document.querySelector("#moveInput").value.trim()));
+document.querySelector("#moveInput").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  makeMove(document.querySelector("#moveInput").value.trim());
+});
 document.querySelector("#whyBtn").addEventListener("click", whyNotMove);
-document.querySelector("#settingsBtn").addEventListener("click", async () => {
+bindBusyButton("#settingsBtn", async () => {
   try {
     await loadSettings();
     document.querySelector("#settingsDialog").showModal();
@@ -1574,16 +1800,26 @@ document.querySelector("#importBtn").addEventListener("click", () => {
   document.querySelector("#importOutput").textContent = "";
   document.querySelector("#importDialog").showModal();
 });
-document.querySelector("#runImportBtn").addEventListener("click", async () => {
+document.querySelector("#importText").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || (!event.ctrlKey && !event.metaKey)) return;
+  event.preventDefault();
+  document.querySelector("#runImportBtn").click();
+});
+bindBusyButton("#runImportBtn", async () => {
   const type = document.querySelector("#importType").value;
   const text = document.querySelector("#importText").value;
+  if (!text.trim()) {
+    showError("Paste a FEN or PGN before importing.", "#importOutput");
+    document.querySelector("#importText").focus();
+    return;
+  }
   try {
     state = type === "fen" ? await call("ImportFEN", text) : await call("ImportPGN", text);
-    selected = null;
+    resetBoardEntry();
     render();
     document.querySelector("#importDialog").close();
   } catch (err) {
-    document.querySelector("#importOutput").textContent = String(err);
+    showError(err, "#importOutput");
   }
 });
 document.querySelector("#promotionDialog").addEventListener("close", () => {
@@ -1593,16 +1829,16 @@ document.querySelector("#promotionDialog").addEventListener("close", () => {
   resolve(null);
 });
 document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
-document.querySelector("#profilesBtn").addEventListener("click", openProfilesEditor);
-document.querySelector("#keychainBtn").addEventListener("click", saveProviderKeyToKeychain);
-document.querySelector("#healthBtn").addEventListener("click", async () => {
+bindBusyButton("#profilesBtn", openProfilesEditor);
+bindBusyButton("#keychainBtn", saveProviderKeyToKeychain);
+bindBusyButton("#healthBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
   } catch (err) {
     showError(err, "#settingsOutput");
   }
 });
-document.querySelector("#benchBtn").addEventListener("click", async () => {
+bindBusyButton("#benchBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = "Running benchmark...";
     document.querySelector("#settingsOutput").textContent = renderBenchmarkSummary(await call("RunRandomBenchmark", 100, 64));
@@ -1610,7 +1846,7 @@ document.querySelector("#benchBtn").addEventListener("click", async () => {
     showError(err, "#settingsOutput");
   }
 });
-document.querySelector("#modeBenchBtn").addEventListener("click", async () => {
+bindBusyButton("#modeBenchBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = "Running mode benchmark...";
     document.querySelector("#settingsOutput").textContent = renderBenchmarkSummary(await call("RunModeBenchmark", 10, 64));
@@ -1618,59 +1854,59 @@ document.querySelector("#modeBenchBtn").addEventListener("click", async () => {
     showError(err, "#settingsOutput");
   }
 });
-document.querySelector("#accessibilityAuditBtn").addEventListener("click", runAccessibilityAudit);
-document.querySelector("#refreshReviewBtn").addEventListener("click", refreshReview);
-document.querySelector("#refreshStudyBtn").addEventListener("click", refreshStudy);
-document.querySelector("#multiAgentBtn").addEventListener("click", refreshMultiAgent);
-document.querySelector("#saveMemoryBtn").addEventListener("click", saveStudyMemory);
-document.querySelector("#newChess960Btn").addEventListener("click", newChess960Game);
-document.querySelector("#customBoardBtn").addEventListener("click", startCustomBoardFromLab);
-document.querySelector("#createBackupBtn").addEventListener("click", createBackup);
-document.querySelector("#restoreBackupBtn").addEventListener("click", restoreBackup);
-document.querySelector("#fineTuneBtn").addEventListener("click", exportFineTuneWorkflow);
-document.querySelector("#trainPolicyPriorBtn").addEventListener("click", trainPolicyPriorFromLab);
-document.querySelector("#enablePolicyPriorBtn").addEventListener("click", enablePolicyPriorFromLab);
-document.querySelector("#importBookBtn").addEventListener("click", importOpeningBookFromLab);
-document.querySelector("#labTournamentBtn").addEventListener("click", runTournamentFromLab);
-document.querySelector("#modeCompareBtn").addEventListener("click", compareAnalysisModes);
-document.querySelector("#promptCompareBtn").addEventListener("click", comparePromptPlayground);
-document.querySelector("#personalityBuilderBtn").addEventListener("click", buildPersonalityFromLab);
-document.querySelector("#providerDashboardBtn").addEventListener("click", () => runExperiment(
+bindBusyButton("#accessibilityAuditBtn", runAccessibilityAudit);
+bindBusyButton("#refreshReviewBtn", refreshReview);
+bindBusyButton("#refreshStudyBtn", refreshStudy);
+bindBusyButton("#multiAgentBtn", refreshMultiAgent);
+bindBusyButton("#saveMemoryBtn", saveStudyMemory);
+bindBusyButton("#newChess960Btn", newChess960Game);
+bindBusyButton("#customBoardBtn", startCustomBoardFromLab);
+bindBusyButton("#createBackupBtn", createBackup);
+bindBusyButton("#restoreBackupBtn", restoreBackup);
+bindBusyButton("#fineTuneBtn", exportFineTuneWorkflow);
+bindBusyButton("#trainPolicyPriorBtn", trainPolicyPriorFromLab);
+bindBusyButton("#enablePolicyPriorBtn", enablePolicyPriorFromLab);
+bindBusyButton("#importBookBtn", importOpeningBookFromLab);
+bindBusyButton("#labTournamentBtn", runTournamentFromLab);
+bindBusyButton("#modeCompareBtn", compareAnalysisModes);
+bindBusyButton("#promptCompareBtn", comparePromptPlayground);
+bindBusyButton("#personalityBuilderBtn", buildPersonalityFromLab);
+bindBusyButton("#providerDashboardBtn", () => runExperiment(
   () => call("ProviderDashboard"),
   "Checking providers",
   renderProviderDashboard
 ));
-document.querySelector("#positionSuiteBtn").addEventListener("click", () => runExperiment(
+bindBusyButton("#positionSuiteBtn", () => runExperiment(
   () => call("RunPositionSuite", []),
   "Running position suite",
   renderPositionSuiteSummary
 ));
-document.querySelector("#providerComparisonBtn").addEventListener("click", () => runExperiment(
+bindBusyButton("#providerComparisonBtn", () => runExperiment(
   () => call("RunProviderComparison"),
   "Comparing providers",
   renderProviderComparison
 ));
-document.querySelector("#tournamentBtn").addEventListener("click", () => runExperiment(
+bindBusyButton("#tournamentBtn", () => runExperiment(
   () => call("RunTournament", 1, 64),
   "Running tournament",
   renderTournament
 ));
-document.querySelector("#experimentBenchBtn").addEventListener("click", () => runExperiment(
+bindBusyButton("#experimentBenchBtn", () => runExperiment(
   () => call("RunRandomBenchmark", 100, 64),
   "Running random benchmark",
   renderBenchmarkSummary
 ));
-document.querySelector("#experimentModeBtn").addEventListener("click", () => runExperiment(
+bindBusyButton("#experimentModeBtn", () => runExperiment(
   () => call("RunModeBenchmark", 10, 64),
   "Running mode benchmark",
   renderBenchmarkSummary
 ));
-document.querySelector("#reloadPromptBtn").addEventListener("click", loadPromptEditor);
-document.querySelector("#validatePromptBtn").addEventListener("click", validatePromptEditor);
-document.querySelector("#runPromptPlaygroundBtn").addEventListener("click", runPromptPlaygroundFromEditor);
-document.querySelector("#savePromptBtn").addEventListener("click", savePromptEditor);
-document.querySelector("#exportProfilesBtn").addEventListener("click", exportProfiles);
-document.querySelector("#importProfilesBtn").addEventListener("click", importProfiles);
+bindBusyButton("#reloadPromptBtn", loadPromptEditor);
+bindBusyButton("#validatePromptBtn", validatePromptEditor);
+bindBusyButton("#runPromptPlaygroundBtn", runPromptPlaygroundFromEditor);
+bindBusyButton("#savePromptBtn", savePromptEditor);
+bindBusyButton("#exportProfilesBtn", exportProfiles);
+bindBusyButton("#importProfilesBtn", importProfiles);
 async function refreshExport() {
   const type = document.querySelector("#exportType").value;
   if (type === "fen") {
@@ -1699,26 +1935,32 @@ function confirmDebugTraceExport() {
   return window.confirm("Debug trace export may include raw prompts or raw LLM responses when raw logging is enabled. Continue?");
 }
 
-document.querySelector("#refreshExportBtn").addEventListener("click", async () => {
+bindBusyButton("#refreshExportBtn", async () => {
   try {
     await refreshExport();
   } catch (err) {
-    showError(err);
+    showError(err, "#exportText");
   }
 });
 document.querySelector("#exportType").addEventListener("change", async () => {
-  try {
-    await refreshExport();
-  } catch (err) {
-    showError(err);
-  }
+  await withBusyControl("#exportType", async () => {
+    try {
+      await refreshExport();
+    } catch (err) {
+      showError(err, "#exportText");
+    }
+  });
 });
-document.querySelector("#exportBtn").addEventListener("click", async () => {
+bindBusyButton("#exportBtn", async () => {
+  const exportDialog = document.querySelector("#exportDialog");
+  document.querySelector("#exportText").value = "Preparing export...";
+  if (!exportDialog.open) exportDialog.showModal();
   try {
-    if (!await refreshExport()) return;
-    document.querySelector("#exportDialog").showModal();
+    if (!await refreshExport()) {
+      document.querySelector("#exportText").value = "Export canceled.";
+    }
   } catch (err) {
-    showError(err);
+    showError(err, "#exportText");
   }
 });
 

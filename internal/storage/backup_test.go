@@ -49,6 +49,72 @@ func TestCreateAndRestoreBackup(t *testing.T) {
 	}
 }
 
+func TestCreateBackupAllowsRapidRepeatedBackups(t *testing.T) {
+	dir := t.TempDir()
+	logDir := filepath.Join(dir, "logs")
+	if err := os.MkdirAll(logDir, 0o700); err != nil {
+		t.Fatalf("mkdir logs: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logDir, "trace.jsonl"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write trace: %v", err)
+	}
+	req := BackupRequest{
+		LogDir:    logDir,
+		OutputDir: filepath.Join(dir, "backups"),
+	}
+	first, err := CreateBackup(context.Background(), req)
+	if err != nil {
+		t.Fatalf("create first backup: %v", err)
+	}
+	second, err := CreateBackup(context.Background(), req)
+	if err != nil {
+		t.Fatalf("create second backup: %v", err)
+	}
+	if first.ArchivePath == second.ArchivePath {
+		t.Fatalf("backup archive paths collided: %q", first.ArchivePath)
+	}
+}
+
+func TestRestoreBackupAllowsCurrentDirectoryTarget(t *testing.T) {
+	dir := t.TempDir()
+	logDir := filepath.Join(dir, "logs")
+	if err := os.MkdirAll(logDir, 0o700); err != nil {
+		t.Fatalf("mkdir logs: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(logDir, "trace.jsonl"), []byte("{}\n"), 0o600); err != nil {
+		t.Fatalf("write trace: %v", err)
+	}
+	manifest, err := CreateBackup(context.Background(), BackupRequest{
+		LogDir:    logDir,
+		OutputDir: filepath.Join(dir, "backups"),
+	})
+	if err != nil {
+		t.Fatalf("create backup: %v", err)
+	}
+	restoreDir := filepath.Join(dir, "restore")
+	if err := os.MkdirAll(restoreDir, 0o700); err != nil {
+		t.Fatalf("mkdir restore: %v", err)
+	}
+	previousDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	if err := os.Chdir(restoreDir); err != nil {
+		t.Fatalf("change working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(previousDir); err != nil {
+			t.Fatalf("restore working directory: %v", err)
+		}
+	})
+	if _, err := RestoreBackup(context.Background(), manifest.ArchivePath, "."); err != nil {
+		t.Fatalf("restore backup to current directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(restoreDir, "logs", "trace.jsonl")); err != nil {
+		t.Fatalf("restored trace missing: %v", err)
+	}
+}
+
 func TestRestoreBackupRejectsPathTraversal(t *testing.T) {
 	dir := t.TempDir()
 	archivePath := filepath.Join(dir, "bad.zip")

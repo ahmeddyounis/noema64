@@ -12,6 +12,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/appsvc"
 	"github.com/ahmedyounis/noema64/internal/experiments"
+	"github.com/ahmedyounis/noema64/internal/storage"
 )
 
 func main() {
@@ -28,7 +29,12 @@ func main() {
 		os.Exit(2)
 	}
 
-	app := appsvc.NewApplication("")
+	app, cleanup, err := benchmarkApplication()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer cleanup()
 	type result struct {
 		summary any
 		err     error
@@ -85,6 +91,24 @@ func main() {
 		}
 		fmt.Print(out)
 	}
+}
+
+func benchmarkApplication() (*appsvc.Application, func(), error) {
+	dir, err := os.MkdirTemp("", "noema64-bench-*")
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup := func() {
+		_ = os.RemoveAll(dir)
+	}
+	settings := storage.DefaultSettings()
+	settings.Logging.OutputDir = filepath.Join(dir, "logs")
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := storage.SaveSettings(configPath, settings); err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	return appsvc.NewApplication(configPath), cleanup, nil
 }
 
 func requestedGames(games int, modes bool) int {

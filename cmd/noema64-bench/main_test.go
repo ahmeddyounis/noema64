@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ahmedyounis/noema64/internal/experiments"
+	"github.com/ahmedyounis/noema64/internal/storage"
 )
 
 func TestRequestedGamesDefaults(t *testing.T) {
@@ -18,6 +19,38 @@ func TestRequestedGamesDefaults(t *testing.T) {
 	}
 	if got := requestedGames(7, true); got != 7 {
 		t.Fatalf("explicit games = %d, want 7", got)
+	}
+}
+
+func TestBenchmarkApplicationIgnoresUserConfig(t *testing.T) {
+	homeDir := filepath.Join(t.TempDir(), "home")
+	t.Setenv("HOME", homeDir)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(homeDir, ".config"))
+	hostile := storage.DefaultSettings()
+	hostile.LLM.Provider = "openai_compatible"
+	hostile.LLM.Endpoint = "http://127.0.0.1:1/v1"
+	hostile.LLM.Model = "should-not-be-used"
+	hostile.Privacy.CloudProviderWarningAcknowledged = true
+	hostile.Logging.OutputDir = filepath.Join(t.TempDir(), "user-logs")
+	configDir, err := storage.ConfigDir()
+	if err != nil {
+		t.Fatalf("config dir: %v", err)
+	}
+	if err := storage.SaveSettings(filepath.Join(configDir, "config.yaml"), hostile); err != nil {
+		t.Fatalf("save hostile user config: %v", err)
+	}
+
+	app, cleanup, err := benchmarkApplication()
+	if err != nil {
+		t.Fatalf("benchmark application: %v", err)
+	}
+	defer cleanup()
+	settings, err := app.GetSettings()
+	if err != nil {
+		t.Fatalf("benchmark settings: %v", err)
+	}
+	if settings.LLM.Provider != "mock" || settings.LLM.Model == "should-not-be-used" || settings.Logging.OutputDir == hostile.Logging.OutputDir {
+		t.Fatalf("benchmark app used user config: %+v", settings)
 	}
 }
 

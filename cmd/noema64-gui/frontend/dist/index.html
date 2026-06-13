@@ -14,36 +14,46 @@
           <strong>Noema64</strong>
           <span>A chess engine that remembers what it is trying to do.</span>
         </div>
-        <div class="toolbar">
-          <button id="newGameBtn" title="New game (N)" aria-label="New game" aria-keyshortcuts="N">N</button>
-          <button id="recentBtn" title="Recent games" aria-label="Recent games">◷</button>
-          <button id="engineBtn" title="Ask engine (Space)" aria-label="Ask engine" aria-keyshortcuts="Space">▶</button>
-          <button id="analyzeBtn" title="Analyze current position (A)" aria-label="Analyze current position" aria-keyshortcuts="A">◇</button>
-          <button id="stopBtn" title="Stop thinking" aria-label="Stop thinking">■</button>
-          <button id="resignBtn" title="Resign (R)" aria-label="Resign" aria-keyshortcuts="R">⚑</button>
-          <button id="undoBtn" title="Undo (U)" aria-label="Undo" aria-keyshortcuts="U">↶</button>
-          <button id="flipBtn" title="Flip board (F)" aria-label="Flip board" aria-keyshortcuts="F">⇅</button>
-          <button id="reviewBtn" title="Post-game review" aria-label="Post-game review">◎</button>
-          <button id="studyBtn" title="Study tools" aria-label="Study tools">※</button>
-          <button id="experimentsBtn" title="Experiments" aria-label="Experiments">Σ</button>
-          <button id="labBtn" title="Roadmap lab" aria-label="Roadmap lab">⌬</button>
-          <button id="promptEditorBtn" title="Prompt editor" aria-label="Prompt editor">✎</button>
-          <button id="importBtn" title="Import PGN or FEN" aria-label="Import PGN or FEN">⇧</button>
-          <button id="exportBtn" title="Export PGN" aria-label="Export PGN">⇩</button>
-          <button id="settingsBtn" title="Settings (,)" aria-label="Settings" aria-keyshortcuts=",">⚙</button>
+        <div class="toolbar" role="toolbar" aria-label="Game controls">
+          <span class="toolbar-group" role="group" aria-label="Game">
+            <button id="newGameBtn" title="New game (N)" aria-label="New game" aria-keyshortcuts="N">N</button>
+            <button id="recentBtn" title="Recent games" aria-label="Recent games">◷</button>
+            <button id="engineBtn" title="Ask engine (Space)" aria-label="Ask engine" aria-keyshortcuts="Space">▶</button>
+            <button id="analyzeBtn" title="Analyze current position (A)" aria-label="Analyze current position" aria-keyshortcuts="A">◇</button>
+            <button id="stopBtn" title="Stop thinking" aria-label="Stop thinking">■</button>
+            <button id="resignBtn" title="Resign (R)" aria-label="Resign" aria-keyshortcuts="R">⚑</button>
+          </span>
+          <span class="toolbar-group" role="group" aria-label="Board">
+            <button id="undoBtn" title="Undo (U)" aria-label="Undo" aria-keyshortcuts="U">↶</button>
+            <button id="flipBtn" title="Flip board (F)" aria-label="Flip board" aria-keyshortcuts="F">⇅</button>
+          </span>
+          <span class="toolbar-group" role="group" aria-label="Study and lab">
+            <button id="reviewBtn" title="Post-game review" aria-label="Post-game review">◎</button>
+            <button id="studyBtn" title="Study tools" aria-label="Study tools">※</button>
+            <button id="experimentsBtn" title="Experiments" aria-label="Experiments">Σ</button>
+            <button id="labBtn" title="Roadmap lab" aria-label="Roadmap lab">⌬</button>
+            <button id="promptEditorBtn" title="Prompt editor" aria-label="Prompt editor">✎</button>
+          </span>
+          <span class="toolbar-group" role="group" aria-label="Files and settings">
+            <button id="importBtn" title="Import PGN or FEN" aria-label="Import PGN or FEN">⇧</button>
+            <button id="exportBtn" title="Export PGN" aria-label="Export PGN">⇩</button>
+            <button id="settingsBtn" title="Settings (,)" aria-label="Settings" aria-keyshortcuts=",">⚙</button>
+          </span>
         </div>
       </header>
 
       <main class="workspace">
         <section class="board-area" aria-label="Chess board workspace">
           <div class="status-row">
-            <span id="statusText">Loading game...</span>
+            <span id="statusText" role="status" aria-live="polite">Loading game...</span>
             <span class="status-meta"><span id="clockText">Untimed</span><span id="modeText">mode</span></span>
           </div>
-          <div id="board" class="board" role="grid" aria-label="Chess board"></div>
+          <div id="board" class="board board-empty-state" role="grid" aria-label="Chess board">
+            <div class="board-empty">Loading board...</div>
+          </div>
           <div class="move-entry">
-            <input id="moveInput" aria-label="UCI move" placeholder="e2e4" />
-            <button id="moveBtn">Play</button>
+            <input id="moveInput" aria-label="UCI move" placeholder="e2e4" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" />
+            <button id="moveBtn" title="Play move (Enter)" aria-label="Play move" aria-keyshortcuts="Enter">Play</button>
             <button id="whyBtn" title="Why not this move?" aria-label="Why not this move?">?</button>
           </div>
           <ol id="moveList" class="move-list" aria-label="Move list"></ol>
@@ -52,16 +62,16 @@
         <section class="panel trace-panel" aria-label="Decision trace">
           <div class="panel-header">
             <h2>Decision Trace</h2>
-            <span id="thinkingStage">Idle</span>
+            <span id="thinkingStage" role="status" aria-live="polite">Idle</span>
           </div>
-          <div class="tabs">
-            <button data-tab="summary" class="active">Summary</button>
-            <button data-tab="diff">Diff</button>
-            <button data-tab="verifier">Verifier</button>
-            <button data-tab="prompt">Prompt</button>
-            <button data-tab="raw">JSON</button>
+          <div class="tabs" role="tablist" aria-label="Decision trace views">
+            <button id="summaryTab" data-tab="summary" class="active" role="tab" aria-selected="true" aria-controls="tabContent" tabindex="0">Summary</button>
+            <button id="diffTab" data-tab="diff" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">Diff</button>
+            <button id="verifierTab" data-tab="verifier" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">Verifier</button>
+            <button id="promptTab" data-tab="prompt" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">Prompt</button>
+            <button id="rawTab" data-tab="raw" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">JSON</button>
           </div>
-          <div id="tabContent" class="tab-content"></div>
+          <div id="tabContent" class="tab-content" role="tabpanel" aria-live="polite"></div>
           <h2>Candidate Moves</h2>
           <div id="candidates" class="candidates"></div>
         </section>
@@ -75,12 +85,13 @@
         </section>
       </main>
 
-      <dialog id="settingsDialog">
+      <dialog id="settingsDialog" aria-labelledby="settingsTitle">
         <form method="dialog" class="settings">
           <header>
-            <h2>Settings</h2>
+            <h2 id="settingsTitle">Settings</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
+          <h3 class="settings-section">Game</h3>
           <label>Mode
             <select id="settingMode">
               <option value="pure">Pure</option>
@@ -135,11 +146,12 @@
             </select>
           </label>
           <div class="time-control-grid">
-            <label>Initial minutes <input id="settingClockInitial" type="number" min="1" max="180" step="1" /></label>
+            <label>Initial minutes <input id="settingClockInitial" type="number" min="0" max="180" step="1" /></label>
             <label>Increment seconds <input id="settingClockIncrement" type="number" min="0" max="120" step="1" /></label>
           </div>
-          <label><input id="settingAutoReply" type="checkbox" checked /> Engine replies automatically</label>
+          <label class="check-label"><input id="settingAutoReply" type="checkbox" checked /> Engine replies automatically</label>
           <label>Max candidates <input id="settingMaxCandidates" type="number" min="1" max="10" /></label>
+          <h3 class="settings-section">Provider</h3>
           <label>Profile
             <select id="settingProfile">
               <option value="custom">Custom</option>
@@ -155,7 +167,7 @@
               <option value="policy_prior">Policy prior</option>
             </select>
           </label>
-          <label id="cloudProviderWarning" class="provider-warning hidden"><input id="settingCloudAck" type="checkbox" /> I understand this provider may receive FEN, legal moves, move history, strategy memory, and selected settings.</label>
+          <label id="cloudProviderWarning" class="provider-warning hidden"><input id="settingCloudAck" type="checkbox" /> I understand this provider endpoint may receive FEN, legal moves, move history, strategy memory, and selected settings.</label>
           <label>Endpoint <input id="settingEndpoint" placeholder="http://localhost:11434/v1" /></label>
           <label>Model <input id="settingModel" placeholder="mock-balanced" /></label>
           <label>Temperature <input id="settingTemperature" type="number" min="0" max="2" step="0.05" /></label>
@@ -164,17 +176,19 @@
           <label>Retries <input id="settingRetries" type="number" min="0" max="5" step="1" /></label>
           <label>API key <input id="settingKey" type="password" autocomplete="off" /></label>
           <label>API key ref <input id="settingKeyRef" placeholder="provider/cloud" /></label>
-          <label><input id="settingVerifier" type="checkbox" /> Verifier enabled</label>
+          <h3 class="settings-section">Verifier</h3>
+          <label class="check-label"><input id="settingVerifier" type="checkbox" /> Verifier enabled</label>
           <label>Verifier path <input id="settingVerifierPath" placeholder="stockfish" /></label>
           <label>Verifier movetime ms <input id="settingVerifierMoveTime" type="number" min="10" step="10" /></label>
           <label>Max centipawn loss <input id="settingVerifierMaxLoss" type="number" min="0" step="10" /></label>
-          <label><input id="settingTablebase" type="checkbox" /> External tablebase enabled</label>
+          <label class="check-label"><input id="settingTablebase" type="checkbox" /> External tablebase enabled</label>
           <label>Tablebase probe path <input id="settingTablebasePath" placeholder="/usr/local/bin/noema64-tablebase" /></label>
           <label>Tablebase timeout ms <input id="settingTablebaseTimeout" type="number" min="50" max="10000" step="50" /></label>
-          <label><input id="settingTraceEnabled" type="checkbox" /> Decision trace logging</label>
+          <h3 class="settings-section">Logging</h3>
+          <label class="check-label"><input id="settingTraceEnabled" type="checkbox" /> Decision trace logging</label>
           <label>Log output directory <input id="settingLogDir" placeholder="logs" /></label>
-          <label><input id="settingRaw" type="checkbox" /> Raw prompt logging</label>
-          <label><input id="settingRawResponses" type="checkbox" /> Raw LLM response logging</label>
+          <label class="check-label"><input id="settingRaw" type="checkbox" /> Raw prompt logging</label>
+          <label class="check-label"><input id="settingRawResponses" type="checkbox" /> Raw LLM response logging</label>
           <menu>
             <button id="healthBtn" value="none" type="button">Health</button>
             <button id="benchBtn" value="none" type="button">Benchmark 100</button>
@@ -184,27 +198,27 @@
             <button id="accessibilityAuditBtn" value="none" type="button">A11y</button>
             <button id="saveSettingsBtn" value="none" type="button">Save</button>
           </menu>
-          <pre id="settingsOutput"></pre>
+          <pre id="settingsOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="reviewDialog">
+      <dialog id="reviewDialog" aria-labelledby="reviewTitle">
         <form method="dialog">
           <header>
-            <h2>Post-game Review</h2>
+            <h2 id="reviewTitle">Post-game Review</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
             <button id="refreshReviewBtn" value="none" type="button">Refresh</button>
           </menu>
-          <pre id="reviewOutput"></pre>
+          <pre id="reviewOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="experimentsDialog">
+      <dialog id="experimentsDialog" aria-labelledby="experimentsTitle">
         <form method="dialog" class="experiments">
           <header>
-            <h2>Experiments</h2>
+            <h2 id="experimentsTitle">Experiments</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
@@ -215,51 +229,51 @@
             <button id="experimentBenchBtn" value="none" type="button">Random 100</button>
             <button id="experimentModeBtn" value="none" type="button">Modes</button>
           </menu>
-          <pre id="experimentsOutput"></pre>
+          <pre id="experimentsOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="promptDialog">
+      <dialog id="promptDialog" aria-labelledby="promptTitle">
         <form method="dialog" class="prompt-editor">
           <header>
-            <h2>Prompt Editor</h2>
+            <h2 id="promptTitle">Prompt Editor</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <label>Source <input id="promptSource" readonly /></label>
           <label>Save directory <input id="promptSaveDir" placeholder="~/noema64-prompts/v1" /></label>
-          <label>Manifest JSON <textarea id="promptManifest"></textarea></label>
-          <label>System template <textarea id="promptSystem"></textarea></label>
-          <label>User template <textarea id="promptUser"></textarea></label>
-          <label>Output schema JSON <textarea id="promptSchema"></textarea></label>
+          <label>Manifest JSON <textarea id="promptManifest" spellcheck="false"></textarea></label>
+          <label>System template <textarea id="promptSystem" spellcheck="false"></textarea></label>
+          <label>User template <textarea id="promptUser" spellcheck="false"></textarea></label>
+          <label>Output schema JSON <textarea id="promptSchema" spellcheck="false"></textarea></label>
           <menu class="dialog-actions">
             <button id="reloadPromptBtn" value="none" type="button">Reload</button>
             <button id="validatePromptBtn" value="none" type="button">Validate</button>
             <button id="runPromptPlaygroundBtn" value="none" type="button">Run Side by Side</button>
             <button id="savePromptBtn" value="none" type="button">Save Pack</button>
           </menu>
-          <pre id="promptOutput"></pre>
+          <pre id="promptOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="profilesDialog">
+      <dialog id="profilesDialog" aria-labelledby="profilesTitle">
         <form method="dialog" class="profiles-editor">
           <header>
-            <h2>Provider Profiles</h2>
+            <h2 id="profilesTitle">Provider Profiles</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
             <button id="exportProfilesBtn" value="none" type="button">Export</button>
             <button id="importProfilesBtn" value="none" type="button">Import</button>
           </menu>
-          <textarea id="profilesText"></textarea>
-          <pre id="profilesOutput"></pre>
+          <textarea id="profilesText" spellcheck="false"></textarea>
+          <pre id="profilesOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="studyDialog">
+      <dialog id="studyDialog" aria-labelledby="studyTitle">
         <form method="dialog" class="study-tools">
           <header>
-            <h2>Study</h2>
+            <h2 id="studyTitle">Study</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
@@ -268,14 +282,14 @@
             <button id="saveMemoryBtn" value="none" type="button">Save Memory</button>
           </menu>
           <textarea id="studyMemoryText" spellcheck="false"></textarea>
-          <pre id="studyOutput"></pre>
+          <pre id="studyOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="labDialog">
+      <dialog id="labDialog" aria-labelledby="labTitle">
         <form method="dialog" class="lab-tools">
           <header>
-            <h2>Lab</h2>
+            <h2 id="labTitle">Lab</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div class="lab-grid">
@@ -301,14 +315,14 @@
             <button id="promptCompareBtn" value="none" type="button">Prompt Compare</button>
             <button id="personalityBuilderBtn" value="none" type="button">Personality</button>
           </menu>
-          <pre id="labOutput"></pre>
+          <pre id="labOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="exportDialog">
+      <dialog id="exportDialog" aria-labelledby="exportTitle">
         <form method="dialog">
           <header>
-            <h2>Export</h2>
+            <h2 id="exportTitle">Export</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div class="export-controls">
@@ -323,14 +337,14 @@
             </label>
             <button id="refreshExportBtn" value="none" type="button">Refresh</button>
           </div>
-          <textarea id="exportText" readonly></textarea>
+          <textarea id="exportText" readonly spellcheck="false"></textarea>
         </form>
       </dialog>
 
-      <dialog id="importDialog">
+      <dialog id="importDialog" aria-labelledby="importTitle">
         <form method="dialog">
           <header>
-            <h2>Import Position</h2>
+            <h2 id="importTitle">Import Position</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div class="import-controls">
@@ -340,28 +354,28 @@
                 <option value="pgn">PGN</option>
               </select>
             </label>
-            <button id="runImportBtn" value="none" type="button">Import</button>
+            <button id="runImportBtn" value="none" type="button" title="Import (Ctrl+Enter)" aria-keyshortcuts="Control+Enter Meta+Enter">Import</button>
           </div>
-          <textarea id="importText" placeholder="Paste FEN or PGN"></textarea>
-          <pre id="importOutput"></pre>
+          <textarea id="importText" placeholder="Paste FEN or PGN" spellcheck="false"></textarea>
+          <pre id="importOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="recentDialog">
+      <dialog id="recentDialog" aria-labelledby="recentTitle">
         <form method="dialog">
           <header>
-            <h2>Recent Games</h2>
+            <h2 id="recentTitle">Recent Games</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
-          <div id="recentList" class="recent-list"></div>
-          <pre id="recentOutput"></pre>
+          <div id="recentList" class="recent-list" role="list"></div>
+          <pre id="recentOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
-      <dialog id="promotionDialog">
+      <dialog id="promotionDialog" aria-labelledby="promotionTitle">
         <form method="dialog" class="promotion">
           <header>
-            <h2>Promote</h2>
+            <h2 id="promotionTitle">Promote</h2>
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div id="promotionGrid" class="promotion-grid"></div>

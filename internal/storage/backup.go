@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -44,8 +45,7 @@ func CreateBackup(ctx context.Context, req BackupRequest) (BackupManifest, error
 		return BackupManifest{}, err
 	}
 	createdAt := time.Now().UTC()
-	archivePath := filepath.Join(req.OutputDir, "noema64-backup-"+createdAt.Format("20060102T150405Z")+".zip")
-	file, err := os.OpenFile(archivePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	archivePath, file, err := createBackupArchive(req.OutputDir, createdAt)
 	if err != nil {
 		return BackupManifest{}, err
 	}
@@ -154,16 +154,39 @@ func CreateBackup(ctx context.Context, req BackupRequest) (BackupManifest, error
 	return manifest, nil
 }
 
+func createBackupArchive(outputDir string, createdAt time.Time) (string, *os.File, error) {
+	stamp := createdAt.Format("20060102T150405.000000000Z")
+	for attempt := 0; attempt < 100; attempt++ {
+		suffix := ""
+		if attempt > 0 {
+			suffix = fmt.Sprintf("-%02d", attempt)
+		}
+		archivePath := filepath.Join(outputDir, "noema64-backup-"+stamp+suffix+".zip")
+		file, err := os.OpenFile(archivePath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err == nil {
+			return archivePath, file, nil
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return "", nil, err
+		}
+	}
+	return "", nil, fmt.Errorf("could not create unique backup archive for timestamp %s", stamp)
+}
+
 func RestoreBackup(ctx context.Context, archivePath string, targetDir string) (BackupManifest, error) {
 	if strings.TrimSpace(targetDir) == "" {
 		return BackupManifest{}, fmt.Errorf("restore target directory is required")
+	}
+	absTargetDir, err := filepath.Abs(targetDir)
+	if err != nil {
+		return BackupManifest{}, err
 	}
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return BackupManifest{}, err
 	}
 	defer reader.Close()
-	if err := os.MkdirAll(targetDir, 0o700); err != nil {
+	if err := os.MkdirAll(absTargetDir, 0o700); err != nil {
 		return BackupManifest{}, err
 	}
 	manifest := BackupManifest{SchemaVersion: BackupManifestSchemaVersion, ArchivePath: archivePath}
@@ -179,8 +202,10 @@ func RestoreBackup(ctx context.Context, archivePath string, targetDir string) (B
 		if !safeArchiveName(file.Name) {
 			return manifest, fmt.Errorf("unsafe archive path %q", file.Name)
 		}
-		targetPath := filepath.Join(targetDir, filepath.FromSlash(file.Name))
-		if !strings.HasPrefix(filepath.Clean(targetPath), filepath.Clean(targetDir)+string(filepath.Separator)) {
+		targetPath := filepath.Join(absTargetDir, filepath.FromSlash(file.Name))
+		cleanTargetPath := filepath.Clean(targetPath)
+		cleanTargetDir := filepath.Clean(absTargetDir)
+		if cleanTargetPath != cleanTargetDir && !strings.HasPrefix(cleanTargetPath, cleanTargetDir+string(filepath.Separator)) {
 			return manifest, fmt.Errorf("archive path %q escapes restore directory", file.Name)
 		}
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0o700); err != nil {

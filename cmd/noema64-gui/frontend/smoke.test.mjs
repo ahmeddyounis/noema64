@@ -22,6 +22,13 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /aria-label="Chess board workspace"/);
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
+  assert.match(indexHTML, /role="status" aria-live="polite"/);
+  assert.match(indexHTML, /role="tablist" aria-label="Decision trace views"/);
+  assert.match(indexHTML, /id="summaryTab"[\s\S]*tabindex="0"/);
+  assert.match(indexHTML, /id="diffTab"[\s\S]*tabindex="-1"/);
+  assert.match(indexHTML, /role="tabpanel" aria-live="polite"/);
+  assert.match(indexHTML, /board-empty-state/);
+  assert.match(indexHTML, /Loading board/);
   assert.match(indexHTML, /data-tab="prompt"/);
   assert.match(indexHTML, /Trace JSONL/);
   assert.match(indexHTML, /Debug trace JSONL/);
@@ -75,8 +82,17 @@ test("primary toolbar and dialogs expose expected controls", () => {
     assert.match(indexHTML, new RegExp(`aria-label="${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `missing aria-label for ${label}`);
   }
   assert.match(indexHTML, /aria-label="Close dialog"/);
+  assert.match(indexHTML, /role="toolbar" aria-label="Game controls"/);
+  assert.match(indexHTML, /class="toolbar-group" role="group" aria-label="Game"/);
+  assert.match(indexHTML, /class="check-label"><input id="settingAutoReply"/);
+  assert.match(indexHTML, /id="settingClockInitial" type="number" min="0"/);
+  assert.match(indexHTML, /dialog id="settingsDialog" aria-labelledby="settingsTitle"/);
+  assert.match(indexHTML, /dialog id="promotionDialog" aria-labelledby="promotionTitle"/);
+  assert.match(indexHTML, /id="recentList" class="recent-list" role="list"/);
   assert.match(indexHTML, /aria-keyshortcuts="N"/);
   assert.match(indexHTML, /aria-keyshortcuts="Space"/);
+  assert.match(indexHTML, /id="moveBtn"[\s\S]*aria-keyshortcuts="Enter"/);
+  assert.match(indexHTML, /id="runImportBtn"[\s\S]*aria-keyshortcuts="Control\+Enter Meta\+Enter"/);
   assert.match(indexHTML, /title="Settings \(\,\)"/);
 });
 
@@ -132,6 +148,9 @@ test("settings surface covers MVP and profile controls", () => {
     expectMarkupID(id);
   }
   assert.match(indexHTML, /high_contrast/);
+  for (const section of ["Game", "Provider", "Verifier", "Logging"]) {
+    assert.match(indexHTML, new RegExp(`<h3 class="settings-section">${section}</h3>`), `missing settings section ${section}`);
+  }
 });
 
 test("bundle wires core actions and renders trace metadata", () => {
@@ -234,6 +253,46 @@ test("bundle wires core actions and renders trace metadata", () => {
     "shouldIgnoreGlobalShortcut",
     "arrowGeometry",
     "renderBoardOverlay",
+    "renderUnavailableState",
+    "renderBoardEmpty",
+    "renderMoveListEmpty",
+    "renderStrategyRows",
+    "const dec = state?.last_decision",
+    "activateTraceTab",
+    "moveTraceTabFocus",
+    "tabIndex = selectedTab ? 0 : -1",
+    "busyControls",
+    "setControlBusy",
+    "withBusyControl",
+    "bindBusyButton",
+    "controlFrom",
+    "busyKey",
+    "resetBoardEntry",
+    "parseJSONField",
+    "field.focus()",
+    "must be valid JSON",
+    "requireField",
+    "Choose a backup archive before restoring.",
+    "Enter a policy model path before enabling the prior.",
+    "Enter an opening book path before importing.",
+    "Enter a save directory before saving the prompt pack.",
+    "Paste provider profiles before importing.",
+    "aria-busy",
+    "Enter a UCI move before playing.",
+    "Paste a FEN or PGN before importing.",
+    "document.querySelector(\"#moveInput\").addEventListener(\"keydown\"",
+    "document.querySelector(\"#importText\").addEventListener(\"keydown\"",
+    "document.querySelector(\"#moveInput\").value = \"\"",
+    "Recent games could not be loaded.",
+    "Load ${title.textContent} from ${formatSavedAt(savedAt)}, ${outcomeStatus}",
+    "row.setAttribute(\"role\", \"listitem\")",
+    "Preparing export...",
+    "Export canceled.",
+    "settings.gui.clock_initial_ms = timeControl.initial_ms",
+    "Number.isFinite(clockInitialMS)",
+    "Choose Custom to edit the clock values.",
+    "top-candidate",
+    "ply ${snapshot.ply || 0}",
     "tablebase_enabled",
     "tablebase_timeout_ms",
     "temperature",
@@ -255,6 +314,12 @@ test("bundle wires core actions and renders trace metadata", () => {
   }
   assert.match(appJS, /--board-files/);
   assert.match(appJS, /--board-ranks/);
+  assert.match(appJS, /aria-rowcount/);
+  assert.match(appJS, /aria-colindex/);
+  assert.match(appJS, /"openai_compatible", "anthropic", "gemini", "ollama"/);
+  assert.match(appJS, /initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/);
+  assert.match(appJS, /bindBusyButton\("#runImportBtn"/);
+  assert.match(appJS, /showError\(err, "#exportText"\)/);
   assert.match(appJS, /target\.closest\("dialog\[open\]"\)/);
   assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);
   assert.match(stylesCSS, /\.candidate-arrow-head/);
@@ -262,12 +327,27 @@ test("bundle wires core actions and renders trace metadata", () => {
 });
 
 test("dialog and control styles stay usable on narrow screens", () => {
+  assert.match(stylesCSS, /color-scheme: light;/);
+  assert.match(stylesCSS, /input,\nselect,\ntextarea \{[\s\S]*background: #ffffff;[\s\S]*color: #1c2026;/);
+  assert.match(stylesCSS, /button:disabled,\ninput:disabled,\nselect:disabled,\ntextarea:disabled/);
+  assert.match(stylesCSS, /button\[aria-busy="true"\]::after/);
+  assert.match(stylesCSS, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(stylesCSS, /\.toolbar-group/);
+  assert.match(stylesCSS, /\.board-empty-state/);
+  assert.match(stylesCSS, /\.empty-copy/);
+  assert.match(stylesCSS, /\.trace-panel \{[\s\S]*grid-template-rows:/);
+  assert.match(stylesCSS, /\.top-candidate/);
+  assert.match(stylesCSS, /\.settings \.check-label/);
+  assert.match(stylesCSS, /\.settings-section/);
   assert.match(stylesCSS, /button:focus-visible/);
   assert.match(stylesCSS, /-webkit-line-clamp: 2/);
   assert.match(stylesCSS, /\.tabs \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /dialog > form/);
   assert.match(stylesCSS, /position: sticky/);
+  assert.match(stylesCSS, /\.settings \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(stylesCSS, /\.settings menu \{[\s\S]*flex-wrap: wrap;/);
+  assert.match(stylesCSS, /@media \(max-width: 1240px\)/);
+  assert.match(stylesCSS, /@media \(max-width: 760px\)/);
   assert.match(stylesCSS, /@media \(max-width: 520px\)/);
   assert.match(stylesCSS, /\.settings menu button,\n  \.dialog-actions button \{[\s\S]*flex: 1 1 128px;/);
   assert.match(stylesCSS, /\.candidate \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) max-content;/);
