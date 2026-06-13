@@ -976,7 +976,29 @@ function openExperiments() {
 function openLab() {
   document.querySelector("#labOutput").textContent = "";
   document.querySelector("#tournamentGames").value = document.querySelector("#tournamentGames").value || "1";
+  if (!document.querySelector("#customBoardDefinition").value.trim()) {
+    document.querySelector("#customBoardDefinition").value = JSON.stringify(defaultCustomBoardDefinition(), null, 2);
+  }
   document.querySelector("#labDialog").showModal();
+}
+
+function defaultCustomBoardDefinition() {
+  return {
+    schema_version: "custom-board-definition.v1",
+    id: "archbishop-lab",
+    name: "Archbishop Lab",
+    initial_fen: "4k3/8/8/8/3A4/8/8/4K3 w - - 0 1",
+    rule_set: "custom-piece-lab",
+    board_width: 8,
+    board_height: 8,
+    piece_rules: [
+      {
+        symbol: "A",
+        name: "Archbishop",
+        move: "bishop+knight"
+      }
+    ]
+  };
 }
 
 async function newChess960Game() {
@@ -994,6 +1016,29 @@ async function newChess960Game() {
     });
     render();
     document.querySelector("#labOutput").textContent = JSON.stringify(state.variant || {}, null, 2);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function startCustomBoardFromLab() {
+  try {
+    const definition = JSON.parse(document.querySelector("#customBoardDefinition").value);
+    let side = document.querySelector("#settingSide")?.value || playerSide || "white";
+    if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
+    playerSide = side;
+    gameVariant = "custom";
+    state = await call("NewGame", {
+      side,
+      variant: "custom",
+      board_definition: definition,
+      mode: document.querySelector("#settingMode")?.value || "blunderguard",
+      personality: document.querySelector("#settingPersonality")?.value || "balanced",
+      time_control: timeControlForNewGame()
+    });
+    render();
+    document.querySelector("#labOutput").textContent = JSON.stringify(state.variant || {}, null, 2);
+    if (autoReply && side === "black") await askEngine();
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1388,6 +1433,7 @@ document.querySelector("#refreshStudyBtn").addEventListener("click", refreshStud
 document.querySelector("#multiAgentBtn").addEventListener("click", refreshMultiAgent);
 document.querySelector("#saveMemoryBtn").addEventListener("click", saveStudyMemory);
 document.querySelector("#newChess960Btn").addEventListener("click", newChess960Game);
+document.querySelector("#customBoardBtn").addEventListener("click", startCustomBoardFromLab);
 document.querySelector("#createBackupBtn").addEventListener("click", createBackup);
 document.querySelector("#restoreBackupBtn").addEventListener("click", restoreBackup);
 document.querySelector("#fineTuneBtn").addEventListener("click", exportFineTuneWorkflow);
