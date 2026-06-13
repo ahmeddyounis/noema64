@@ -1826,10 +1826,15 @@ function markProviderProfileCustom() {
 }
 
 const settingsSaveErrorFields = [
+  [/engine\.max_candidates|max candidates/i, "#settingMaxCandidates"],
+  [/llm\.temperature|temperature/i, "#settingTemperature"],
+  [/llm\.timeout_ms|llm timeout/i, "#settingTimeout"],
+  [/verifier\.movetime_ms|verifier movetime|movetime/i, "#settingVerifierMoveTime"],
+  [/verifier\.max_centipawn_loss|max centipawn loss/i, "#settingVerifierMaxLoss"],
   [/tablebase_path|tablebase path/i, "#settingTablebasePath"],
   [/tablebase_timeout|tablebase timeout/i, "#settingTablebaseTimeout"],
-  [/verifier\\.path|verifier path/i, "#settingVerifierPath"],
-  [/logging\\.output_dir|log output directory|output_dir/i, "#settingLogDir"]
+  [/verifier\.path|verifier path/i, "#settingVerifierPath"],
+  [/logging\.output_dir|log output directory|output_dir/i, "#settingLogDir"]
 ];
 
 function clearSettingsSaveErrorFields() {
