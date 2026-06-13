@@ -355,6 +355,7 @@ function formatActivityTime(value) {
 function openActivityHistory() {
   renderActivityLog();
   document.querySelector("#activityDialog").showModal();
+  focusDialogInitialControl("#clearActivityBtn");
 }
 
 function clearActivityHistory() {
@@ -454,7 +455,10 @@ function bindDialogCloseButtons() {
     button.addEventListener("click", () => {
       const dialog = button.closest("dialog");
       const restoreSettings = dialog?.id === "profilesDialog" && reopenSettingsAfterProfiles;
-      if (dialog?.open) dialog.close("cancel");
+      if (dialog?.open) {
+        dialog.close("cancel");
+        restoreDialogFocus(dialog);
+      }
       if (restoreSettings) restoreSettingsAfterProfiles();
     });
   });
@@ -468,13 +472,27 @@ function restoreDialogFocus(dialog) {
     const preferred = document.querySelector(dialogReturnFocusTargets[dialog?.id]);
     const fallback = document.querySelector("[role='tab'][aria-selected='true']");
     const target = [preferred, fallback].find((element) => element && !element.disabled && isElementVisible(element));
-    try {
-      target?.focus({ preventScroll: true });
-    } catch {
-      target?.focus();
-    }
+    focusVisibleElement(target, true);
   };
   [0, 80, 250, 750, 1250].forEach((delay) => window.setTimeout(restore, delay));
+}
+
+function focusVisibleElement(element, preventScroll = false) {
+  if (!element || element.disabled || !isElementVisible(element)) return false;
+  try {
+    if (preventScroll) {
+      element.focus({ preventScroll: true });
+    } else {
+      element.focus();
+    }
+  } catch {
+    element.focus();
+  }
+  return true;
+}
+
+function focusDialogInitialControl(selector) {
+  window.setTimeout(() => focusVisibleElement(document.querySelector(selector)), 0);
 }
 
 function setWorkspaceView(view, focus = false) {
@@ -1947,6 +1965,7 @@ function renderReview(review) {
 async function openReview() {
   document.querySelector("#reviewOutput").textContent = "Loading review...";
   document.querySelector("#reviewDialog").showModal();
+  focusDialogInitialControl("#refreshReviewBtn");
   await refreshReview();
 }
 
@@ -1963,6 +1982,7 @@ async function openStudy() {
   document.querySelector("#studyOutput").textContent = "Loading study tools...";
   document.querySelector("#studyDialog").showModal();
   await refreshStudy();
+  focusDialogInitialControl("#studyMemoryText");
 }
 
 async function refreshStudy() {
@@ -2000,6 +2020,7 @@ async function saveStudyMemory() {
 function openExperiments() {
   document.querySelector("#experimentsOutput").textContent = "";
   document.querySelector("#experimentsDialog").showModal();
+  focusDialogInitialControl("#providerDashboardBtn");
 }
 
 function openLab() {
@@ -2009,6 +2030,7 @@ function openLab() {
     document.querySelector("#customBoardDefinition").value = JSON.stringify(defaultCustomBoardDefinition(), null, 2);
   }
   document.querySelector("#labDialog").showModal();
+  focusDialogInitialControl("#backupDir");
 }
 
 function defaultCustomBoardDefinition() {
@@ -2243,6 +2265,7 @@ async function loadPromptEditor() {
 async function openPromptEditor() {
   document.querySelector("#promptDialog").showModal();
   await loadPromptEditor();
+  focusDialogInitialControl("#promptSaveDir");
 }
 
 function promptPackFromInputs() {
@@ -2317,6 +2340,7 @@ async function openProfilesEditor() {
   settingsScrollBeforeProfiles = settingsForm?.scrollTop || 0;
   if (reopenSettingsAfterProfiles) settingsDialog.close("profiles");
   dialog.showModal();
+  focusDialogInitialControl("#profilesText");
   if (importButton) importButton.disabled = true;
   try {
     await exportProfiles();
@@ -2562,6 +2586,7 @@ bindBusyButton("#settingsBtn", async () => {
   try {
     await loadSettings();
     document.querySelector("#settingsDialog").showModal();
+    focusDialogInitialControl("#settingMode");
   } catch (err) {
     showError(err);
   }
@@ -2569,6 +2594,7 @@ bindBusyButton("#settingsBtn", async () => {
 document.querySelector("#importBtn").addEventListener("click", () => {
   document.querySelector("#importOutput").textContent = "";
   document.querySelector("#importDialog").showModal();
+  focusDialogInitialControl("#importText");
 });
 document.querySelector("#importText").addEventListener("keydown", (event) => {
   if (event.key !== "Enter" || (!event.ctrlKey && !event.metaKey)) return;
@@ -2739,6 +2765,7 @@ bindBusyButton("#exportBtn", async () => {
   const exportDialog = document.querySelector("#exportDialog");
   document.querySelector("#exportText").value = "Preparing export...";
   if (!exportDialog.open) exportDialog.showModal();
+  focusDialogInitialControl("#exportType");
   try {
     if (!await refreshExport()) {
       showExportCanceled();
