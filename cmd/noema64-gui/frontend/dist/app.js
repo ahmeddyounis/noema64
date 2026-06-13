@@ -780,8 +780,11 @@ function focusMoveInput(select = false) {
 function parseJSONField(selector, label) {
   const field = document.querySelector(selector);
   try {
-    return JSON.parse(field.value);
+    const value = JSON.parse(field.value);
+    clearFieldInvalid(field);
+    return value;
   } catch (err) {
+    markFieldInvalid(field);
     field.focus();
     field.select?.();
     throw new Error(`${label} must be valid JSON. ${appErrorMessage(err)}`);
@@ -791,9 +794,53 @@ function parseJSONField(selector, label) {
 function requireField(selector, message) {
   const field = document.querySelector(selector);
   const value = String(field?.value || "").trim();
-  if (value) return value;
+  if (value) {
+    clearFieldInvalid(field);
+    return value;
+  }
+  markFieldInvalid(field);
   field?.focus();
   throw new Error(message);
+}
+
+function markFieldInvalid(field) {
+  if (!field) return;
+  field.setAttribute("aria-invalid", "true");
+  const describedBy = statusDescriberForField(field);
+  if (describedBy) {
+    addDescribedBy(field, describedBy);
+    field.dataset.invalidDescribedBy = describedBy;
+  }
+  const clear = () => clearFieldInvalid(field);
+  field.addEventListener("input", clear, { once: true });
+  field.addEventListener("change", clear, { once: true });
+}
+
+function clearFieldInvalid(field) {
+  if (!field) return;
+  field.removeAttribute("aria-invalid");
+  const describedBy = field.dataset.invalidDescribedBy;
+  if (describedBy) removeDescribedBy(field, describedBy);
+  delete field.dataset.invalidDescribedBy;
+}
+
+function statusDescriberForField(field) {
+  return field?.closest?.("dialog")?.querySelector?.("[role='status'][id]")?.id || "";
+}
+
+function addDescribedBy(field, id) {
+  const ids = new Set(String(field.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
+  ids.add(id);
+  field.setAttribute("aria-describedby", [...ids].join(" "));
+}
+
+function removeDescribedBy(field, id) {
+  const ids = String(field.getAttribute("aria-describedby") || "").split(/\s+/).filter((value) => value && value !== id);
+  if (ids.length) {
+    field.setAttribute("aria-describedby", ids.join(" "));
+  } else {
+    field.removeAttribute("aria-describedby");
+  }
 }
 
 async function refresh() {
@@ -1785,12 +1832,15 @@ async function saveSettings() {
       settings.llm.retries = Number(document.querySelector("#settingRetries").value) || 0;
       settings.llm.api_key = document.querySelector("#settingKey").value;
       settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
-      settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
+      const cloudAck = document.querySelector("#settingCloudAck");
+      settings.privacy.cloud_provider_warning_acknowledged = cloudAck.checked;
       if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
+        markFieldInvalid(cloudAck);
         showError("Acknowledge provider endpoint data sharing before saving.", "#settingsOutput");
-        document.querySelector("#settingCloudAck").focus();
+        cloudAck.focus();
         return;
       }
+      clearFieldInvalid(cloudAck);
       settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
       settings.verifier.path = document.querySelector("#settingVerifierPath").value;
       settings.verifier.movetime_ms = Number(document.querySelector("#settingVerifierMoveTime").value) || settings.verifier.movetime_ms;
@@ -1834,6 +1884,7 @@ function syncProviderDisclosure() {
   const warning = document.querySelector("#cloudProviderWarning");
   const isCloud = providerRequiresAck(document.querySelector("#settingProvider").value);
   warning.classList.toggle("hidden", !isCloud);
+  if (!isCloud) clearFieldInvalid(document.querySelector("#settingCloudAck"));
 }
 
 function providerRequiresAck(provider) {
@@ -2348,6 +2399,9 @@ async function loadPromptEditor() {
     document.querySelector("#promptUser").value = promptPack.user || "";
     document.querySelector("#promptSchema").value = promptPack.schema || "";
     document.querySelector("#promptOutput").textContent = "";
+    clearFieldInvalid(document.querySelector("#promptManifest"));
+    clearFieldInvalid(document.querySelector("#promptSchema"));
+    clearFieldInvalid(document.querySelector("#promptSaveDir"));
     renderWorkflowPanel();
     showSuccess("Prompt pack loaded.");
   } catch (err) {
@@ -2387,6 +2441,7 @@ function focusPromptValidationError(validation) {
       ? "#promptManifest"
       : null;
   const field = selector ? document.querySelector(selector) : null;
+  markFieldInvalid(field);
   field?.focus();
   field?.select?.();
 }
@@ -2398,6 +2453,8 @@ function renderPromptValidation(validation, successMessage) {
     focusPromptValidationError(validation);
     return false;
   }
+  clearFieldInvalid(document.querySelector("#promptManifest"));
+  clearFieldInvalid(document.querySelector("#promptSchema"));
   showSuccess(successMessage);
   return true;
 }
