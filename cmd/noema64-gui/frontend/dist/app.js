@@ -455,13 +455,16 @@ function bindDialogCloseButtons() {
     button.addEventListener("click", () => {
       const dialog = button.closest("dialog");
       const restoreSettings = dialog?.id === "profilesDialog" && reopenSettingsAfterProfiles;
-      if (dialog?.open) {
-        dialog.close("cancel");
-        restoreDialogFocus(dialog);
-      }
+      closeDialogAndRestoreFocus(dialog, "cancel");
       if (restoreSettings) restoreSettingsAfterProfiles();
     });
   });
+}
+
+function closeDialogAndRestoreFocus(dialog, returnValue = undefined) {
+  if (!dialog?.open) return;
+  dialog.close(returnValue);
+  restoreDialogFocus(dialog);
 }
 
 function restoreDialogFocus(dialog) {
@@ -491,8 +494,11 @@ function focusVisibleElement(element, preventScroll = false) {
   return true;
 }
 
-function focusDialogInitialControl(selector) {
-  window.setTimeout(() => focusVisibleElement(document.querySelector(selector)), 0);
+function focusDialogInitialControl(selector, fallbackSelector = null) {
+  window.setTimeout(() => {
+    focusVisibleElement(document.querySelector(selector)) ||
+      focusVisibleElement(document.querySelector(fallbackSelector));
+  }, 0);
 }
 
 function setWorkspaceView(view, focus = false) {
@@ -1217,7 +1223,7 @@ function finishPromotion(promotion) {
   if (!pendingPromotion) return;
   const { moves, resolve } = pendingPromotion;
   pendingPromotion = null;
-  document.querySelector("#promotionDialog").close();
+  closeDialogAndRestoreFocus(document.querySelector("#promotionDialog"));
   resolve(asArray(moves).find((m) => m?.promotion === promotion) || null);
 }
 
@@ -2427,7 +2433,7 @@ function renderRecentGames(records) {
     button.addEventListener("click", () => withBusyControl(button, async () => {
       try {
         applyGameStateResult(await call("LoadRecentGame", gameID));
-        document.querySelector("#recentDialog").close();
+        closeDialogAndRestoreFocus(document.querySelector("#recentDialog"));
         showSuccess("Recent game loaded.");
       } catch (err) {
         showError(err, "#recentOutput");
@@ -2444,6 +2450,7 @@ async function openRecentGames() {
     document.querySelector("#recentList").textContent = "Loading...";
     document.querySelector("#recentDialog").showModal();
     renderRecentGames(await call("RecentGames", 10));
+    focusDialogInitialControl("#recentList button:not(:disabled)", "#recentDialog button[value='cancel']");
     showSuccess("Recent games loaded.");
   } catch (err) {
     document.querySelector("#recentList").textContent = "Recent games could not be loaded.";
@@ -2611,7 +2618,7 @@ bindBusyButton("#runImportBtn", async () => {
   }
   try {
     applyGameStateResult(type === "fen" ? await call("ImportFEN", text) : await call("ImportPGN", text));
-    document.querySelector("#importDialog").close();
+    closeDialogAndRestoreFocus(document.querySelector("#importDialog"));
     showSuccess("Position imported.");
   } catch (err) {
     showError(err, "#importOutput");
