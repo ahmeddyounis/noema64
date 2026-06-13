@@ -20,6 +20,8 @@ let pendingPromotion = null;
 let applyingProviderProfile = false;
 let lastStageEvent = null;
 let promptPack = null;
+let reopenSettingsAfterProfiles = false;
+let settingsScrollBeforeProfiles = 0;
 const busyControls = new Set();
 const busyDisabledState = new WeakMap();
 let activeOperationCount = 0;
@@ -451,13 +453,18 @@ function bindDialogCloseButtons() {
     button.type = "button";
     button.addEventListener("click", () => {
       const dialog = button.closest("dialog");
+      const restoreSettings = dialog?.id === "profilesDialog" && reopenSettingsAfterProfiles;
       if (dialog?.open) dialog.close("cancel");
+      if (restoreSettings) restoreSettingsAfterProfiles();
     });
   });
 }
 
 function restoreDialogFocus(dialog) {
-  window.setTimeout(() => {
+  const restore = () => {
+    const active = document.activeElement;
+    const needsRestore = !active || active === document.body || !!active.closest?.("dialog:not([open])");
+    if (!needsRestore) return;
     const preferred = document.querySelector(dialogReturnFocusTargets[dialog?.id]);
     const fallback = document.querySelector("[role='tab'][aria-selected='true']");
     const target = [preferred, fallback].find((element) => element && !element.disabled && isElementVisible(element));
@@ -466,7 +473,8 @@ function restoreDialogFocus(dialog) {
     } catch {
       target?.focus();
     }
-  }, 0);
+  };
+  [0, 80, 250, 750, 1250].forEach((delay) => window.setTimeout(restore, delay));
 }
 
 function setWorkspaceView(view, focus = false) {
@@ -2301,8 +2309,13 @@ async function savePromptEditor() {
 
 async function openProfilesEditor() {
   const dialog = document.querySelector("#profilesDialog");
+  const settingsDialog = document.querySelector("#settingsDialog");
+  const settingsForm = settingsDialog?.querySelector("form");
   const importButton = document.querySelector("#importProfilesBtn");
   const previousImportDisabled = importButton?.disabled || false;
+  reopenSettingsAfterProfiles = !!settingsDialog?.open;
+  settingsScrollBeforeProfiles = settingsForm?.scrollTop || 0;
+  if (reopenSettingsAfterProfiles) settingsDialog.close("profiles");
   dialog.showModal();
   if (importButton) importButton.disabled = true;
   try {
@@ -2312,6 +2325,22 @@ async function openProfilesEditor() {
       importButton.disabled = previousImportDisabled;
     }
   }
+}
+
+function restoreSettingsAfterProfiles() {
+  if (!reopenSettingsAfterProfiles) return;
+  reopenSettingsAfterProfiles = false;
+  window.setTimeout(() => {
+    const settingsDialog = document.querySelector("#settingsDialog");
+    const settingsForm = settingsDialog?.querySelector("form");
+    if (settingsDialog && !settingsDialog.open) settingsDialog.showModal();
+    if (settingsForm) settingsForm.scrollTop = settingsScrollBeforeProfiles;
+    try {
+      document.querySelector("#profilesBtn")?.focus({ preventScroll: true });
+    } catch {
+      document.querySelector("#profilesBtn")?.focus();
+    }
+  }, 0);
 }
 
 async function exportProfiles() {
@@ -2649,6 +2678,7 @@ bindBusyButton("#reloadPromptBtn", loadPromptEditor);
 bindBusyButton("#validatePromptBtn", validatePromptEditor);
 bindBusyButton("#runPromptPlaygroundBtn", runPromptPlaygroundFromEditor);
 bindBusyButton("#savePromptBtn", savePromptEditor);
+document.querySelector("#profilesDialog").addEventListener("close", restoreSettingsAfterProfiles);
 bindBusyButton("#exportProfilesBtn", exportProfiles);
 bindBusyButton("#importProfilesBtn", importProfiles);
 async function refreshExport() {
