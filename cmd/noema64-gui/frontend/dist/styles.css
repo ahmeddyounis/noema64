@@ -1164,13 +1164,30 @@ textarea {
 }
 
 @media (max-width: 760px) {
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "brand nav"
+      "toolbar toolbar"
+      "activity activity";
+    align-items: center;
+  }
+
+  .brand span {
+    display: none;
+  }
+
+  .workspace-nav {
+    justify-self: end;
+  }
+
   .workspace {
     gap: 10px;
     padding: 10px;
   }
 
   .workflow-cards {
-    grid-template-columns: 1fr;
+    display: none;
   }
 
   .workflow-card {
