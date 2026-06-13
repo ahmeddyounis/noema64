@@ -481,6 +481,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusDialogInitialControl(\"#refreshExportBtn\")",
     "focusDialogInitialControl(loaded ? \"#promptSaveDir\" : \"#reloadPromptBtn\")",
     "focusDialogInitialControl(\"#profilesText\")",
+    "focusDialogInitialControl(\"#exportProfilesBtn\")",
     "focusDialogInitialControl(\"#backupDir\")",
     "focusDialogInitialControl(\"#saveSettingsBtn\")",
     "focusDialogInitialControl(\"#clearActivityBtn:not(:disabled)\", \"#activityDialog button[value='cancel']\")",

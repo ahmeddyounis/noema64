@@ -2665,6 +2665,7 @@ async function exportProfiles() {
     showSuccess("Provider profiles exported.");
   } catch (err) {
     showError(err, "#profilesOutput");
+    focusDialogInitialControl("#exportProfilesBtn");
   }
 }
 
