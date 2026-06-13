@@ -1077,6 +1077,7 @@ dialog header button {
 
 pre,
 textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   width: 100%;
   min-height: 220px;
   margin: 0;
