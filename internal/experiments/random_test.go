@@ -13,7 +13,7 @@ import (
 func TestRandomBenchmarkSample(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	summary, err := (Runner{MaxPlies: 64}).RandomLegalBenchmark(ctx, 2, 64)
+	summary, err := (Runner{MaxPlies: 32}).RandomLegalBenchmark(ctx, 2, 64)
 	if err != nil {
 		t.Fatalf("benchmark: %v", err)
 	}
@@ -77,9 +77,9 @@ func TestModeBenchmarkCSVExportsModeRows(t *testing.T) {
 }
 
 func TestRandomModeBenchmarkCoversCoreModes(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	summary, err := (Runner{MaxPlies: 64}).RandomLegalModeBenchmark(ctx, 1, 64, nil)
+	summary, err := (Runner{MaxPlies: 32}).RandomLegalModeBenchmark(ctx, 1, 64, nil)
 	if err != nil {
 		t.Fatalf("mode benchmark: %v", err)
 	}

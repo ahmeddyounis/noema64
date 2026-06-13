@@ -53,6 +53,8 @@ wails dev
 
 The embedded frontend is static and works with Wails bindings. The mock provider is the default, so no API key is required. The GUI restores the most recent saved game, including clock and strategy state, from the configured log directory on relaunch.
 
+CI runs Go format/vet/tests, race tests for the non-Wails packages, frontend smoke tests, UCI smoke, trace validation, perft, dependency license scanning, non-GUI binary builds, and the 100-game reliability benchmark. Packaged Wails desktop builds are a local/manual release gate because hosted Linux runners require platform GUI system dependencies.
+
 ## Modes
 
 - `pure`: provider candidates are repaired and legality-filtered; no tactical verifier is used.
