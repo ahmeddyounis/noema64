@@ -451,6 +451,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusDialogInitialControl(\"#studyMemoryText\")",
     "focusDialogInitialControl(\"#providerDashboardBtn\")",
     "focusDialogInitialControl(\"#recentList button:not(:disabled)\", \"#recentDialog button[value='cancel']\")",
+    "focusDialogInitialControl(\"#promotionGrid button\")",
     "dialog:not([open])",
     "[0, 80, 250, 750, 1250].forEach",
     "element.focus({ preventScroll: true })",

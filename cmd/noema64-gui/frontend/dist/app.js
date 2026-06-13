@@ -1175,6 +1175,7 @@ function choosePromotion(moves) {
   return new Promise((resolve) => {
     pendingPromotion = { moves, resolve };
     dialog.showModal();
+    focusDialogInitialControl("#promotionGrid button");
   });
 }
 
