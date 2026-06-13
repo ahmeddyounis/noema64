@@ -1,0 +1,39 @@
+- name: area:engine
+  color: "1d76db"
+  description: Core engine, orchestration, move selection, and clocks.
+- name: area:gui
+  color: "5319e7"
+  description: Wails desktop UI, board interaction, and frontend state.
+- name: area:llm
+  color: "0e8a16"
+  description: Providers, prompts, schema parsing, and strategy memory.
+- name: area:uci
+  color: "0052cc"
+  description: UCI protocol, options, stdout discipline, and bot bridges.
+- name: area:verifier
+  color: "fbca04"
+  description: Static safety checks, external UCI verifier, and tablebase probes.
+- name: area:docs
+  color: "0075ca"
+  description: README, architecture, contributor, and user documentation.
+- name: area:tests
+  color: "c2e0c6"
+  description: Unit, integration, fuzz, protocol, and benchmark coverage.
+- name: good-first-issue
+  color: "7057ff"
+  description: Small, well-scoped issue suitable for a first contribution.
+- name: research
+  color: "bfdadc"
+  description: Exploratory work, benchmarks, experiments, or design spikes.
+- name: bug
+  color: "d73a4a"
+  description: Incorrect behavior, regression, crash, or protocol failure.
+- name: feature
+  color: "a2eeef"
+  description: New user-visible capability or supported integration.
+- name: security
+  color: "b60205"
+  description: Privacy, secret handling, external binary, or supply-chain risk.
+- name: needs-design
+  color: "d876e3"
+  description: Requires UX, architecture, or acceptance-criteria clarification.
