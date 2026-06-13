@@ -145,6 +145,11 @@ function asArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function lastItem(value) {
+  const items = asArray(value);
+  return items.length ? items[items.length - 1] : undefined;
+}
+
 function asObject(value) {
   return value && typeof value === "object" ? value : {};
 }
@@ -1031,7 +1036,7 @@ function renderBoard() {
   const legalTargets = selected
     ? legalMoves.filter((m) => m?.from === selected).map((m) => m?.to)
     : [];
-  const last = asArray(state.snapshot.move_history).at(-1);
+  const last = lastItem(state.snapshot.move_history);
   const lastSquares = splitUCIMoveSquares(last?.uci);
   let row = null;
   for (const [index, sq] of order.entries()) {
@@ -2698,7 +2703,7 @@ document.querySelectorAll(".tabs button").forEach((btn) => {
     }
     if (event.key === "End") {
       event.preventDefault();
-      activateTraceTab(availableTraceTabs().at(-1), true);
+      activateTraceTab(lastItem(availableTraceTabs()), true);
     }
   });
 });

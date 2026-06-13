@@ -274,7 +274,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "availableTraceTabs",
     "setAttribute(\"aria-labelledby\", next?.id || \"summaryTab\")",
     "activateTraceTab(availableTraceTabs()[0], true)",
-    "activateTraceTab(availableTraceTabs().at(-1), true)",
+    "activateTraceTab(lastItem(availableTraceTabs()), true)",
     "subscribeDecisionStageEvents",
     "stageSummary",
     "statusSummary",
@@ -323,6 +323,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "renderUnavailableState",
     "state = null;",
     "function asArray(value)",
+    "function lastItem(value)",
     "function asObject(value)",
     "function asText(value",
     "function textAreaValue(value)",
@@ -602,6 +603,7 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/);
   assert.match(appJS, /bindBusyButton\("#runImportBtn"/);
   assert.match(appJS, /showExportError\(err\)/);
+  assert.doesNotMatch(appJS, /\.at\(/);
   assert.match(appJS, /async function whyNotMove\(\)[\s\S]*call\("WhyNotMove", move\)[\s\S]*catch \(err\) \{\n      markFieldInvalid\(moveInput\);\n      showError\(err\);\n      focusMoveInput\(true\);/);
   assert.match(appJS, /target\.closest\("dialog\[open\]"\)/);
   assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);
