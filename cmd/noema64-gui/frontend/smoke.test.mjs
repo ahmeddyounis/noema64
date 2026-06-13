@@ -515,6 +515,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "textAreaValue(await call(\"ExportProviderProfiles\"))",
     "clearFieldInvalid(profilesText)",
     "clearFieldInvalid(restoreArchive)",
+    "clearFieldInvalid(policyModelPath)",
     "finishExport(workflow?.dataset_jsonl, \"Fine-tune export ready.\")",
     "clearFieldInvalid(memoryField)",
     "parseJSONField",

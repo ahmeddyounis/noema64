@@ -2357,9 +2357,11 @@ async function buildPersonalityFromLab() {
 async function trainPolicyPriorFromLab() {
   try {
     const workflow = await call("ExportFineTuneDataset");
-    const path = document.querySelector("#policyModelPath").value.trim() || "logs/policy-prior-model.json";
+    const policyModelPath = document.querySelector("#policyModelPath");
+    const path = policyModelPath.value.trim() || "logs/policy-prior-model.json";
     const result = await call("TrainLocalPolicyPrior", workflow?.dataset_jsonl || "", path);
-    document.querySelector("#policyModelPath").value = result?.model_path || path;
+    policyModelPath.value = result?.model_path || path;
+    clearFieldInvalid(policyModelPath);
     document.querySelector("#labOutput").textContent = JSON.stringify(result, null, 2);
     showSuccess("Policy prior trained.");
   } catch (err) {
