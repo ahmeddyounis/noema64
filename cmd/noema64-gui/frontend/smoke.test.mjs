@@ -113,6 +113,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "temperature",
     "max_tokens",
     "retries",
+    "personality_score",
     "search_score",
     "verifier_score",
   ]) {

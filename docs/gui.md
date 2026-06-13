@@ -11,7 +11,7 @@ It exposes:
 - Relaunch restore for the latest saved game, clock, and strategy memory from `logging.output_dir/games`.
 - Strategy memory panel.
 - Candidate move panel with confidence, plan alignment, final rank, and verifier status.
-- Decision trace tabs, prompt/raw-response/parsed-provider inspector, and backend-emitted `decision.stage` progress updates.
+- Decision trace tabs, prompt/raw-response/parsed-provider inspector, candidate `personality_score` display, and backend-emitted `decision.stage` progress updates.
 - “Why not this move?” comparison for a typed move against the last engine decision trace.
 - Provider health, random benchmark, and mode benchmark actions.
 
