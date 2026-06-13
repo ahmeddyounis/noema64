@@ -11,7 +11,8 @@ import (
 )
 
 type Runner struct {
-	Options engine.Options
+	Options  engine.Options
+	MaxPlies int
 }
 
 type Summary struct {
@@ -99,7 +100,7 @@ func (r Runner) RandomLegalModeBenchmark(ctx context.Context, games int, seed in
 		if opts.Verifier == nil {
 			opts.Verifier = verifier.StaticVerifier{}
 		}
-		modeSummary, err := (Runner{Options: opts}).RandomLegalBenchmark(ctx, games, seed)
+		modeSummary, err := (Runner{Options: opts, MaxPlies: r.MaxPlies}).RandomLegalBenchmark(ctx, games, seed)
 		summary.Results = append(summary.Results, ModeBenchmarkResult{
 			Mode:    mode,
 			Summary: modeSummary,
@@ -112,6 +113,10 @@ func (r Runner) RandomLegalModeBenchmark(ctx context.Context, games int, seed in
 }
 
 func (r Runner) playOne(ctx context.Context, index int, rng *rand.Rand) (GameSummary, error) {
+	maxPlies := r.MaxPlies
+	if maxPlies <= 0 {
+		maxPlies = 240
+	}
 	opts := r.Options
 	if opts.Mode == "" {
 		opts.Mode = strategy.ModePure
@@ -125,7 +130,7 @@ func (r Runner) playOne(ctx context.Context, index int, rng *rand.Rand) (GameSum
 		return GameSummary{GameIndex: index}, err
 	}
 	result := GameSummary{GameIndex: index}
-	for state.Snapshot.Outcome.Status == "ongoing" && state.Snapshot.Ply < 240 {
+	for state.Snapshot.Outcome.Status == "ongoing" && state.Snapshot.Ply < maxPlies {
 		dec, next, err := e.ChooseMove(ctx)
 		if err != nil {
 			return result, err
