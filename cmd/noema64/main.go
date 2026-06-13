@@ -11,11 +11,21 @@ import (
 )
 
 func main() {
-	cmd := flag.String("cmd", "state", "state, move, engine, pgn, fen")
+	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen")
 	move := flag.String("move", "", "UCI move for -cmd move")
+	fen := flag.String("fen", "", "FEN to load before running the command")
+	pgn := flag.String("pgn", "", "PGN to load before running the command")
 	flag.Parse()
 
 	app := appsvc.NewApplication("")
+	if *fen != "" {
+		_, err := app.ImportFEN(*fen)
+		exitOnAppErr(err)
+	}
+	if *pgn != "" {
+		_, err := app.ImportPGN(*pgn)
+		exitOnAppErr(err)
+	}
 	switch *cmd {
 	case "state":
 		state, err := app.GetGame()
@@ -33,6 +43,10 @@ func main() {
 		result, err := app.RequestEngineMove()
 		exitOnAppErr(err)
 		printJSON(result)
+	case "analyze":
+		decision, err := app.AnalyzeCurrentPosition()
+		exitOnAppErr(err)
+		printJSON(decision)
 	case "pgn":
 		pgn, err := app.ExportPGN()
 		exitOnAppErr(err)

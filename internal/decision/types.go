@@ -50,6 +50,7 @@ type MoveDecision struct {
 	Assistance         AssistanceTrace          `json:"assistance"`
 	FENBefore          string                   `json:"fen_before"`
 	LegalMovesCount    int                      `json:"legal_moves_count"`
+	AnalysisOnly       bool                     `json:"analysis_only,omitempty"`
 }
 
 type ProviderTrace struct {

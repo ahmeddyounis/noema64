@@ -362,6 +362,22 @@ async function askEngine() {
   }
 }
 
+async function analyzeCurrentPosition() {
+  try {
+    lastStageEvent = null;
+    document.querySelector("#thinkingStage").textContent = "Analyzing current position";
+    const decision = await call("AnalyzeCurrentPosition");
+    if (state) {
+      state.last_decision = decision;
+    }
+    renderStatus();
+    renderDecision();
+  } catch (err) {
+    showError(err);
+    document.querySelector("#thinkingStage").textContent = "Analysis failed";
+  }
+}
+
 function subscribeDecisionStageEvents() {
   if (!window.runtime?.EventsOn) return;
   window.runtime.EventsOn("decision.stage", (event) => {
@@ -652,6 +668,7 @@ document.querySelector("#settingProvider").addEventListener("change", () => {
 });
 document.querySelector("#recentBtn").addEventListener("click", openRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
+document.querySelector("#analyzeBtn").addEventListener("click", analyzeCurrentPosition);
 document.querySelector("#stopBtn").addEventListener("click", async () => {
   try {
     await call("StopEngine");
@@ -759,6 +776,7 @@ document.querySelector("#exportBtn").addEventListener("click", async () => {
 window.addEventListener("keydown", (event) => {
   if (event.target.matches("input, textarea, select")) return;
   if (event.key === "n" || event.key === "N") document.querySelector("#newGameBtn").click();
+  if (event.key === "a" || event.key === "A") document.querySelector("#analyzeBtn").click();
   if (event.key === " ") { event.preventDefault(); askEngine(); }
   if (event.key === "r" || event.key === "R") document.querySelector("#resignBtn").click();
   if (event.key === "u" || event.key === "U") document.querySelector("#undoBtn").click();

@@ -254,6 +254,60 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	return dec, e.stateLocked(), nil
 }
 
+func (e *Engine) AnalyzePosition(ctx context.Context) (*decision.MoveDecision, error) {
+	e.mu.Lock()
+	if e.currentOutcomeLocked().Status != "ongoing" {
+		e.mu.Unlock()
+		return nil, fmt.Errorf("game is over")
+	}
+	if e.cancel != nil {
+		e.mu.Unlock()
+		return nil, fmt.Errorf("engine is already thinking")
+	}
+	rootCtx, cancel := context.WithCancel(ctx)
+	e.cancel = cancel
+	activeID := fmt.Sprintf("%d", time.Now().UnixNano())
+	e.activeID = activeID
+	req := decision.Request{
+		Game:           e.game.Clone(),
+		Memory:         e.memory,
+		Mode:           e.opts.Mode,
+		Personality:    e.opts.Personality,
+		Provider:       e.opts.Provider,
+		Verifier:       e.opts.Verifier,
+		Model:          e.opts.Model,
+		Temperature:    e.opts.Temperature,
+		MaxTokens:      e.opts.MaxTokens,
+		MaxCandidates:  e.opts.MaxCandidates,
+		Timeout:        e.opts.MoveTimeout,
+		LogRawPrompts:  e.opts.LogRawPrompts,
+		LogRawResponse: e.opts.LogRawResponse,
+		Progress:       e.opts.Progress,
+	}
+	e.mu.Unlock()
+
+	dec, err := decision.ChooseMove(rootCtx, req)
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	stillActive := e.activeID == activeID
+	if stillActive {
+		e.cancel = nil
+		e.activeID = ""
+	}
+	if !stillActive {
+		return nil, fmt.Errorf("engine analysis was cancelled")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if dec == nil {
+		return nil, fmt.Errorf("no move decision")
+	}
+	dec.AnalysisOnly = true
+	return dec, nil
+}
+
 func (e *Engine) Resign(ctx context.Context, side string) (*GameState, error) {
 	select {
 	case <-ctx.Done():

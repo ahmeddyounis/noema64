@@ -86,6 +86,7 @@ func decisionTraceRecord(trace *decision.MoveDecision) map[string]any {
 		"llm_raw_available": trace.Provider.RawAvailable,
 		"llm_parse_status":  trace.Provider.ParseStatus,
 		"selected_move":     trace.SelectedMove.UCI,
+		"analysis_only":     trace.AnalysisOnly,
 		"fallback_used":     trace.FallbackUsed,
 		"candidate_moves":   trace.CandidateMoves,
 		"verifier_result":   trace.VerifierTrace,

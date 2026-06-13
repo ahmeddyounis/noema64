@@ -33,6 +33,7 @@ go test ./...
 npm --prefix cmd/noema64-gui/frontend test
 go run ./cmd/noema64 -cmd state
 go run ./cmd/noema64 -cmd engine
+go run ./cmd/noema64 -cmd analyze -fen 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3'
 go run ./cmd/noema64-bench -games 100
 go run ./cmd/noema64-bench -games 100 -format csv > benchmark.csv
 ```

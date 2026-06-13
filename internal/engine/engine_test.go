@@ -139,6 +139,34 @@ func TestEngineExportPGNIncludesNoema64MetadataAndComments(t *testing.T) {
 	}
 }
 
+func TestAnalyzePositionDoesNotMutateGameState(t *testing.T) {
+	e := New(Options{Provider: providers.MockProvider{}})
+	before, err := e.State(context.Background())
+	if err != nil {
+		t.Fatalf("state before: %v", err)
+	}
+	dec, err := e.AnalyzePosition(context.Background())
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	if !dec.AnalysisOnly {
+		t.Fatalf("analysis decision was not marked analysis-only: %+v", dec)
+	}
+	after, err := e.State(context.Background())
+	if err != nil {
+		t.Fatalf("state after: %v", err)
+	}
+	if after.Snapshot.Ply != before.Snapshot.Ply || after.Snapshot.FEN != before.Snapshot.FEN {
+		t.Fatalf("analysis mutated game state: before=%+v after=%+v", before.Snapshot, after.Snapshot)
+	}
+	if after.LastDecision != nil {
+		t.Fatalf("analysis replaced last played decision: %+v", after.LastDecision)
+	}
+	if after.StrategyMemory.LastUpdate.DecisionID != before.StrategyMemory.LastUpdate.DecisionID {
+		t.Fatalf("analysis mutated strategy memory: before=%+v after=%+v", before.StrategyMemory.LastUpdate, after.StrategyMemory.LastUpdate)
+	}
+}
+
 func TestEngineResignStopsGameAndRestoresFromState(t *testing.T) {
 	e := New(Options{})
 	state, err := e.Resign(context.Background(), "white")

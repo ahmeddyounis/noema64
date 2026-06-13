@@ -163,6 +163,35 @@ func (a *Application) RequestEngineMove() (any, error) {
 	return map[string]any{"decision": dec, "state": state}, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
+func (a *Application) AnalyzeCurrentPosition() (*decision.MoveDecision, error) {
+	dec, err := a.engine.AnalyzePosition(context.Background())
+	if err == nil && a.settings.Engine.TraceEnabled {
+		traceStageStarted := time.Now()
+		a.emitDecisionProgress(decision.ProgressEvent{
+			EventName:  decision.DecisionStageEvent,
+			DecisionID: dec.DecisionID,
+			GameID:     dec.GameID,
+			Stage:      "writing_trace",
+			Status:     "started",
+			Message:    "Persist analysis trace.",
+			Timestamp:  traceStageStarted.UTC().Format(time.RFC3339Nano),
+		})
+		dec.Stages = append(dec.Stages, decision.CompletedStage("writing_trace", "completed", "Analysis trace persisted.", traceStageStarted, time.Now()))
+		_ = a.traces.AppendDecision(context.Background(), dec)
+		a.emitDecisionProgress(decision.ProgressEvent{
+			EventName:  decision.DecisionStageEvent,
+			DecisionID: dec.DecisionID,
+			GameID:     dec.GameID,
+			Stage:      "writing_trace",
+			Status:     "completed",
+			Message:    "Analysis trace persisted.",
+			ElapsedMS:  time.Since(traceStageStarted).Milliseconds(),
+			Timestamp:  time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	}
+	return dec, appErr("ERR_ANALYSIS", err, true)
+}
+
 func (a *Application) StopEngine() error {
 	return appErr("ERR_CANCELLED", a.engine.Stop(context.Background()), true)
 }

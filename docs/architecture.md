@@ -38,3 +38,5 @@ Persist game snapshot
 ```
 
 The final move is rechecked against `chesscore` immediately before it mutates game state.
+
+Analysis-only requests use the same snapshot, provider, repair, verifier, scoring, and trace stages, but run on a cloned position and return a decision marked `analysis_only` without applying the selected move or changing strategy memory.

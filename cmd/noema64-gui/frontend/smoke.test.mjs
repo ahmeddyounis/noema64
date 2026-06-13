@@ -29,6 +29,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
     "newGameBtn",
     "recentBtn",
     "engineBtn",
+    "analyzeBtn",
     "stopBtn",
     "resignBtn",
     "undoBtn",
@@ -79,6 +80,8 @@ test("settings surface covers MVP and profile controls", () => {
 test("bundle wires core actions and renders trace metadata", () => {
   for (const token of [
     "RequestEngineMove",
+    "AnalyzeCurrentPosition",
+    "analyzeCurrentPosition",
     "MakeUserMove",
     "NewGame",
     "StopEngine",

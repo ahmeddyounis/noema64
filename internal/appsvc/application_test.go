@@ -100,6 +100,28 @@ func TestImportErrorsDoNotMutateCurrentGame(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCurrentPositionDoesNotMutateCurrentGame(t *testing.T) {
+	app, _ := newTestApplication(t)
+	before, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get before: %v", err)
+	}
+	dec, err := app.AnalyzeCurrentPosition()
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	if !dec.AnalysisOnly {
+		t.Fatalf("analysis_only = false for decision %+v", dec)
+	}
+	after, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get after: %v", err)
+	}
+	if after.Snapshot.Ply != before.Snapshot.Ply || after.Snapshot.FEN != before.Snapshot.FEN {
+		t.Fatalf("analysis mutated current game: before=%+v after=%+v", before.Snapshot, after.Snapshot)
+	}
+}
+
 func TestNewApplicationRecoversFromCorruptSettings(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(configPath, []byte("llm: [not valid yaml\n"), 0o600); err != nil {
