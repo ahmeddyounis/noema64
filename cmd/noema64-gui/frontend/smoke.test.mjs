@@ -483,6 +483,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "settings = normalizeSettingsShape(await call(\"GetSettings\"))",
     "settings = normalizeSettingsShape(settings)",
     "renderBoardEmpty(\"Board unavailable\"",
+    "renderCandidatesEmpty(\"Candidate moves are unavailable until a game is loaded.\")",
     "applyGameStateResult(await call(\"RequestEngineMove\"))",
     "applyGameStateResult(await call(\"MakeUserMove\", normalizedMove))",
     "applyGameStateResult(type === \"fen\" ? await call(\"ImportFEN\", text) : await call(\"ImportPGN\", text))",

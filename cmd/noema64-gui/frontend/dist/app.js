@@ -824,9 +824,7 @@ function renderUnavailableState(message) {
   const tab = document.querySelector("#tabContent");
   tab.textContent = "Decision traces will appear after the game service is connected and the engine makes a decision.";
   tab.classList.add("empty-copy");
-  const candidates = document.querySelector("#candidates");
-  candidates.textContent = "Candidate moves are unavailable until a game is loaded.";
-  candidates.classList.add("empty-copy");
+  renderCandidatesEmpty("Candidate moves are unavailable until a game is loaded.");
   document.querySelector("#confidence").textContent = "0.00";
   renderStrategyRows([
     ["Status", "Unavailable"],
