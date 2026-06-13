@@ -10,13 +10,13 @@ Implemented in this repository:
 
 - Go chess core wrapper with legal moves, FEN, PGN, move history, outcomes, promotions, castling, and en passant through `github.com/corentings/chess/v2`.
 - Strategy memory v1.2 structs, diffing, versioned editable prompt packs, strict JSON parsing, candidate repair, and schema validation.
-- Mock provider that works offline and an OpenAI-compatible HTTP adapter shape.
+- Mock provider that works offline, OpenAI-compatible HTTP, Anthropic, Gemini, Ollama, and local policy-prior provider adapters.
 - Deterministic fallback ladder that always chooses a legal move when legal moves exist.
 - Static blunderguard verifier plus optional external UCI verifier and external tablebase probe path support.
 - UCI binary with `uci`, `isready`, `ucinewgame`, `position`, `go`, `stop`, `quit`, and `setoption`.
 - Wails v2 GUI entrypoint with embedded board, time controls, recent games, settings, strategy, candidates, trace, resignation, PGN/FEN/JSONL trace export, and benchmark controls.
 - Study dashboard, compressed memory, plan coherence, candidate diversity, deterministic multi-agent review, and editable strategy memory APIs.
-- Chess960/custom-start metadata, including deterministic Chess960 start generation. Chess960 castling is intentionally disabled until the underlying move generator exposes full Chess960 castling semantics.
+- Chess960/custom-start metadata, deterministic Chess960 start generation, and Noema64-managed Chess960 castling through a compatibility layer.
 - Local backup/restore archives, fine-tune JSONL dataset export, deterministic tournament/rating automation, and sandbox validation for configured external binaries.
 - CLI and benchmark commands with JSON or CSV benchmark output.
 - Local YAML settings, JSONL decision traces, redacted game snapshots with strategy memory, tests, prompts, configs, and docs.
@@ -90,7 +90,7 @@ Study returns compressed memory, opening-book suggestions, endgame trainer drill
 
 ## Provider Setup
 
-Default config uses the offline mock provider. To use an OpenAI-compatible endpoint, set:
+Default config uses the offline mock provider. Supported provider values are `mock`, `openai_compatible`, `anthropic`, `gemini`, `ollama`, and `policy_prior`. To use an OpenAI-compatible endpoint, set:
 
 ```yaml
 llm:
@@ -146,7 +146,7 @@ For bot bridge usage, see [docs/lichess-bot.md](docs/lichess-bot.md).
 ## Limitations
 
 - The static verifier is intentionally shallow.
-- Chess960 starts are playable with castling disabled.
+- Chess960 castling is handled by Noema64's compatibility layer rather than the upstream move generator.
 - The GUI is a Wails MVP surface, not a polished app-store release.
 - LLM quality depends on the configured provider.
 - Raw prompts are not stored unless the user enables logging.
