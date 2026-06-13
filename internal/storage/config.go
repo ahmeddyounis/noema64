@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ahmedyounis/noema64/internal/strategy"
@@ -28,11 +29,13 @@ type Settings struct {
 }
 
 type EngineSettings struct {
-	DefaultMode    strategy.EngineMode  `json:"default_mode" yaml:"default_mode"`
-	Personality    strategy.Personality `json:"personality" yaml:"personality"`
-	MaxCandidates  int                  `json:"max_candidates" yaml:"max_candidates"`
-	FallbackPolicy string               `json:"fallback_policy" yaml:"fallback_policy"`
-	TraceEnabled   bool                 `json:"trace_enabled" yaml:"trace_enabled"`
+	DefaultMode         strategy.EngineMode           `json:"default_mode" yaml:"default_mode"`
+	Personality         strategy.Personality          `json:"personality" yaml:"personality"`
+	CustomPersonalityID string                        `json:"custom_personality_id,omitempty" yaml:"custom_personality_id,omitempty"`
+	CustomPersonalities []strategy.PersonalityProfile `json:"custom_personalities,omitempty" yaml:"custom_personalities,omitempty"`
+	MaxCandidates       int                           `json:"max_candidates" yaml:"max_candidates"`
+	FallbackPolicy      string                        `json:"fallback_policy" yaml:"fallback_policy"`
+	TraceEnabled        bool                          `json:"trace_enabled" yaml:"trace_enabled"`
 }
 
 type LLMSettings struct {
@@ -212,6 +215,40 @@ func DefaultProviderProfiles() []ProviderProfile {
 			TimeoutMS:   20000,
 			Retries:     1,
 		},
+		{
+			ID:          "ollama-local",
+			Provider:    "ollama",
+			Mode:        "balanced",
+			IntendedUse: "local_ollama",
+			Endpoint:    "http://localhost:11434",
+			Model:       "llama3.1",
+			Temperature: 0.2,
+			MaxTokens:   1600,
+			TimeoutMS:   12000,
+			Retries:     1,
+		},
+		{
+			ID:          "anthropic-cloud",
+			Provider:    "anthropic",
+			Mode:        "quality",
+			IntendedUse: "cloud_strategy",
+			Model:       "claude-sonnet",
+			Temperature: 0.2,
+			MaxTokens:   2000,
+			TimeoutMS:   20000,
+			Retries:     1,
+		},
+		{
+			ID:          "gemini-cloud",
+			Provider:    "gemini",
+			Mode:        "quality",
+			IntendedUse: "cloud_strategy",
+			Model:       "gemini-1.5-pro",
+			Temperature: 0.2,
+			MaxTokens:   2000,
+			TimeoutMS:   20000,
+			Retries:     1,
+		},
 	}
 }
 
@@ -263,6 +300,7 @@ func NormalizeSettings(settings Settings) Settings {
 	if settings.Engine.FallbackPolicy == "" {
 		settings.Engine.FallbackPolicy = defaults.Engine.FallbackPolicy
 	}
+	settings.Engine.CustomPersonalities = normalizeCustomPersonalities(settings.Engine.CustomPersonalities)
 	if settings.LLM.Provider == "" {
 		settings.LLM.Provider = defaults.LLM.Provider
 	}
@@ -401,13 +439,19 @@ func validateSettings(settings Settings) error {
 	default:
 		return errors.New("settings engine.personality is invalid")
 	}
+	if err := validateCustomPersonalities(settings.Engine.CustomPersonalities, settings.Engine.CustomPersonalityID); err != nil {
+		return err
+	}
 	switch settings.LLM.Provider {
-	case "mock", "openai_compatible":
+	case "mock", "openai_compatible", "anthropic", "gemini", "ollama", "policy_prior":
 	default:
 		return errors.New("settings llm.provider is invalid")
 	}
-	if settings.LLM.Provider == "openai_compatible" && settings.LLM.Endpoint == "" {
-		return errors.New("settings llm.endpoint is required for openai_compatible provider")
+	if providerRequiresEndpoint(settings.LLM.Provider) && settings.LLM.Endpoint == "" {
+		return fmt.Errorf("settings llm.endpoint is required for %s provider", settings.LLM.Provider)
+	}
+	if settings.LLM.Provider == "policy_prior" && settings.LLM.Model == "" {
+		return errors.New("settings llm.model is required for policy_prior provider")
 	}
 	if settings.Engine.MaxCandidates < 1 || settings.Engine.MaxCandidates > 10 {
 		return errors.New("settings engine.max_candidates must be between 1 and 10")
@@ -452,7 +496,7 @@ func validateProviderProfiles(profiles []ProviderProfile) error {
 		}
 		seen[profile.ID] = struct{}{}
 		switch profile.Provider {
-		case "mock", "openai_compatible":
+		case "mock", "openai_compatible", "anthropic", "gemini", "ollama", "policy_prior":
 		default:
 			return errors.New("settings llm.profiles.provider is invalid")
 		}
@@ -467,4 +511,60 @@ func validateProviderProfiles(profiles []ProviderProfile) error {
 		}
 	}
 	return nil
+}
+
+func normalizeCustomPersonalities(profiles []strategy.PersonalityProfile) []strategy.PersonalityProfile {
+	out := make([]strategy.PersonalityProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		if strings.TrimSpace(string(profile.ID)) == "" {
+			continue
+		}
+		if strings.TrimSpace(profile.Name) == "" {
+			profile.Name = string(profile.ID)
+		}
+		if profile.RiskTolerance < 0 {
+			profile.RiskTolerance = 0
+		}
+		if profile.RiskTolerance > 1 {
+			profile.RiskTolerance = 1
+		}
+		out = append(out, profile)
+	}
+	return out
+}
+
+func validateCustomPersonalities(profiles []strategy.PersonalityProfile, selectedID string) error {
+	seen := map[string]struct{}{}
+	for _, profile := range profiles {
+		id := strings.TrimSpace(string(profile.ID))
+		if id == "" {
+			return errors.New("settings engine.custom_personalities.id is required")
+		}
+		switch strategy.Personality(id) {
+		case strategy.PersonalityBalanced, strategy.PersonalityAggressive, strategy.PersonalityPositional, strategy.PersonalityBeginnerCoach:
+			return errors.New("settings engine.custom_personalities.id must not shadow built-in personalities")
+		}
+		if _, ok := seen[id]; ok {
+			return errors.New("settings engine.custom_personalities.id must be unique")
+		}
+		seen[id] = struct{}{}
+		if profile.RiskTolerance < 0 || profile.RiskTolerance > 1 {
+			return errors.New("settings engine.custom_personalities.risk_tolerance must be between 0 and 1")
+		}
+	}
+	if selectedID != "" {
+		if _, ok := seen[selectedID]; !ok {
+			return errors.New("settings engine.custom_personality_id must reference a saved custom personality")
+		}
+	}
+	return nil
+}
+
+func providerRequiresEndpoint(provider string) bool {
+	switch provider {
+	case "openai_compatible":
+		return true
+	default:
+		return false
+	}
 }

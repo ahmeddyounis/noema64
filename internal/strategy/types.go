@@ -177,16 +177,17 @@ type MemoryDiff struct {
 }
 
 type StrategyRequest struct {
-	GameID           string                   `json:"game_id"`
-	FEN              string                   `json:"fen"`
-	PGN              string                   `json:"pgn"`
-	SideToMove       string                   `json:"side_to_move"`
-	MoveNumber       int                      `json:"move_number"`
-	LastOpponentMove string                   `json:"last_opponent_move"`
-	LegalMoves       []chesscore.LegalMove    `json:"legal_moves"`
-	Features         chesscore.FeatureSummary `json:"features"`
-	PreviousMemory   StrategyMemory           `json:"previous_memory"`
-	Mode             EngineMode               `json:"mode"`
-	Personality      Personality              `json:"personality"`
-	Clock            map[string]int64         `json:"clock,omitempty"`
+	GameID             string                   `json:"game_id"`
+	FEN                string                   `json:"fen"`
+	PGN                string                   `json:"pgn"`
+	SideToMove         string                   `json:"side_to_move"`
+	MoveNumber         int                      `json:"move_number"`
+	LastOpponentMove   string                   `json:"last_opponent_move"`
+	LegalMoves         []chesscore.LegalMove    `json:"legal_moves"`
+	Features           chesscore.FeatureSummary `json:"features"`
+	PreviousMemory     StrategyMemory           `json:"previous_memory"`
+	Mode               EngineMode               `json:"mode"`
+	Personality        Personality              `json:"personality"`
+	PersonalityProfile *PersonalityProfile      `json:"personality_profile,omitempty"`
+	Clock              map[string]int64         `json:"clock,omitempty"`
 }

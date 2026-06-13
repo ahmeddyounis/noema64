@@ -15,19 +15,20 @@ import (
 )
 
 type Options struct {
-	Mode            strategy.EngineMode
-	Personality     strategy.Personality
-	Provider        providers.Provider
-	Verifier        verifier.Verifier
-	Model           string
-	Temperature     float64
-	MaxTokens       int
-	ProviderRetries int
-	MaxCandidates   int
-	MoveTimeout     time.Duration
-	LogRawPrompts   bool
-	LogRawResponse  bool
-	Progress        decision.ProgressFunc
+	Mode               strategy.EngineMode
+	Personality        strategy.Personality
+	PersonalityProfile *strategy.PersonalityProfile
+	Provider           providers.Provider
+	Verifier           verifier.Verifier
+	Model              string
+	Temperature        float64
+	MaxTokens          int
+	ProviderRetries    int
+	MaxCandidates      int
+	MoveTimeout        time.Duration
+	LogRawPrompts      bool
+	LogRawResponse     bool
+	Progress           decision.ProgressFunc
 }
 
 type NewGameOptions struct {
@@ -206,21 +207,22 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	movingSide := e.game.SideToMove()
 	start := time.Now()
 	req := decision.Request{
-		Game:            e.game.Clone(),
-		Memory:          e.memory,
-		Mode:            e.opts.Mode,
-		Personality:     e.opts.Personality,
-		Provider:        e.opts.Provider,
-		Verifier:        e.opts.Verifier,
-		Model:           e.opts.Model,
-		Temperature:     e.opts.Temperature,
-		MaxTokens:       e.opts.MaxTokens,
-		ProviderRetries: e.opts.ProviderRetries,
-		MaxCandidates:   e.opts.MaxCandidates,
-		Timeout:         e.opts.MoveTimeout,
-		LogRawPrompts:   e.opts.LogRawPrompts,
-		LogRawResponse:  e.opts.LogRawResponse,
-		Progress:        e.opts.Progress,
+		Game:               e.game.Clone(),
+		Memory:             e.memory,
+		Mode:               e.opts.Mode,
+		Personality:        e.opts.Personality,
+		PersonalityProfile: e.opts.PersonalityProfile,
+		Provider:           e.opts.Provider,
+		Verifier:           e.opts.Verifier,
+		Model:              e.opts.Model,
+		Temperature:        e.opts.Temperature,
+		MaxTokens:          e.opts.MaxTokens,
+		ProviderRetries:    e.opts.ProviderRetries,
+		MaxCandidates:      e.opts.MaxCandidates,
+		Timeout:            e.opts.MoveTimeout,
+		LogRawPrompts:      e.opts.LogRawPrompts,
+		LogRawResponse:     e.opts.LogRawResponse,
+		Progress:           e.opts.Progress,
 	}
 	e.mu.Unlock()
 
@@ -281,21 +283,22 @@ func (e *Engine) AnalyzePosition(ctx context.Context) (*decision.MoveDecision, e
 	activeID := fmt.Sprintf("%d", time.Now().UnixNano())
 	e.activeID = activeID
 	req := decision.Request{
-		Game:            e.game.Clone(),
-		Memory:          e.memory,
-		Mode:            e.opts.Mode,
-		Personality:     e.opts.Personality,
-		Provider:        e.opts.Provider,
-		Verifier:        e.opts.Verifier,
-		Model:           e.opts.Model,
-		Temperature:     e.opts.Temperature,
-		MaxTokens:       e.opts.MaxTokens,
-		ProviderRetries: e.opts.ProviderRetries,
-		MaxCandidates:   e.opts.MaxCandidates,
-		Timeout:         e.opts.MoveTimeout,
-		LogRawPrompts:   e.opts.LogRawPrompts,
-		LogRawResponse:  e.opts.LogRawResponse,
-		Progress:        e.opts.Progress,
+		Game:               e.game.Clone(),
+		Memory:             e.memory,
+		Mode:               e.opts.Mode,
+		Personality:        e.opts.Personality,
+		PersonalityProfile: e.opts.PersonalityProfile,
+		Provider:           e.opts.Provider,
+		Verifier:           e.opts.Verifier,
+		Model:              e.opts.Model,
+		Temperature:        e.opts.Temperature,
+		MaxTokens:          e.opts.MaxTokens,
+		ProviderRetries:    e.opts.ProviderRetries,
+		MaxCandidates:      e.opts.MaxCandidates,
+		Timeout:            e.opts.MoveTimeout,
+		LogRawPrompts:      e.opts.LogRawPrompts,
+		LogRawResponse:     e.opts.LogRawResponse,
+		Progress:           e.opts.Progress,
 	}
 	e.mu.Unlock()
 

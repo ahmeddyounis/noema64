@@ -53,3 +53,20 @@ func ProfileForPersonality(personality Personality) PersonalityProfile {
 		}
 	}
 }
+
+func ResolvePersonalityProfile(personality Personality, custom *PersonalityProfile) PersonalityProfile {
+	if custom == nil || custom.ID == "" {
+		return ProfileForPersonality(personality)
+	}
+	profile := *custom
+	if profile.Name == "" {
+		profile.Name = string(profile.ID)
+	}
+	if profile.RiskTolerance < 0 {
+		profile.RiskTolerance = 0
+	}
+	if profile.RiskTolerance > 1 {
+		profile.RiskTolerance = 1
+	}
+	return profile
+}

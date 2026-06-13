@@ -14,6 +14,7 @@ import (
 	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
+	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 )
 
@@ -237,6 +238,91 @@ func (a *Application) BuildCustomPersonalityProfile(id string, name string, risk
 		StrategicBiases: dedupeStrings(biases),
 		PromptModifiers: dedupeStrings(modifiers),
 	}, nil
+}
+
+func (a *Application) CustomPersonalityProfiles() ([]CustomPersonalityProfile, error) {
+	out := make([]CustomPersonalityProfile, 0, len(a.settings.Engine.CustomPersonalities))
+	for _, profile := range a.settings.Engine.CustomPersonalities {
+		out = append(out, CustomPersonalityProfile{
+			ID:              string(profile.ID),
+			Name:            profile.Name,
+			RiskTolerance:   profile.RiskTolerance,
+			StrategicBiases: append([]string(nil), profile.StrategicBiases...),
+			PromptModifiers: append([]string(nil), profile.PromptModifiers...),
+		})
+	}
+	return out, nil
+}
+
+func (a *Application) SaveCustomPersonalityProfile(profile CustomPersonalityProfile, selectProfile bool) (storage.Settings, error) {
+	normalized, err := a.BuildCustomPersonalityProfile(profile.ID, profile.Name, profile.RiskTolerance, profile.StrategicBiases, profile.PromptModifiers)
+	if err != nil {
+		return storage.Settings{}, err
+	}
+	settings := a.settings
+	strategyProfile := strategy.PersonalityProfile{
+		ID:              strategy.Personality(normalized.ID),
+		Name:            normalized.Name,
+		RiskTolerance:   normalized.RiskTolerance,
+		StrategicBiases: append([]string(nil), normalized.StrategicBiases...),
+		PromptModifiers: append([]string(nil), normalized.PromptModifiers...),
+	}
+	replaced := false
+	for i := range settings.Engine.CustomPersonalities {
+		if settings.Engine.CustomPersonalities[i].ID == strategyProfile.ID {
+			settings.Engine.CustomPersonalities[i] = strategyProfile
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		settings.Engine.CustomPersonalities = append(settings.Engine.CustomPersonalities, strategyProfile)
+	}
+	if selectProfile {
+		settings.Engine.CustomPersonalityID = string(strategyProfile.ID)
+	}
+	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
+		return storage.Settings{}, appErr("ERR_SETTINGS_INVALID", err, true)
+	}
+	a.settings = storage.NormalizeSettings(settings)
+	a.engine.SetOptions(a.engineOptions())
+	return a.GetSettings()
+}
+
+func (a *Application) SelectCustomPersonalityProfile(id string) (storage.Settings, error) {
+	id = strings.TrimSpace(id)
+	settings := a.settings
+	settings.Engine.CustomPersonalityID = id
+	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
+		return storage.Settings{}, appErr("ERR_SETTINGS_INVALID", err, true)
+	}
+	a.settings = storage.NormalizeSettings(settings)
+	a.engine.SetOptions(a.engineOptions())
+	return a.GetSettings()
+}
+
+func (a *Application) DeleteCustomPersonalityProfile(id string) (storage.Settings, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return storage.Settings{}, &AppError{Code: "ERR_CUSTOM_PERSONALITY", Message: "Custom personality ID is required", Recoverable: true}
+	}
+	settings := a.settings
+	filtered := settings.Engine.CustomPersonalities[:0]
+	for _, profile := range settings.Engine.CustomPersonalities {
+		if string(profile.ID) != id {
+			filtered = append(filtered, profile)
+		}
+	}
+	settings.Engine.CustomPersonalities = filtered
+	if settings.Engine.CustomPersonalityID == id {
+		settings.Engine.CustomPersonalityID = ""
+	}
+	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
+		return storage.Settings{}, appErr("ERR_SETTINGS_INVALID", err, true)
+	}
+	a.settings = storage.NormalizeSettings(settings)
+	a.engine.SetOptions(a.engineOptions())
+	return a.GetSettings()
 }
 
 func (a *Application) UpdateStrategyMemory(memory strategy.StrategyMemory) (*engine.GameState, error) {

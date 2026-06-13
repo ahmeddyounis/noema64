@@ -55,17 +55,18 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	memBefore := req.Memory
 	memoryStage := stages.begin("updating_strategy_memory", "Prepare current strategy memory and prompt context.")
 	stratReq := strategy.StrategyRequest{
-		GameID:           snapshot.GameID,
-		FEN:              snapshot.FEN,
-		PGN:              snapshot.PGN,
-		SideToMove:       snapshot.SideToMove,
-		MoveNumber:       snapshot.Ply/2 + 1,
-		LastOpponentMove: lastMove(snapshot.MoveHistory),
-		LegalMoves:       legal,
-		Features:         req.Game.Features(),
-		PreviousMemory:   req.Memory,
-		Mode:             req.Mode,
-		Personality:      req.Personality,
+		GameID:             snapshot.GameID,
+		FEN:                snapshot.FEN,
+		PGN:                snapshot.PGN,
+		SideToMove:         snapshot.SideToMove,
+		MoveNumber:         snapshot.Ply/2 + 1,
+		LastOpponentMove:   lastMove(snapshot.MoveHistory),
+		LegalMoves:         legal,
+		Features:           req.Game.Features(),
+		PreviousMemory:     req.Memory,
+		Mode:               req.Mode,
+		Personality:        req.Personality,
+		PersonalityProfile: req.PersonalityProfile,
 	}
 	system, user, err := strategy.BuildPrompt(stratReq)
 	if err != nil {
@@ -88,6 +89,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 			"legal_moves":    strategy.LegalMoveCSV(stratReq),
 			"max_candidates": strconv.Itoa(req.MaxCandidates),
 			"game_id":        snapshot.GameID,
+			"fen":            snapshot.FEN,
 		},
 	})
 	providerMS := time.Since(providerStart).Milliseconds()
@@ -162,7 +164,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	searchStart := time.Now()
 	searchUsed, searchName := applySearchScores(ctx, req.Game, candidates, req.Mode)
 	searchMS := time.Since(searchStart).Milliseconds()
-	scoreCandidates(candidates, req.Memory, req.Mode, req.Personality)
+	scoreCandidates(candidates, req.Memory, req.Mode, strategy.ResolvePersonalityProfile(req.Personality, req.PersonalityProfile))
 	chosen, ok := selectCandidate(candidates, req.Mode)
 	if !ok {
 		scoreStage.finish("failed", "No acceptable candidate after scoring.")
@@ -324,11 +326,11 @@ func applyVerifierScores(candidates []strategy.CandidateMove, result *verifier.R
 	}
 }
 
-func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyMemory, mode strategy.EngineMode, personality strategy.Personality) {
+func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyMemory, mode strategy.EngineMode, profile strategy.PersonalityProfile) {
 	for i := range candidates {
 		plan := planAlignment(candidates[i], mem)
 		candidates[i].PlanAlignmentScore = plan
-		personalityFit := personalityAlignment(candidates[i], personality)
+		personalityFit := personalityAlignment(candidates[i], profile)
 		candidates[i].PersonalityScore = personalityFit
 		tactical := 0.5
 		switch candidates[i].VerifierScore.Status {
@@ -367,8 +369,7 @@ func selectCandidate(candidates []strategy.CandidateMove, mode strategy.EngineMo
 	return strategy.CandidateMove{}, false
 }
 
-func personalityAlignment(candidate strategy.CandidateMove, personality strategy.Personality) float64 {
-	profile := strategy.ProfileForPersonality(personality)
+func personalityAlignment(candidate strategy.CandidateMove, profile strategy.PersonalityProfile) float64 {
 	riskDelta := profile.RiskTolerance - 0.45
 	score := 0.0
 	forcing := candidate.LegalMove.Capture || candidate.LegalMove.Check

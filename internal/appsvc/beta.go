@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ahmedyounis/noema64/internal/experiments"
+	"github.com/ahmedyounis/noema64/internal/finetune"
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/security"
 	"github.com/ahmedyounis/noema64/internal/storage"
@@ -335,7 +336,7 @@ func (a *Application) providerProfileStatus(profile storage.ProviderProfile) Pro
 		out.Error = err.Error()
 		return out
 	}
-	if profile.Provider == "openai_compatible" && !a.settings.Privacy.CloudProviderWarningAcknowledged {
+	if providerRequiresPrivacyAck(profile.Provider) && !a.settings.Privacy.CloudProviderWarningAcknowledged {
 		out.Status = "privacy_ack_required"
 		out.Error = "Cloud/local provider data sharing must be acknowledged before health checks."
 		return out
@@ -364,7 +365,7 @@ func (a *Application) runProviderProfileComparison(profile storage.ProviderProfi
 		result.Error = err.Error()
 		return result
 	}
-	if profile.Provider == "openai_compatible" && !a.settings.Privacy.CloudProviderWarningAcknowledged {
+	if providerRequiresPrivacyAck(profile.Provider) && !a.settings.Privacy.CloudProviderWarningAcknowledged {
 		result.Status = "privacy_ack_required"
 		result.Error = "Cloud/local provider data sharing must be acknowledged before provider comparison."
 		return result
@@ -419,6 +420,33 @@ func providerFromProfile(profile storage.ProviderProfile) (providers.Provider, s
 			Model:   profile.Model,
 			Retries: profile.Retries,
 		}, "configured", nil
+	case "anthropic":
+		apiKey, err := security.ResolveAPIKey(profile.APIKey, profile.APIKeyRef)
+		if err != nil {
+			return providers.AnthropicProvider{BaseURL: profile.Endpoint, Model: profile.Model, Retries: profile.Retries}, "keychain_unavailable", err
+		}
+		return providers.AnthropicProvider{BaseURL: profile.Endpoint, APIKey: apiKey, Model: profile.Model, Retries: profile.Retries}, "configured", nil
+	case "gemini":
+		apiKey, err := security.ResolveAPIKey(profile.APIKey, profile.APIKeyRef)
+		if err != nil {
+			return providers.GeminiProvider{BaseURL: profile.Endpoint, Model: profile.Model, Retries: profile.Retries}, "keychain_unavailable", err
+		}
+		return providers.GeminiProvider{BaseURL: profile.Endpoint, APIKey: apiKey, Model: profile.Model, Retries: profile.Retries}, "configured", nil
+	case "ollama":
+		return providers.OllamaProvider{BaseURL: profile.Endpoint, Model: profile.Model, Retries: profile.Retries}, "configured", nil
+	case "policy_prior":
+		path := strings.TrimSpace(profile.Model)
+		if path == "" {
+			path = strings.TrimSpace(profile.Endpoint)
+		}
+		if path == "" {
+			return nil, "config_missing", fmt.Errorf("policy_prior model path is required")
+		}
+		model, err := finetune.LoadPolicyPriorModel(path)
+		if err != nil {
+			return nil, "model_unavailable", err
+		}
+		return finetune.LocalPolicyPriorProvider{Model: model, Path: path}, "configured", nil
 	default:
 		return nil, "unsupported", fmt.Errorf("unsupported provider %q", profile.Provider)
 	}

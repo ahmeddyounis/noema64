@@ -11,7 +11,6 @@ import (
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/experiments"
 	"github.com/ahmedyounis/noema64/internal/providers"
-	"github.com/ahmedyounis/noema64/internal/security"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"github.com/ahmedyounis/noema64/internal/verifier"
@@ -65,9 +64,8 @@ func NewApplication(settingsPath string) *Application {
 
 func (a *Application) engineOptions() engine.Options {
 	var provider providers.Provider = providers.MockProvider{}
-	if a.settings.LLM.Provider == "openai_compatible" && a.settings.LLM.Endpoint != "" {
-		apiKey, _ := security.ResolveAPIKey(a.settings.LLM.APIKey, a.settings.LLM.APIKeyRef)
-		provider = providers.OpenAICompatible{BaseURL: a.settings.LLM.Endpoint, APIKey: apiKey, Model: a.settings.LLM.Model, Retries: a.settings.LLM.Retries}
+	if built, _, err := providerFromSettings(a.settings.LLM); err == nil && built != nil {
+		provider = built
 	}
 	var verify verifier.Verifier = verifier.StaticVerifier{Enabled: a.settings.Verifier.Enabled}
 	if a.settings.Verifier.Enabled && a.settings.Verifier.Path != "" {
@@ -89,19 +87,20 @@ func (a *Application) engineOptions() engine.Options {
 		timeout = 12 * time.Second
 	}
 	return engine.Options{
-		Mode:            a.settings.Engine.DefaultMode,
-		Personality:     a.settings.Engine.Personality,
-		Provider:        provider,
-		Verifier:        verify,
-		Model:           a.settings.LLM.Model,
-		Temperature:     a.settings.LLM.Temperature,
-		MaxTokens:       a.settings.LLM.MaxTokens,
-		ProviderRetries: a.settings.LLM.Retries,
-		MaxCandidates:   a.settings.Engine.MaxCandidates,
-		MoveTimeout:     timeout,
-		LogRawPrompts:   a.settings.Privacy.LogRawPrompts,
-		LogRawResponse:  a.settings.Privacy.LogRawLLMResponses,
-		Progress:        a.emitDecisionProgress,
+		Mode:               a.settings.Engine.DefaultMode,
+		Personality:        a.settings.Engine.Personality,
+		PersonalityProfile: selectedCustomPersonality(a.settings),
+		Provider:           provider,
+		Verifier:           verify,
+		Model:              a.settings.LLM.Model,
+		Temperature:        a.settings.LLM.Temperature,
+		MaxTokens:          a.settings.LLM.MaxTokens,
+		ProviderRetries:    a.settings.LLM.Retries,
+		MaxCandidates:      a.settings.Engine.MaxCandidates,
+		MoveTimeout:        timeout,
+		LogRawPrompts:      a.settings.Privacy.LogRawPrompts,
+		LogRawResponse:     a.settings.Privacy.LogRawLLMResponses,
+		Progress:           a.emitDecisionProgress,
 	}
 }
 
@@ -358,7 +357,7 @@ func (a *Application) SaveSettings(settings storage.Settings) error {
 	}
 	preserveRedactedProfileKeys(&settings, a.settings)
 	settings = storage.NormalizeSettings(settings)
-	if settings.LLM.Provider == "openai_compatible" && !settings.Privacy.CloudProviderWarningAcknowledged {
+	if providerRequiresPrivacyAck(settings.LLM.Provider) && !settings.Privacy.CloudProviderWarningAcknowledged {
 		return &AppError{Code: "ERR_PRIVACY_ACK_REQUIRED", Message: "Cloud provider data sharing must be acknowledged before saving this provider.", Recoverable: true}
 	}
 	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
@@ -388,6 +387,45 @@ func preserveRedactedProfileKeys(settings *storage.Settings, previous storage.Se
 		if settings.LLM.Profiles[i].APIKey == "[REDACTED]" {
 			settings.LLM.Profiles[i].APIKey = previousKeys[settings.LLM.Profiles[i].ID]
 		}
+	}
+}
+
+func providerFromSettings(settings storage.LLMSettings) (providers.Provider, string, error) {
+	profile := storage.ProviderProfile{
+		ID:          settings.ProfileID,
+		Provider:    settings.Provider,
+		Endpoint:    settings.Endpoint,
+		Model:       settings.Model,
+		APIKey:      settings.APIKey,
+		APIKeyRef:   settings.APIKeyRef,
+		Temperature: settings.Temperature,
+		MaxTokens:   settings.MaxTokens,
+		TimeoutMS:   settings.TimeoutMS,
+		Retries:     settings.Retries,
+	}
+	return providerFromProfile(profile)
+}
+
+func selectedCustomPersonality(settings storage.Settings) *strategy.PersonalityProfile {
+	id := strings.TrimSpace(settings.Engine.CustomPersonalityID)
+	if id == "" {
+		return nil
+	}
+	for _, profile := range settings.Engine.CustomPersonalities {
+		if string(profile.ID) == id {
+			copy := profile
+			return &copy
+		}
+	}
+	return nil
+}
+
+func providerRequiresPrivacyAck(provider string) bool {
+	switch provider {
+	case "openai_compatible", "anthropic", "gemini":
+		return true
+	default:
+		return false
 	}
 }
 

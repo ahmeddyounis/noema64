@@ -10,21 +10,22 @@ import (
 )
 
 type Request struct {
-	Game            *chesscore.Game
-	Memory          strategy.StrategyMemory
-	Mode            strategy.EngineMode
-	Personality     strategy.Personality
-	Provider        providers.Provider
-	Verifier        verifier.Verifier
-	Model           string
-	Temperature     float64
-	MaxTokens       int
-	ProviderRetries int
-	MaxCandidates   int
-	Timeout         time.Duration
-	LogRawPrompts   bool
-	LogRawResponse  bool
-	Progress        ProgressFunc `json:"-"`
+	Game               *chesscore.Game
+	Memory             strategy.StrategyMemory
+	Mode               strategy.EngineMode
+	Personality        strategy.Personality
+	PersonalityProfile *strategy.PersonalityProfile
+	Provider           providers.Provider
+	Verifier           verifier.Verifier
+	Model              string
+	Temperature        float64
+	MaxTokens          int
+	ProviderRetries    int
+	MaxCandidates      int
+	Timeout            time.Duration
+	LogRawPrompts      bool
+	LogRawResponse     bool
+	Progress           ProgressFunc `json:"-"`
 }
 
 type MoveDecision struct {
