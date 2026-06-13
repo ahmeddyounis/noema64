@@ -1825,6 +1825,30 @@ function markProviderProfileCustom() {
   document.querySelector("#settingProfile").value = "custom";
 }
 
+const settingsSaveErrorFields = [
+  [/tablebase_path|tablebase path/i, "#settingTablebasePath"],
+  [/tablebase_timeout|tablebase timeout/i, "#settingTablebaseTimeout"],
+  [/verifier\\.path|verifier path/i, "#settingVerifierPath"],
+  [/logging\\.output_dir|log output directory|output_dir/i, "#settingLogDir"]
+];
+
+function clearSettingsSaveErrorFields() {
+  settingsSaveErrorFields.forEach(([, selector]) => clearFieldInvalid(document.querySelector(selector)));
+}
+
+function focusSettingsSaveError(err) {
+  const message = appErrorMessage(err);
+  const match = settingsSaveErrorFields.find(([pattern]) => pattern.test(message));
+  const field = match ? document.querySelector(match[1]) : null;
+  if (!field) {
+    focusDialogInitialControl("#saveSettingsBtn");
+    return;
+  }
+  markFieldInvalid(field);
+  field.focus();
+  field.select?.();
+}
+
 async function saveSettings() {
   return withBusyControl("#saveSettingsBtn", async () => {
     try {
@@ -1875,12 +1899,13 @@ async function saveSettings() {
       settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
       await call("SaveSettings", settings);
       applyTheme(settings.gui.theme);
+      clearSettingsSaveErrorFields();
       showSuccess("Settings saved.", "#settingsOutput");
       renderWorkflowPanel();
       focusDialogInitialControl("#saveSettingsBtn");
     } catch (err) {
       showError(err, "#settingsOutput");
-      focusDialogInitialControl("#saveSettingsBtn");
+      focusSettingsSaveError(err);
     }
   });
 }
