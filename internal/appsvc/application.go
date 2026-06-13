@@ -173,63 +173,65 @@ func (a *Application) MakeUserMove(moveUCI string) (*engine.GameState, error) {
 
 func (a *Application) RequestEngineMove() (any, error) {
 	dec, state, err := a.engine.ChooseMove(context.Background())
+	var traceErr error
 	if err == nil && a.settings.Engine.TraceEnabled {
-		traceStageStarted := time.Now()
-		a.emitDecisionProgress(decision.ProgressEvent{
-			EventName:  decision.DecisionStageEvent,
-			DecisionID: dec.DecisionID,
-			GameID:     dec.GameID,
-			Stage:      "writing_trace",
-			Status:     "started",
-			Message:    "Persist decision trace.",
-			Timestamp:  traceStageStarted.UTC().Format(time.RFC3339Nano),
-		})
-		dec.Stages = append(dec.Stages, decision.CompletedStage("writing_trace", "completed", "Decision trace persisted.", traceStageStarted, time.Now()))
-		_ = a.traces.AppendDecision(context.Background(), dec)
-		a.emitDecisionProgress(decision.ProgressEvent{
-			EventName:  decision.DecisionStageEvent,
-			DecisionID: dec.DecisionID,
-			GameID:     dec.GameID,
-			Stage:      "writing_trace",
-			Status:     "completed",
-			Message:    "Decision trace persisted.",
-			ElapsedMS:  time.Since(traceStageStarted).Milliseconds(),
-			Timestamp:  time.Now().UTC().Format(time.RFC3339Nano),
-		})
+		traceErr = a.writeDecisionTrace(dec, "Persist decision trace.", "Decision trace persisted.", "Decision trace could not be persisted.")
 	}
 	if err != nil {
 		return map[string]any{"decision": dec, "state": state}, appErr("ERR_ENGINE_MOVE", err, true)
 	}
-	return map[string]any{"decision": dec, "state": state}, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
+	if err := a.persistGameState(state); err != nil {
+		return map[string]any{"decision": dec, "state": state}, appErr("ERR_SAVE_GAME", err, true)
+	}
+	return map[string]any{"decision": dec, "state": state}, appErr("ERR_TRACE_WRITE", traceErr, true)
 }
 
 func (a *Application) AnalyzeCurrentPosition() (*decision.MoveDecision, error) {
 	dec, err := a.engine.AnalyzePosition(context.Background())
+	var traceErr error
 	if err == nil && a.settings.Engine.TraceEnabled {
-		traceStageStarted := time.Now()
-		a.emitDecisionProgress(decision.ProgressEvent{
-			EventName:  decision.DecisionStageEvent,
-			DecisionID: dec.DecisionID,
-			GameID:     dec.GameID,
-			Stage:      "writing_trace",
-			Status:     "started",
-			Message:    "Persist analysis trace.",
-			Timestamp:  traceStageStarted.UTC().Format(time.RFC3339Nano),
-		})
-		dec.Stages = append(dec.Stages, decision.CompletedStage("writing_trace", "completed", "Analysis trace persisted.", traceStageStarted, time.Now()))
-		_ = a.traces.AppendDecision(context.Background(), dec)
-		a.emitDecisionProgress(decision.ProgressEvent{
-			EventName:  decision.DecisionStageEvent,
-			DecisionID: dec.DecisionID,
-			GameID:     dec.GameID,
-			Stage:      "writing_trace",
-			Status:     "completed",
-			Message:    "Analysis trace persisted.",
-			ElapsedMS:  time.Since(traceStageStarted).Milliseconds(),
-			Timestamp:  time.Now().UTC().Format(time.RFC3339Nano),
-		})
+		traceErr = a.writeDecisionTrace(dec, "Persist analysis trace.", "Analysis trace persisted.", "Analysis trace could not be persisted.")
 	}
-	return dec, appErr("ERR_ANALYSIS", err, true)
+	if err != nil {
+		return dec, appErr("ERR_ANALYSIS", err, true)
+	}
+	return dec, appErr("ERR_TRACE_WRITE", traceErr, true)
+}
+
+func (a *Application) writeDecisionTrace(dec *decision.MoveDecision, startedMessage, persistedMessage, failedMessage string) error {
+	if dec == nil {
+		return nil
+	}
+	traceStageStarted := time.Now()
+	a.emitDecisionProgress(decision.ProgressEvent{
+		EventName:  decision.DecisionStageEvent,
+		DecisionID: dec.DecisionID,
+		GameID:     dec.GameID,
+		Stage:      "writing_trace",
+		Status:     "started",
+		Message:    startedMessage,
+		Timestamp:  traceStageStarted.UTC().Format(time.RFC3339Nano),
+	})
+	dec.Stages = append(dec.Stages, decision.CompletedStage("writing_trace", "completed", persistedMessage, traceStageStarted, time.Now()))
+	traceErr := a.traces.AppendDecision(context.Background(), dec)
+	status := "completed"
+	message := persistedMessage
+	if traceErr != nil {
+		status = "failed"
+		message = failedMessage
+		dec.Stages[len(dec.Stages)-1] = decision.CompletedStage("writing_trace", status, message, traceStageStarted, time.Now())
+	}
+	a.emitDecisionProgress(decision.ProgressEvent{
+		EventName:  decision.DecisionStageEvent,
+		DecisionID: dec.DecisionID,
+		GameID:     dec.GameID,
+		Stage:      "writing_trace",
+		Status:     status,
+		Message:    message,
+		ElapsedMS:  time.Since(traceStageStarted).Milliseconds(),
+		Timestamp:  time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	return traceErr
 }
 
 func (a *Application) StopEngine() error {

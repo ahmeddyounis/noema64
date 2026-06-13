@@ -474,6 +474,75 @@ func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
 	}
 }
 
+func TestRequestEngineMoveReportsTraceWriteFailureAfterSave(t *testing.T) {
+	app, _ := newTestApplication(t)
+	blocker := filepath.Join(t.TempDir(), "trace-blocker")
+	if err := os.WriteFile(blocker, []byte("block"), 0o600); err != nil {
+		t.Fatalf("write blocker: %v", err)
+	}
+	app.traces = storage.NewTraceStore(blocker)
+	events := []capturedEvent{}
+	app.SetEventSink(func(name string, payload any) {
+		events = append(events, capturedEvent{name: name, payload: payload})
+	})
+
+	result, err := app.RequestEngineMove()
+	if err == nil {
+		t.Fatal("expected trace write failure")
+	}
+	appError, ok := err.(*AppError)
+	if !ok || appError.Code != "ERR_TRACE_WRITE" || !appError.Recoverable {
+		t.Fatalf("error = %#v, want recoverable ERR_TRACE_WRITE", err)
+	}
+	payload, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("result type = %T, want map payload", result)
+	}
+	state, ok := payload["state"].(*engine.GameState)
+	if !ok || state == nil || len(state.Snapshot.MoveHistory) == 0 {
+		t.Fatalf("state payload missing played move: %#v", payload["state"])
+	}
+	decisionPayload, ok := payload["decision"].(*decision.MoveDecision)
+	if !ok || decisionPayload == nil || !hasDecisionStageStatus(decisionPayload.Stages, "writing_trace", "failed") {
+		t.Fatalf("decision payload missing failed trace stage: %#v", payload["decision"])
+	}
+	if !hasCapturedStageStatus(events, "writing_trace", "failed") {
+		t.Fatalf("missing failed trace event: %+v", events)
+	}
+	restored := NewApplication(app.settingsPath)
+	saved, saveErr := restored.GetGame()
+	if saveErr != nil {
+		t.Fatalf("restore saved game: %v", saveErr)
+	}
+	if len(saved.Snapshot.MoveHistory) != len(state.Snapshot.MoveHistory) {
+		t.Fatalf("saved game plies = %d, want %d", len(saved.Snapshot.MoveHistory), len(state.Snapshot.MoveHistory))
+	}
+}
+
+func TestAnalyzeCurrentPositionReportsTraceWriteFailure(t *testing.T) {
+	app, _ := newTestApplication(t)
+	blocker := filepath.Join(t.TempDir(), "trace-blocker")
+	if err := os.WriteFile(blocker, []byte("block"), 0o600); err != nil {
+		t.Fatalf("write blocker: %v", err)
+	}
+	app.traces = storage.NewTraceStore(blocker)
+
+	dec, err := app.AnalyzeCurrentPosition()
+	if err == nil {
+		t.Fatal("expected trace write failure")
+	}
+	appError, ok := err.(*AppError)
+	if !ok || appError.Code != "ERR_TRACE_WRITE" || !appError.Recoverable {
+		t.Fatalf("error = %#v, want recoverable ERR_TRACE_WRITE", err)
+	}
+	if dec == nil || !dec.AnalysisOnly {
+		t.Fatalf("analysis decision missing: %+v", dec)
+	}
+	if !hasDecisionStageStatus(dec.Stages, "writing_trace", "failed") {
+		t.Fatalf("decision missing failed trace stage: %+v", dec.Stages)
+	}
+}
+
 func TestPrivacySettingsEnableRawProviderTrace(t *testing.T) {
 	app, _ := newTestApplication(t)
 	settings := app.settings
@@ -1070,6 +1139,15 @@ func hasDecisionStage(stages []decision.StageTrace, name string) bool {
 	return false
 }
 
+func hasDecisionStageStatus(stages []decision.StageTrace, name, status string) bool {
+	for _, stage := range stages {
+		if stage.Name == name && stage.Status == status {
+			return true
+		}
+	}
+	return false
+}
+
 func hasAgentRole(reviews []analysis.AgentReview, role string) bool {
 	for _, review := range reviews {
 		if review.Role == role {
@@ -1106,6 +1184,16 @@ func hasCapturedStage(events []capturedEvent, stageName string) bool {
 	for _, event := range events {
 		progress, ok := event.payload.(decision.ProgressEvent)
 		if ok && progress.Stage == stageName {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCapturedStageStatus(events []capturedEvent, stageName, status string) bool {
+	for _, event := range events {
+		progress, ok := event.payload.(decision.ProgressEvent)
+		if ok && progress.Stage == stageName && progress.Status == status {
 			return true
 		}
 	}
