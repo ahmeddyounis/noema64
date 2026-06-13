@@ -548,6 +548,10 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /--board-ranks/);
   assert.match(appJS, /aria-rowcount/);
   assert.match(appJS, /aria-colindex/);
+  assert.match(appJS, /empty\.setAttribute\("role", "gridcell"\)/);
+  assert.match(appJS, /empty\.setAttribute\("aria-colspan", "8"\)/);
+  assert.match(appJS, /board\.setAttribute\("aria-label", message\)/);
+  assert.match(appJS, /board\.setAttribute\("aria-label", "Chess board"\)/);
   assert.match(appJS, /"openai_compatible", "anthropic", "gemini", "ollama"/);
   assert.match(appJS, /initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/);
   assert.match(appJS, /bindBusyButton\("#runImportBtn"/);

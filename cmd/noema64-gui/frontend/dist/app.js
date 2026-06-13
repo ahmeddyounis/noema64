@@ -836,6 +836,7 @@ function renderUnavailableState(message) {
 
 function renderBoardEmpty(title, detail) {
   const board = document.querySelector("#board");
+  const message = detail ? `${title}. ${detail}` : title;
   board.innerHTML = "";
   board.classList.add("board-empty-state");
   board.style.setProperty("--board-files", 8);
@@ -843,9 +844,14 @@ function renderBoardEmpty(title, detail) {
   board.style.aspectRatio = "1 / 1";
   board.setAttribute("aria-rowcount", "8");
   board.setAttribute("aria-colcount", "8");
+  board.setAttribute("aria-label", message);
   const empty = document.createElement("div");
   empty.className = "board-empty";
-  empty.textContent = detail ? `${title}. ${detail}` : title;
+  empty.setAttribute("role", "gridcell");
+  empty.setAttribute("aria-rowindex", "1");
+  empty.setAttribute("aria-colindex", "1");
+  empty.setAttribute("aria-colspan", "8");
+  empty.textContent = message;
   board.appendChild(empty);
 }
 
@@ -938,6 +944,7 @@ function renderBoard() {
   const board = document.querySelector("#board");
   board.innerHTML = "";
   board.classList.remove("board-empty-state");
+  board.setAttribute("aria-label", "Chess board");
   const dims = boardDimensions();
   const order = squareOrder();
   if (!order.includes(focusedSquare)) focusedSquare = order[0] || "a1";
