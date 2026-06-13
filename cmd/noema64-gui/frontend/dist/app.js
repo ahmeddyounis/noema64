@@ -15,6 +15,7 @@ let autoReply = true;
 let pendingPromotion = null;
 let applyingProviderProfile = false;
 let lastStageEvent = null;
+let promptPack = null;
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -211,6 +212,7 @@ function renderMoves() {
 
 function renderStrategy() {
   const mem = state.strategy_memory || {};
+  const metrics = state.strategy_metrics || {};
   document.querySelector("#confidence").textContent = Number(mem.plan?.confidence || 0).toFixed(2);
   const dl = document.querySelector("#strategyMemory");
   dl.innerHTML = "";
@@ -218,6 +220,9 @@ function renderStrategy() {
     ["Plan", mem.plan?.summary],
     ["Status", mem.plan?.status],
     ["Phase", mem.phase],
+    ["Quality", formatMetric(metrics.quality)],
+    ["Drift", `${formatMetric(metrics.drift)} · ${metrics.alert_level || "none"}`],
+    ["Alerts", formatStrategyAlerts(metrics.alerts)],
     ["Targets", [...(mem.targets?.squares || []), ...(mem.targets?.pieces || []), ...(mem.targets?.pawns || [])].join(", ")],
     ["Opponent", mem.opponent_model?.likely_plan],
     ["Warnings", (mem.tactical_warnings || []).join("; ")],
@@ -232,6 +237,16 @@ function renderStrategy() {
     dd.textContent = value || "None";
     dl.append(dt, dd);
   }
+}
+
+function formatMetric(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+}
+
+function formatStrategyAlerts(alerts) {
+  if (!alerts?.length) return "None";
+  return alerts.map((alert) => `${alert.severity || "info"}: ${alert.message || alert.code}`).join("; ");
 }
 
 function renderDecision() {
@@ -617,6 +632,170 @@ function renderBenchmarkSummary(summary) {
   return `Random benchmark · ${summary.games_completed || 0}/${summary.games_requested || 0} games · ${summary.total_plies || 0} plies · ${summary.fallbacks_used || 0} fallbacks · ${summary.engine_errors || 0} errors`;
 }
 
+function renderPositionSuiteSummary(summary) {
+  if (!summary) return "No position suite result.";
+  const rows = (summary.results || []).map((result) => {
+    const move = result.selected_san ? `${result.selected_san} (${result.selected_move})` : result.selected_move || "none";
+    const status = result.engine_error ? `error: ${result.engine_error}` : `${move} · ${result.candidate_count || 0} candidates · ${result.duration_ms || 0} ms`;
+    return `${result.index}. ${result.name || "Position"} · ${result.side_to_move || "unknown"} · ${status}`;
+  });
+  return [
+    `Position suite · ${summary.positions_analyzed || 0}/${summary.positions_requested || 0} analyzed · ${summary.fallbacks_used || 0} fallbacks · ${summary.engine_errors || 0} errors`,
+    ...rows
+  ].join("\n");
+}
+
+function renderProviderComparison(summary) {
+  if (!summary) return "No provider comparison result.";
+  const rows = (summary.results || []).map((result) => {
+    const suite = result.summary || {};
+    return `${result.profile_id || "profile"} · ${result.status || "unknown"} · ${suite.positions_analyzed || 0}/${suite.positions_requested || 0} positions · ${suite.fallbacks_used || 0} fallbacks · ${result.error || ""}`.trim();
+  });
+  return [
+    `Provider comparison · ${summary.profiles_compared || 0} profiles completed · ${summary.positions?.length || 0} positions`,
+    ...rows
+  ].join("\n");
+}
+
+function renderProviderDashboard(dashboard) {
+  if (!dashboard) return "No provider dashboard result.";
+  const rows = (dashboard.profiles || []).map((profile) => {
+    const endpoint = profile.endpoint ? ` · ${profile.endpoint}` : "";
+    const error = profile.error ? ` · ${profile.error}` : "";
+    return `${profile.id || "profile"} · ${profile.provider || "provider"} · ${profile.model || "model"} · ${profile.status || "unknown"}${endpoint}${error}`;
+  });
+  return [
+    `Provider dashboard · active ${dashboard.active_profile || "custom"} · ${dashboard.active_provider || "unknown"} · ${dashboard.active_model || "model"}`,
+    ...rows
+  ].join("\n");
+}
+
+function renderReview(review) {
+  if (!review) return "No review available.";
+  const metrics = review.strategy_metrics || {};
+  const recommendations = review.recommendations?.length ? review.recommendations.join("\n") : "No recommendations.";
+  return [
+    review.summary || "No review summary.",
+    "",
+    `Game: ${review.game_id || "unknown"} · ply ${review.ply || 0} · ${review.outcome_status || "unknown"}`,
+    `Move: ${review.selected_move || "none"}`,
+    `Provider: ${review.provider || "none"} · mode ${review.mode || "none"}`,
+    `Plan: ${review.plan || "none"}`,
+    `Strategy quality: ${formatMetric(metrics.quality)} · completeness ${formatMetric(metrics.completeness)} · consistency ${formatMetric(metrics.consistency)} · drift ${formatMetric(metrics.drift)} · alerts ${metrics.alert_level || "none"}`,
+    "",
+    "POSITION SUMMARY",
+    review.position_summary || "No position summary recorded.",
+    "",
+    "RECOMMENDATIONS",
+    recommendations
+  ].join("\n");
+}
+
+async function openReview() {
+  document.querySelector("#reviewOutput").textContent = "Loading review...";
+  document.querySelector("#reviewDialog").showModal();
+  await refreshReview();
+}
+
+async function refreshReview() {
+  try {
+    document.querySelector("#reviewOutput").textContent = renderReview(await call("PostGameReview"));
+  } catch (err) {
+    showError(err, "#reviewOutput");
+  }
+}
+
+function openExperiments() {
+  document.querySelector("#experimentsOutput").textContent = "";
+  document.querySelector("#experimentsDialog").showModal();
+}
+
+async function runExperiment(action, label, renderResult) {
+  try {
+    document.querySelector("#experimentsOutput").textContent = `${label}...`;
+    document.querySelector("#experimentsOutput").textContent = renderResult(await action());
+  } catch (err) {
+    showError(err, "#experimentsOutput");
+  }
+}
+
+async function loadPromptEditor() {
+  try {
+    promptPack = await call("PromptTemplatePack");
+    document.querySelector("#promptSource").value = promptPack.source || "default";
+    document.querySelector("#promptManifest").value = JSON.stringify(promptPack.manifest || {}, null, 2);
+    document.querySelector("#promptSystem").value = promptPack.system || "";
+    document.querySelector("#promptUser").value = promptPack.user || "";
+    document.querySelector("#promptSchema").value = promptPack.schema || "";
+    document.querySelector("#promptOutput").textContent = "";
+  } catch (err) {
+    showError(err, "#promptOutput");
+  }
+}
+
+async function openPromptEditor() {
+  document.querySelector("#promptDialog").showModal();
+  await loadPromptEditor();
+}
+
+function promptPackFromInputs() {
+  const manifestText = document.querySelector("#promptManifest").value;
+  const manifest = JSON.parse(manifestText);
+  return {
+    schema_version: "prompt-template-pack.v1",
+    source: document.querySelector("#promptSource").value || "editor",
+    manifest,
+    system: document.querySelector("#promptSystem").value,
+    user: document.querySelector("#promptUser").value,
+    schema: document.querySelector("#promptSchema").value
+  };
+}
+
+async function validatePromptEditor() {
+  try {
+    const validation = await call("ValidatePromptTemplatePack", promptPackFromInputs());
+    document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
+    return validation;
+  } catch (err) {
+    showError(err, "#promptOutput");
+    return null;
+  }
+}
+
+async function savePromptEditor() {
+  try {
+    const dir = document.querySelector("#promptSaveDir").value.trim();
+    const validation = await call("SavePromptTemplatePack", dir, promptPackFromInputs());
+    document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
+  } catch (err) {
+    showError(err, "#promptOutput");
+  }
+}
+
+async function openProfilesEditor() {
+  document.querySelector("#profilesDialog").showModal();
+  await exportProfiles();
+}
+
+async function exportProfiles() {
+  try {
+    document.querySelector("#profilesText").value = await call("ExportProviderProfiles");
+    document.querySelector("#profilesOutput").textContent = "Profiles exported.";
+  } catch (err) {
+    showError(err, "#profilesOutput");
+  }
+}
+
+async function importProfiles() {
+  try {
+    settings = await call("ImportProviderProfiles", document.querySelector("#profilesText").value);
+    populateProviderProfiles(settings.llm?.profiles || []);
+    document.querySelector("#profilesOutput").textContent = "Profiles imported.";
+  } catch (err) {
+    showError(err, "#profilesOutput");
+  }
+}
+
 function renderRecentGames(records) {
   const list = document.querySelector("#recentList");
   list.innerHTML = "";
@@ -719,6 +898,9 @@ document.querySelector("#undoBtn").addEventListener("click", async () => {
   }
 });
 document.querySelector("#flipBtn").addEventListener("click", () => { flipped = !flipped; renderBoard(); });
+document.querySelector("#reviewBtn").addEventListener("click", openReview);
+document.querySelector("#experimentsBtn").addEventListener("click", openExperiments);
+document.querySelector("#promptEditorBtn").addEventListener("click", openPromptEditor);
 document.querySelector("#moveBtn").addEventListener("click", () => makeMove(document.querySelector("#moveInput").value.trim()));
 document.querySelector("#whyBtn").addEventListener("click", whyNotMove);
 document.querySelector("#settingsBtn").addEventListener("click", async () => {
@@ -755,6 +937,7 @@ document.querySelector("#promotionDialog").addEventListener("close", () => {
   resolve(null);
 });
 document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
+document.querySelector("#profilesBtn").addEventListener("click", openProfilesEditor);
 document.querySelector("#healthBtn").addEventListener("click", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
@@ -778,6 +961,37 @@ document.querySelector("#modeBenchBtn").addEventListener("click", async () => {
     showError(err, "#settingsOutput");
   }
 });
+document.querySelector("#refreshReviewBtn").addEventListener("click", refreshReview);
+document.querySelector("#providerDashboardBtn").addEventListener("click", () => runExperiment(
+  () => call("ProviderDashboard"),
+  "Checking providers",
+  renderProviderDashboard
+));
+document.querySelector("#positionSuiteBtn").addEventListener("click", () => runExperiment(
+  () => call("RunPositionSuite", []),
+  "Running position suite",
+  renderPositionSuiteSummary
+));
+document.querySelector("#providerComparisonBtn").addEventListener("click", () => runExperiment(
+  () => call("RunProviderComparison"),
+  "Comparing providers",
+  renderProviderComparison
+));
+document.querySelector("#experimentBenchBtn").addEventListener("click", () => runExperiment(
+  () => call("RunRandomBenchmark", 100, 64),
+  "Running random benchmark",
+  renderBenchmarkSummary
+));
+document.querySelector("#experimentModeBtn").addEventListener("click", () => runExperiment(
+  () => call("RunModeBenchmark", 10, 64),
+  "Running mode benchmark",
+  renderBenchmarkSummary
+));
+document.querySelector("#reloadPromptBtn").addEventListener("click", loadPromptEditor);
+document.querySelector("#validatePromptBtn").addEventListener("click", validatePromptEditor);
+document.querySelector("#savePromptBtn").addEventListener("click", savePromptEditor);
+document.querySelector("#exportProfilesBtn").addEventListener("click", exportProfiles);
+document.querySelector("#importProfilesBtn").addEventListener("click", importProfiles);
 async function refreshExport() {
   const type = document.querySelector("#exportType").value;
   if (type === "fen") {

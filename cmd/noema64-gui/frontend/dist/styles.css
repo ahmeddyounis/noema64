@@ -277,6 +277,13 @@ dialog {
   padding: 0;
 }
 
+#experimentsDialog,
+#promptDialog,
+#profilesDialog,
+#reviewDialog {
+  width: min(920px, 94vw);
+}
+
 dialog header {
   display: flex;
   justify-content: space-between;
@@ -295,10 +302,34 @@ dialog h2 {
   gap: 10px;
 }
 
-.settings label {
+.settings label,
+.prompt-editor label {
   display: grid;
   gap: 4px;
   padding: 0 12px;
+}
+
+.prompt-editor,
+.profiles-editor,
+.experiments {
+  display: grid;
+  gap: 10px;
+}
+
+.prompt-editor input {
+  min-height: 34px;
+  border: 1px solid #c7ced8;
+  border-radius: 6px;
+  padding: 0 10px;
+}
+
+.prompt-editor textarea {
+  min-height: 150px;
+}
+
+#promptManifest,
+#promptSchema {
+  min-height: 120px;
 }
 
 .settings .provider-warning {
@@ -394,6 +425,15 @@ dialog h2 {
   justify-content: flex-end;
   padding: 12px;
   margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 12px;
+  margin: 0;
+  flex-wrap: wrap;
 }
 
 pre,
