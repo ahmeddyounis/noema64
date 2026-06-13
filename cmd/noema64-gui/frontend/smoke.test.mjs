@@ -499,6 +499,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusMoveInput(select = false)",
     "focusMoveInput()",
     "focusMoveInput(true)",
+    "restoreBusyControlFocus",
+    "#newGameBtn:not(:disabled)",
     "document.querySelector(\"#thinkingStage\").textContent = \"Move failed\"",
     "Paste a FEN or PGN before importing.",
     "document.querySelector(\"#moveInput\").addEventListener(\"keydown\"",

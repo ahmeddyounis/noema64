@@ -441,9 +441,28 @@ async function withBusyControl(controlOrSelector, action) {
     setControlBusy(controlOrSelector, false);
     finishAppOperation(marker);
     if (hadFocus && document.activeElement === document.body) {
-      focusVisibleElement(control, true);
+      restoreBusyControlFocus(control);
     }
   }
+}
+
+function restoreBusyControlFocus(control) {
+  if (focusVisibleElement(control, true)) return;
+  const dialog = control?.closest?.("dialog[open]");
+  const scopedFallback = dialog?.querySelector([
+    "input:not(:disabled)",
+    "textarea:not(:disabled)",
+    "select:not(:disabled)",
+    "button:not(:disabled)",
+    "a[href]",
+    "[role='button']:not([aria-disabled='true'])"
+  ].join(", "));
+  if (focusVisibleElement(scopedFallback, true)) return;
+  focusVisibleElement(
+    document.querySelector("#newGameBtn:not(:disabled)") ||
+    document.querySelector("[role='tab'][aria-selected='true']"),
+    true
+  );
 }
 
 function bindBusyButton(selector, action) {
