@@ -845,14 +845,18 @@ function renderBoardEmpty(title, detail) {
   board.setAttribute("aria-rowcount", "8");
   board.setAttribute("aria-colcount", "8");
   board.setAttribute("aria-label", message);
+  const row = document.createElement("div");
+  row.className = "board-empty-row";
+  row.setAttribute("role", "row");
+  row.setAttribute("aria-rowindex", "1");
   const empty = document.createElement("div");
   empty.className = "board-empty";
   empty.setAttribute("role", "gridcell");
-  empty.setAttribute("aria-rowindex", "1");
   empty.setAttribute("aria-colindex", "1");
   empty.setAttribute("aria-colspan", "8");
   empty.textContent = message;
-  board.appendChild(empty);
+  row.appendChild(empty);
+  board.appendChild(row);
 }
 
 function renderStatus() {
