@@ -2921,6 +2921,7 @@ bindBusyButton("#runImportBtn", async () => {
     markFieldInvalid(importText);
     showError(err, "#importOutput");
     importText.focus();
+    importText.select?.();
   }
 });
 document.querySelector("#promotionDialog").addEventListener("close", () => {

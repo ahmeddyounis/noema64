@@ -586,6 +586,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "markFieldInvalid(importText)",
     "clearFieldInvalid(importText)",
     "importText.focus()",
+    "importText.select?.()",
     "moveInput.value = \"\"",
     "renderRecentGamesEmpty",
     "Loading recent games...",
