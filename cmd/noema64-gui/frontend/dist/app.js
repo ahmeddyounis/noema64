@@ -41,6 +41,26 @@ const workflowCommandTargets = {
   settings: "#settingsBtn",
   study: "#studyBtn"
 };
+const primaryActionRequirements = {
+  "#analyzeBtn": "game",
+  "#engineBtn": "ongoing",
+  "#experimentsBtn": "service",
+  "#exportBtn": "game",
+  "#flipBtn": "game",
+  "#importBtn": "service",
+  "#labBtn": "service",
+  "#moveBtn": "ongoing",
+  "#newGameBtn": "service",
+  "#promptEditorBtn": "service",
+  "#recentBtn": "service",
+  "#resignBtn": "ongoing",
+  "#reviewBtn": "game",
+  "#settingsBtn": "service",
+  "#stopBtn": "game",
+  "#studyBtn": "game",
+  "#undoBtn": "moves",
+  "#whyBtn": "game"
+};
 const operationLabels = {
   "#accessibilityAuditBtn": "Accessibility audit",
   "#analyzeBtn": "Analysis",
@@ -84,6 +104,16 @@ const operationLabels = {
   "#studyBtn": "Study tools",
   "#trainPolicyPriorBtn": "Policy training",
   "#validatePromptBtn": "Prompt validation"
+};
+const knownHumanizedTokens = {
+  api: "API",
+  fen: "FEN",
+  json: "JSON",
+  jsonl: "JSONL",
+  llm: "LLM",
+  openai: "OpenAI",
+  pgn: "PGN",
+  uci: "UCI"
 };
 
 const timeControlPresets = {
@@ -500,6 +530,7 @@ function renderWorkflowPanel() {
   setText("#providerFlowMeta", providerFlowMeta());
   setText("#promptFlowMeta", promptFlowMeta());
   setText("#assetFlowMeta", assetFlowMeta(snapshot));
+  setPrimaryActionAvailability(snapshot);
   setWorkflowActionAvailability(snapshot, decision);
 }
 
@@ -588,19 +619,44 @@ function setWorkflowActionAvailability(snapshot, decision) {
   document.querySelectorAll("#workflowPanel [data-requires]").forEach((button) => {
     const requirement = button.dataset.requires;
     const busy = workflowCommandBusy(button.dataset.command);
-    button.disabled = busy || (requirement === "game" && !snapshot) || (requirement === "decision" && !decision);
+    const unavailable = workflowCommandUnavailable(button.dataset.command);
+    button.disabled = busy || unavailable || (requirement === "game" && !snapshot) || (requirement === "decision" && !decision);
     button.toggleAttribute("aria-busy", busy);
   });
   document.querySelectorAll("#workflowPanel [data-command]:not([data-requires])").forEach((button) => {
     const busy = workflowCommandBusy(button.dataset.command);
-    button.disabled = busy;
+    button.disabled = busy || workflowCommandUnavailable(button.dataset.command);
     button.toggleAttribute("aria-busy", busy);
   });
+}
+
+function setPrimaryActionAvailability(snapshot) {
+  const hasService = !!api();
+  const hasGame = !!snapshot;
+  const ongoing = hasGame && snapshot.outcome?.status === "ongoing";
+  const hasMoves = hasGame && asArray(snapshot.move_history).length > 0;
+  for (const [selector, requirement] of Object.entries(primaryActionRequirements)) {
+    const control = document.querySelector(selector);
+    if (!control || busyControls.has(selector)) continue;
+    control.disabled =
+      (requirement === "service" && !hasService) ||
+      (requirement === "game" && (!hasService || !hasGame)) ||
+      (requirement === "ongoing" && (!hasService || !ongoing)) ||
+      (requirement === "moves" && (!hasService || !hasMoves));
+  }
+  const moveInput = document.querySelector("#moveInput");
+  if (moveInput) moveInput.disabled = !hasService || !ongoing;
 }
 
 function workflowCommandBusy(command) {
   const target = workflowCommandTargets[command];
   return !!target && busyControls.has(target);
+}
+
+function workflowCommandUnavailable(command) {
+  const target = workflowCommandTargets[command];
+  const control = target ? document.querySelector(target) : null;
+  return !!control?.disabled;
 }
 
 function resetBoardEntry() {
@@ -661,6 +717,7 @@ function normalizeRenderableState() {
 }
 
 function renderUnavailableState(message) {
+  state = null;
   selected = null;
   renderBoardEmpty("Board unavailable", "Open Noema64 through the desktop app to connect the game service.");
   const status = document.querySelector("#statusText");
@@ -913,12 +970,18 @@ function squareCenter(square) {
   return { x: (col + 0.5) * (100 / dims.width), y: (row + 0.5) * (100 / dims.height) };
 }
 
+function focusBoardSquare(square = focusedSquare) {
+  const target = document.querySelector(`[data-square="${square}"]`);
+  if (target) target.focus();
+}
+
 async function squareClicked(sq, fromKeyboard = false) {
   if (!state?.snapshot) return;
   boardKeyboardMode = !!fromKeyboard;
   if (!selected) {
     if (state.snapshot.board[sq]) selected = sq;
     renderBoard();
+    focusBoardSquare(sq);
     return;
   }
   await playFromTo(selected, sq);
@@ -929,6 +992,7 @@ async function playFromTo(from, to) {
   if (!matches.length) {
     selected = state?.snapshot?.board?.[to] ? to : null;
     renderBoard();
+    focusBoardSquare(to);
     return;
   }
   let legal = matches[0];
@@ -936,11 +1000,13 @@ async function playFromTo(from, to) {
     legal = await choosePromotion(matches);
     if (!legal) {
       renderBoard();
+      focusBoardSquare(from);
       return;
     }
   }
   selected = null;
   await makeMove(legal.uci);
+  focusBoardSquare(to);
 }
 
 function dragStarted(event, sq) {
@@ -991,6 +1057,7 @@ function handleBoardKeyboard(event) {
   if (event.key === "Escape") {
     selected = null;
     renderBoard();
+    focusBoardSquare();
     return true;
   }
   return false;
@@ -1004,7 +1071,7 @@ function moveBoardFocus(df, dr) {
   const rank = Math.max(0, Math.min(dims.height - 1, dims.ranks.indexOf(current.rank) + dr));
   focusedSquare = dims.files[file] + dims.ranks[rank];
   renderBoard();
-  document.querySelector(`[data-square="${focusedSquare}"]`)?.focus();
+  focusBoardSquare();
 }
 
 function parseBoardSquare(square, dims = boardDimensions()) {
@@ -1179,7 +1246,7 @@ function humanizeToken(value) {
   return String(value || "")
     .split(/[_\s-]+/)
     .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => knownHumanizedTokens[word.toLowerCase()] || word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
 }
 
@@ -1373,13 +1440,17 @@ async function analyzeCurrentPosition() {
 async function whyNotMove() {
   const move = document.querySelector("#moveInput").value.trim();
   if (!move) {
-    document.querySelector("#tabContent").textContent = "Enter a move to compare.";
+    activateTraceTab(document.querySelector("#summaryTab"));
+    showError("Enter a move to compare.", "#tabContent");
+    document.querySelector("#moveInput").focus();
     return;
   }
   return withBusyControl("#whyBtn", async () => {
     try {
       const comparison = await call("WhyNotMove", move);
+      activateTraceTab(document.querySelector("#summaryTab"));
       document.querySelector("#tabContent").textContent = whyNotText(comparison);
+      showSuccess("Move comparison ready.");
     } catch (err) {
       showError(err);
     }
@@ -1419,6 +1490,7 @@ async function resignGame() {
   return withBusyControl("#resignBtn", async () => {
     try {
       applyGameStateResult(await call("Resign", side));
+      showSuccess("Game resigned.");
     } catch (err) {
       showError(err);
     }
@@ -1566,8 +1638,8 @@ async function saveSettings() {
       settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
       settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
       if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
-        document.querySelector("#settingsOutput").textContent = "Acknowledge provider endpoint data sharing before saving.";
-        setAppActivity("Needs attention", "Acknowledge provider endpoint data sharing before saving.", "error");
+        showError("Acknowledge provider endpoint data sharing before saving.", "#settingsOutput");
+        document.querySelector("#settingCloudAck").focus();
         return;
       }
       settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
@@ -1594,7 +1666,8 @@ async function saveSettings() {
 async function saveProviderKeyToKeychain() {
   const apiKey = document.querySelector("#settingKey").value.trim();
   if (!apiKey || apiKey === "[REDACTED]") {
-    document.querySelector("#settingsOutput").textContent = "Enter an API key before saving it to the keychain.";
+    showError("Enter an API key before saving it to the keychain.", "#settingsOutput");
+    document.querySelector("#settingKey").focus();
     return;
   }
   try {
@@ -1708,10 +1781,10 @@ function renderProviderDashboard(dashboard) {
   const rows = asArray(dashboard.profiles).map((profile) => {
     const endpoint = profile?.endpoint ? ` · ${profile.endpoint}` : "";
     const error = profile?.error ? ` · ${profile.error}` : "";
-    return `${profile?.id || "profile"} · ${profile?.provider || "provider"} · ${profile?.model || "model"} · ${profile?.status || "unknown"}${endpoint}${error}`;
+    return `${profile?.id || "profile"} · ${humanizeToken(profile?.provider || "provider")} · ${profile?.model || "model"} · ${profile?.status || "unknown"}${endpoint}${error}`;
   });
   return [
-    `Provider dashboard · active ${dashboard.active_profile || "custom"} · ${dashboard.active_provider || "unknown"} · ${dashboard.active_model || "model"}`,
+    `Provider dashboard · active ${dashboard.active_profile || "custom"} · ${humanizeToken(dashboard.active_provider || "unknown")} · ${dashboard.active_model || "model"}`,
     ...rows
   ].join("\n");
 }
@@ -1722,7 +1795,7 @@ function renderPromptPlayground(result) {
     const candidates = asArray(side?.candidates).map((c) => `${c?.san || c?.uci || "candidate"} · ${c?.purpose || ""}`).join("\n");
     return [
       label,
-      `${side?.provider || "provider"} · ${side?.model || "model"} · valid ${!!side?.valid} · parse ${side?.parse_status || "none"}`,
+      `${humanizeToken(side?.provider || "provider")} · ${side?.model || "model"} · valid ${!!side?.valid} · parse ${side?.parse_status || "none"}`,
       side?.error ? `Error: ${side.error}` : "",
       candidates || "No legal candidates parsed."
     ].filter(Boolean).join("\n");
@@ -1819,7 +1892,7 @@ function renderReview(review) {
     "",
     `Game: ${review.game_id || "unknown"} · ply ${review.ply || 0} · ${review.outcome_status || "unknown"}`,
     `Move: ${review.selected_move || "none"}`,
-    `Provider: ${review.provider || "none"} · mode ${review.mode || "none"}`,
+    `Provider: ${humanizeToken(review.provider || "none")} · mode ${review.mode || "none"}`,
     `Plan: ${review.plan || "none"}`,
     `Strategy quality: ${formatMetric(metrics.quality)} · completeness ${formatMetric(metrics.completeness)} · consistency ${formatMetric(metrics.consistency)} · drift ${formatMetric(metrics.drift)} · alerts ${metrics.alert_level || "none"}`,
     "",
@@ -2168,8 +2241,18 @@ async function savePromptEditor() {
 }
 
 async function openProfilesEditor() {
-  document.querySelector("#profilesDialog").showModal();
-  await exportProfiles();
+  const dialog = document.querySelector("#profilesDialog");
+  const importButton = document.querySelector("#importProfilesBtn");
+  const previousImportDisabled = importButton?.disabled || false;
+  dialog.showModal();
+  if (importButton) importButton.disabled = true;
+  try {
+    await exportProfiles();
+  } finally {
+    if (importButton && !busyControls.has("#importProfilesBtn")) {
+      importButton.disabled = previousImportDisabled;
+    }
+  }
 }
 
 async function exportProfiles() {
@@ -2185,6 +2268,7 @@ async function exportProfiles() {
 async function importProfiles() {
   try {
     const text = requireField("#profilesText", "Paste provider profiles before importing.");
+    parseJSONField("#profilesText", "Provider profiles");
     settings = normalizeSettingsShape(await call("ImportProviderProfiles", text));
     populateProviderProfiles(settings.llm?.profiles || []);
     document.querySelector("#profilesOutput").textContent = "Profiles imported.";
@@ -2201,7 +2285,11 @@ function renderRecentGames(records) {
   list.setAttribute("role", "list");
   const items = asArray(records);
   if (!items.length) {
-    list.textContent = "No recent games.";
+    const empty = document.createElement("div");
+    empty.className = "recent-empty";
+    empty.setAttribute("role", "listitem");
+    empty.textContent = "No recent games.";
+    list.appendChild(empty);
     return;
   }
   for (const record of items) {
@@ -2244,6 +2332,7 @@ async function openRecentGames() {
     document.querySelector("#recentList").textContent = "Loading...";
     document.querySelector("#recentDialog").showModal();
     renderRecentGames(await call("RecentGames", 10));
+    showSuccess("Recent games loaded.");
   } catch (err) {
     document.querySelector("#recentList").textContent = "Recent games could not be loaded.";
     showError(err, "#recentOutput");
@@ -2251,19 +2340,25 @@ async function openRecentGames() {
 }
 
 function activateTraceTab(btn, focus = false) {
+  const next = isTraceTabAvailable(btn) ? btn : document.querySelector("#summaryTab");
   document.querySelectorAll(".tabs button").forEach((b) => {
-    const selectedTab = b === btn;
+    const selectedTab = b === next;
     b.classList.toggle("active", selectedTab);
     b.setAttribute("aria-selected", selectedTab ? "true" : "false");
     b.tabIndex = selectedTab ? 0 : -1;
   });
-  activeTab = btn.dataset.tab;
+  activeTab = next?.dataset.tab || "summary";
   renderDecision();
-  if (focus) btn.focus();
+  if (focus) next?.focus();
+}
+
+function isTraceTabAvailable(button) {
+  if (!button) return false;
+  return activeWorkspaceView === "lab" || button.dataset.labOnly !== "true";
 }
 
 function moveTraceTabFocus(current, delta) {
-  const tabs = [...document.querySelectorAll(".tabs button")];
+  const tabs = [...document.querySelectorAll(".tabs button")].filter(isTraceTabAvailable);
   const index = tabs.indexOf(current);
   if (index < 0) return;
   const next = tabs[(index + delta + tabs.length) % tabs.length];
@@ -2402,6 +2497,7 @@ bindBusyButton("#runImportBtn", async () => {
     showSuccess("Position imported.");
   } catch (err) {
     showError(err, "#importOutput");
+    document.querySelector("#importText").focus();
   }
 });
 document.querySelector("#promotionDialog").addEventListener("close", () => {
@@ -2416,6 +2512,7 @@ bindBusyButton("#keychainBtn", saveProviderKeyToKeychain);
 bindBusyButton("#healthBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
+    showSuccess("Provider health check complete.");
   } catch (err) {
     showError(err, "#settingsOutput");
   }
@@ -2424,6 +2521,7 @@ bindBusyButton("#benchBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = "Running benchmark...";
     document.querySelector("#settingsOutput").textContent = renderBenchmarkSummary(await call("RunRandomBenchmark", 100, 64));
+    showSuccess("Random benchmark complete.");
   } catch (err) {
     showError(err, "#settingsOutput");
   }
@@ -2432,6 +2530,7 @@ bindBusyButton("#modeBenchBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = "Running mode benchmark...";
     document.querySelector("#settingsOutput").textContent = renderBenchmarkSummary(await call("RunModeBenchmark", 10, 64));
+    showSuccess("Mode benchmark complete.");
   } catch (err) {
     showError(err, "#settingsOutput");
   }
@@ -2522,9 +2621,14 @@ function confirmDebugTraceExport() {
   return window.confirm("Debug trace export may include raw prompts or raw LLM responses when raw logging is enabled. Continue?");
 }
 
+function showExportCanceled() {
+  document.querySelector("#exportText").value = "Export canceled.";
+  setAppActivity("Canceled", "Export canceled.", "ready");
+}
+
 bindBusyButton("#refreshExportBtn", async () => {
   try {
-    await refreshExport();
+    if (!await refreshExport()) showExportCanceled();
   } catch (err) {
     showError(err, "#exportText");
   }
@@ -2532,7 +2636,7 @@ bindBusyButton("#refreshExportBtn", async () => {
 document.querySelector("#exportType").addEventListener("change", async () => {
   await withBusyControl("#exportType", async () => {
     try {
-      await refreshExport();
+      if (!await refreshExport()) showExportCanceled();
     } catch (err) {
       showError(err, "#exportText");
     }
@@ -2544,8 +2648,7 @@ bindBusyButton("#exportBtn", async () => {
   if (!exportDialog.open) exportDialog.showModal();
   try {
     if (!await refreshExport()) {
-      document.querySelector("#exportText").value = "Export canceled.";
-      setAppActivity("Canceled", "Export canceled.", "ready");
+      showExportCanceled();
     }
   } catch (err) {
     showError(err, "#exportText");
@@ -2555,13 +2658,16 @@ bindBusyButton("#exportBtn", async () => {
 window.addEventListener("keydown", (event) => {
   if (handleBoardKeyboard(event)) return;
   if (shouldIgnoreGlobalShortcut(event)) return;
-  if (event.key === "n" || event.key === "N") document.querySelector("#newGameBtn").click();
-  if (event.key === "a" || event.key === "A") document.querySelector("#analyzeBtn").click();
-  if (event.key === " ") { event.preventDefault(); askEngine(); }
-  if (event.key === "r" || event.key === "R") document.querySelector("#resignBtn").click();
-  if (event.key === "u" || event.key === "U") document.querySelector("#undoBtn").click();
-  if (event.key === "f" || event.key === "F") document.querySelector("#flipBtn").click();
-  if (event.key === ",") document.querySelector("#settingsBtn").click();
+  if (event.key === "n" || event.key === "N") triggerShortcut("#newGameBtn");
+  if (event.key === "a" || event.key === "A") triggerShortcut("#analyzeBtn");
+  if (event.key === " ") {
+    event.preventDefault();
+    triggerShortcut("#engineBtn");
+  }
+  if (event.key === "r" || event.key === "R") triggerShortcut("#resignBtn");
+  if (event.key === "u" || event.key === "U") triggerShortcut("#undoBtn");
+  if (event.key === "f" || event.key === "F") triggerShortcut("#flipBtn");
+  if (event.key === ",") triggerShortcut("#settingsBtn");
 });
 
 function shouldIgnoreGlobalShortcut(event) {
@@ -2570,6 +2676,17 @@ function shouldIgnoreGlobalShortcut(event) {
   if (target.closest("dialog[open]")) return true;
   if (target.isContentEditable) return true;
   return target.matches("input, textarea, select, button, a, [role='button']");
+}
+
+function triggerShortcut(selector) {
+  const control = document.querySelector(selector);
+  if (!control || control.disabled || !isElementVisible(control)) return false;
+  control.click();
+  return true;
+}
+
+function isElementVisible(element) {
+  return !!(element?.offsetWidth || element?.offsetHeight || element?.getClientRects?.().length);
 }
 
 async function init() {

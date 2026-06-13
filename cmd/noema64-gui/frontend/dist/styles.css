@@ -946,6 +946,11 @@ dialog header button {
   overflow: auto;
 }
 
+.recent-empty {
+  padding: 18px 12px;
+  color: #607083;
+}
+
 .activity-log {
   display: grid;
   gap: 0;
