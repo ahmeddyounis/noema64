@@ -79,6 +79,7 @@ button:hover {
   border: 1px solid #d9dee7;
   border-radius: 8px;
   min-height: 0;
+  min-width: 0;
 }
 
 .board-area {
@@ -94,6 +95,11 @@ button:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+#statusText {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 #modeText,
@@ -154,11 +160,20 @@ button:hover {
   stroke: rgba(21, 92, 149, 0.84);
   stroke-width: 2.4;
   stroke-linecap: round;
-  marker-end: url(#arrowhead);
+  opacity: 0.86;
 }
 
 .candidate-arrow.alt {
   stroke: rgba(145, 79, 31, 0.72);
+}
+
+.candidate-arrow-head {
+  fill: rgba(21, 92, 149, 0.84);
+  opacity: 0.86;
+}
+
+.candidate-arrow-head.alt {
+  fill: rgba(145, 79, 31, 0.72);
 }
 
 .light {
@@ -569,7 +584,7 @@ textarea {
   .toolbar {
     flex: 1 1 100%;
     display: grid;
-    grid-template-columns: repeat(5, minmax(34px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(42px, 1fr));
     gap: 6px;
   }
 

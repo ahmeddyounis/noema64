@@ -15,22 +15,22 @@
           <span>A chess engine that remembers what it is trying to do.</span>
         </div>
         <div class="toolbar">
-          <button id="newGameBtn" title="New game">N</button>
-          <button id="recentBtn" title="Recent games">◷</button>
-          <button id="engineBtn" title="Ask engine">▶</button>
-          <button id="analyzeBtn" title="Analyze current position">◇</button>
-          <button id="stopBtn" title="Stop thinking">■</button>
-          <button id="resignBtn" title="Resign">⚑</button>
-          <button id="undoBtn" title="Undo">↶</button>
-          <button id="flipBtn" title="Flip board">⇅</button>
-          <button id="reviewBtn" title="Post-game review">◎</button>
-          <button id="studyBtn" title="Study tools">※</button>
-          <button id="experimentsBtn" title="Experiments">Σ</button>
-          <button id="labBtn" title="Roadmap lab">⌬</button>
-          <button id="promptEditorBtn" title="Prompt editor">✎</button>
-          <button id="importBtn" title="Import PGN or FEN">⇧</button>
-          <button id="exportBtn" title="Export PGN">⇩</button>
-          <button id="settingsBtn" title="Settings">⚙</button>
+          <button id="newGameBtn" title="New game" aria-label="New game">N</button>
+          <button id="recentBtn" title="Recent games" aria-label="Recent games">◷</button>
+          <button id="engineBtn" title="Ask engine" aria-label="Ask engine">▶</button>
+          <button id="analyzeBtn" title="Analyze current position" aria-label="Analyze current position">◇</button>
+          <button id="stopBtn" title="Stop thinking" aria-label="Stop thinking">■</button>
+          <button id="resignBtn" title="Resign" aria-label="Resign">⚑</button>
+          <button id="undoBtn" title="Undo" aria-label="Undo">↶</button>
+          <button id="flipBtn" title="Flip board" aria-label="Flip board">⇅</button>
+          <button id="reviewBtn" title="Post-game review" aria-label="Post-game review">◎</button>
+          <button id="studyBtn" title="Study tools" aria-label="Study tools">※</button>
+          <button id="experimentsBtn" title="Experiments" aria-label="Experiments">Σ</button>
+          <button id="labBtn" title="Roadmap lab" aria-label="Roadmap lab">⌬</button>
+          <button id="promptEditorBtn" title="Prompt editor" aria-label="Prompt editor">✎</button>
+          <button id="importBtn" title="Import PGN or FEN" aria-label="Import PGN or FEN">⇧</button>
+          <button id="exportBtn" title="Export PGN" aria-label="Export PGN">⇩</button>
+          <button id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
         </div>
       </header>
 
@@ -44,7 +44,7 @@
           <div class="move-entry">
             <input id="moveInput" aria-label="UCI move" placeholder="e2e4" />
             <button id="moveBtn">Play</button>
-            <button id="whyBtn" title="Why not this move?">?</button>
+            <button id="whyBtn" title="Why not this move?" aria-label="Why not this move?">?</button>
           </div>
           <ol id="moveList" class="move-list" aria-label="Move list"></ol>
         </section>

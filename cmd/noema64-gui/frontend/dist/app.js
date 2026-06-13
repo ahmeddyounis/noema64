@@ -176,7 +176,6 @@ function renderBoardOverlay(board) {
   overlay.setAttribute("class", "board-overlay");
   overlay.setAttribute("viewBox", "0 0 100 100");
   overlay.setAttribute("aria-hidden", "true");
-  overlay.innerHTML = `<defs><marker id="arrowhead" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="currentColor"></path></marker></defs>`;
   for (const [index, candidate] of candidates.slice(0, 4).entries()) {
     const move = candidate.legal_move || candidate;
     const parsed = splitUCIMoveSquares(candidate.uci || move.uci);
@@ -186,14 +185,50 @@ function renderBoardOverlay(board) {
     const end = squareCenter(to);
     if (!start || !end) continue;
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", start.x);
-    line.setAttribute("y1", start.y);
-    line.setAttribute("x2", end.x);
-    line.setAttribute("y2", end.y);
+    const head = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+    const geometry = arrowGeometry(start, end);
+    if (!geometry) continue;
+    line.setAttribute("x1", geometry.lineStart.x);
+    line.setAttribute("y1", geometry.lineStart.y);
+    line.setAttribute("x2", geometry.lineEnd.x);
+    line.setAttribute("y2", geometry.lineEnd.y);
     line.setAttribute("class", `candidate-arrow${index ? " alt" : ""}`);
+    head.setAttribute("points", geometry.headPoints);
+    head.setAttribute("class", `candidate-arrow-head${index ? " alt" : ""}`);
     overlay.appendChild(line);
+    overlay.appendChild(head);
   }
   board.appendChild(overlay);
+}
+
+function arrowGeometry(start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 2) return null;
+  const ux = dx / length;
+  const uy = dy / length;
+  const headLength = Math.min(4.6, length * 0.32);
+  const headWidth = Math.min(2.6, length * 0.18);
+  const lineEnd = {
+    x: end.x - ux * headLength * 0.72,
+    y: end.y - uy * headLength * 0.72
+  };
+  const base = {
+    x: end.x - ux * headLength,
+    y: end.y - uy * headLength
+  };
+  const px = -uy;
+  const py = ux;
+  return {
+    lineStart: start,
+    lineEnd,
+    headPoints: [
+      `${end.x.toFixed(2)},${end.y.toFixed(2)}`,
+      `${(base.x + px * headWidth).toFixed(2)},${(base.y + py * headWidth).toFixed(2)}`,
+      `${(base.x - px * headWidth).toFixed(2)},${(base.y - py * headWidth).toFixed(2)}`
+    ].join(" ")
+  };
 }
 
 function squareCenter(square) {
@@ -1632,7 +1667,7 @@ document.querySelector("#exportBtn").addEventListener("click", async () => {
 
 window.addEventListener("keydown", (event) => {
   if (handleBoardKeyboard(event)) return;
-  if (event.target.matches("input, textarea, select")) return;
+  if (shouldIgnoreGlobalShortcut(event)) return;
   if (event.key === "n" || event.key === "N") document.querySelector("#newGameBtn").click();
   if (event.key === "a" || event.key === "A") document.querySelector("#analyzeBtn").click();
   if (event.key === " ") { event.preventDefault(); askEngine(); }
@@ -1641,6 +1676,14 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "f" || event.key === "F") document.querySelector("#flipBtn").click();
   if (event.key === ",") document.querySelector("#settingsBtn").click();
 });
+
+function shouldIgnoreGlobalShortcut(event) {
+  const target = event.target;
+  if (!target?.matches) return false;
+  if (target.closest("dialog[open]")) return true;
+  if (target.isContentEditable) return true;
+  return target.matches("input, textarea, select, button, a, [role='button']");
+}
 
 async function init() {
   subscribeDecisionStageEvents();

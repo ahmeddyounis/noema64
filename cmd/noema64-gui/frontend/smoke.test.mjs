@@ -5,6 +5,7 @@ import test from "node:test";
 const dist = new URL("./dist/", import.meta.url);
 const indexHTML = await readFile(new URL("index.html", dist), "utf8");
 const appJS = await readFile(new URL("app.js", dist), "utf8");
+const stylesCSS = await readFile(new URL("styles.css", dist), "utf8");
 
 function expectMarkupID(id) {
   assert.match(indexHTML, new RegExp(`id="${id}"`), `missing #${id}`);
@@ -60,6 +61,18 @@ test("primary toolbar and dialogs expose expected controls", () => {
     "promotionGrid",
   ]) {
     expectMarkupID(id);
+  }
+  for (const label of [
+    "New game",
+    "Recent games",
+    "Ask engine",
+    "Analyze current position",
+    "Stop thinking",
+    "Flip board",
+    "Settings",
+    "Why not this move?",
+  ]) {
+    assert.match(indexHTML, new RegExp(`aria-label="${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `missing aria-label for ${label}`);
   }
 });
 
@@ -204,6 +217,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "renderPromotionChoices",
     "promotionGlyph",
     "handleBoardKeyboard",
+    "shouldIgnoreGlobalShortcut",
+    "arrowGeometry",
     "renderBoardOverlay",
     "tablebase_enabled",
     "tablebase_timeout_ms",
@@ -226,4 +241,8 @@ test("bundle wires core actions and renders trace metadata", () => {
   }
   assert.match(appJS, /--board-files/);
   assert.match(appJS, /--board-ranks/);
+  assert.match(appJS, /target\.closest\("dialog\[open\]"\)/);
+  assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);
+  assert.match(stylesCSS, /\.candidate-arrow-head/);
+  assert.doesNotMatch(stylesCSS, /marker-end/);
 });
