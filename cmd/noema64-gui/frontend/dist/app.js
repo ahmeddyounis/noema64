@@ -1533,6 +1533,7 @@ async function whyNotMove() {
       showSuccess("Move comparison ready.");
     } catch (err) {
       showError(err);
+      focusMoveInput(true);
     }
   });
 }

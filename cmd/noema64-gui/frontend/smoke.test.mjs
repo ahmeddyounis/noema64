@@ -542,6 +542,7 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/);
   assert.match(appJS, /bindBusyButton\("#runImportBtn"/);
   assert.match(appJS, /showError\(err, "#exportText"\)/);
+  assert.match(appJS, /async function whyNotMove\(\)[\s\S]*call\("WhyNotMove", move\)[\s\S]*catch \(err\) \{\n      showError\(err\);\n      focusMoveInput\(true\);/);
   assert.match(appJS, /target\.closest\("dialog\[open\]"\)/);
   assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);
   assert.match(stylesCSS, /\.candidate-arrow-head/);
