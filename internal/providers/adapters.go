@@ -5,11 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 )
+
+const maxProviderResponseBytes = 4 << 20
 
 type AnthropicProvider struct {
 	BaseURL string
@@ -95,7 +98,7 @@ func (p AnthropicProvider) completeJSONOnce(ctx context.Context, req CompletionR
 		} `json:"content"`
 		Model string `json:"model"`
 	}
-	if err := json.NewDecoder(httpResp.Body).Decode(&decoded); err != nil {
+	if err := decodeProviderResponse(httpResp.Body, &decoded); err != nil {
 		return nil, err
 	}
 	for _, part := range decoded.Content {
@@ -195,7 +198,7 @@ func (p GeminiProvider) completeJSONOnce(ctx context.Context, req CompletionRequ
 			} `json:"content"`
 		} `json:"candidates"`
 	}
-	if err := json.NewDecoder(httpResp.Body).Decode(&decoded); err != nil {
+	if err := decodeProviderResponse(httpResp.Body, &decoded); err != nil {
 		return nil, err
 	}
 	if len(decoded.Candidates) == 0 || len(decoded.Candidates[0].Content.Parts) == 0 {
@@ -286,7 +289,7 @@ func (p OllamaProvider) completeJSONOnce(ctx context.Context, req CompletionRequ
 		} `json:"message"`
 		Model string `json:"model"`
 	}
-	if err := json.NewDecoder(httpResp.Body).Decode(&decoded); err != nil {
+	if err := decodeProviderResponse(httpResp.Body, &decoded); err != nil {
 		return nil, err
 	}
 	if decoded.Message.Content == "" {
@@ -308,6 +311,28 @@ func httpClient(client *http.Client) *http.Client {
 		return client
 	}
 	return http.DefaultClient
+}
+
+func decodeProviderResponse(body io.Reader, target any) error {
+	data, err := io.ReadAll(io.LimitReader(body, maxProviderResponseBytes+1))
+	if err != nil {
+		return err
+	}
+	if len(data) > maxProviderResponseBytes {
+		return fmt.Errorf("provider response exceeds %d bytes", maxProviderResponseBytes)
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return fmt.Errorf("provider response contained multiple JSON values")
+		}
+		return err
+	}
+	return nil
 }
 
 func healthCheckJSON(ctx context.Context, provider Provider, model string) error {

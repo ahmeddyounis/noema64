@@ -127,7 +127,7 @@ func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRe
 			} `json:"message"`
 		} `json:"choices"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&decoded); err != nil {
+	if err := decodeProviderResponse(resp.Body, &decoded); err != nil {
 		return nil, err
 	}
 	if len(decoded.Choices) == 0 {

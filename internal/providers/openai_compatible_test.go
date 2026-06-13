@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -121,6 +122,31 @@ func TestOpenAICompatibleRetriesTransientFailure(t *testing.T) {
 	}
 	if attempts != 2 || resp.Text != `{"ok":true}` {
 		t.Fatalf("attempts=%d response=%+v", attempts, resp)
+	}
+}
+
+func TestOpenAICompatibleRejectsOversizedResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{
+				"message": map[string]string{"content": strings.Repeat("x", maxProviderResponseBytes)},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "model-a"}
+	_, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 16})
+	if err == nil || !strings.Contains(err.Error(), "provider response exceeds") {
+		t.Fatalf("error = %v, want oversized response failure", err)
+	}
+}
+
+func TestProviderDecoderRejectsMultipleJSONValues(t *testing.T) {
+	var decoded map[string]any
+	err := decodeProviderResponse(strings.NewReader(`{"ok":true} {"extra":true}`), &decoded)
+	if err == nil || !strings.Contains(err.Error(), "multiple JSON values") {
+		t.Fatalf("error = %v, want multiple JSON values failure", err)
 	}
 }
 
