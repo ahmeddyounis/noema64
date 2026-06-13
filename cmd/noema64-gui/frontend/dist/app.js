@@ -3062,6 +3062,7 @@ function showExportError(err) {
   const message = appErrorMessage(err);
   setExportText(message);
   showError(message, "#exportOutput");
+  focusDialogInitialControl("#refreshExportBtn");
 }
 
 function confirmDebugTraceExport() {

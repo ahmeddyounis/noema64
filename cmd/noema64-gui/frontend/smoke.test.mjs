@@ -478,6 +478,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusDialogInitialControl(\"#settingMode\")",
     "focusDialogInitialControl(\"#importText\")",
     "focusDialogInitialControl(\"#exportType\")",
+    "focusDialogInitialControl(\"#refreshExportBtn\")",
     "focusDialogInitialControl(loaded ? \"#promptSaveDir\" : \"#reloadPromptBtn\")",
     "focusDialogInitialControl(\"#profilesText\")",
     "focusDialogInitialControl(\"#backupDir\")",
