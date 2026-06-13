@@ -138,6 +138,35 @@ func TestExportTraceReturnsCurrentGameJSONL(t *testing.T) {
 	}
 }
 
+func TestWhyNotMoveComparesAgainstLastDecision(t *testing.T) {
+	app, _ := newTestApplication(t)
+	if _, err := app.RequestEngineMove(); err != nil {
+		t.Fatalf("engine move: %v", err)
+	}
+	state, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get game: %v", err)
+	}
+	if state.LastDecision == nil || len(state.LastDecision.CandidateMoves) == 0 {
+		t.Fatalf("missing decision candidates: %+v", state.LastDecision)
+	}
+	candidate := state.LastDecision.CandidateMoves[0].UCI
+	comparison, err := app.WhyNotMove(candidate)
+	if err != nil {
+		t.Fatalf("why not: %v", err)
+	}
+	if comparison.RequestedMove != candidate || comparison.SelectedMove != state.LastDecision.SelectedMove.UCI || comparison.Summary == "" {
+		t.Fatalf("unexpected comparison: %+v", comparison)
+	}
+}
+
+func TestWhyNotMoveRequiresLastDecision(t *testing.T) {
+	app, _ := newTestApplication(t)
+	if _, err := app.WhyNotMove("e2e4"); err == nil {
+		t.Fatal("expected missing decision comparison to fail")
+	}
+}
+
 func TestNewApplicationRecoversFromCorruptSettings(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(configPath, []byte("llm: [not valid yaml\n"), 0o600); err != nil {

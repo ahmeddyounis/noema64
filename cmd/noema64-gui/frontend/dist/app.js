@@ -378,6 +378,35 @@ async function analyzeCurrentPosition() {
   }
 }
 
+async function whyNotMove() {
+  const move = document.querySelector("#moveInput").value.trim();
+  if (!move) {
+    document.querySelector("#tabContent").textContent = "Enter a move to compare.";
+    return;
+  }
+  try {
+    const comparison = await call("WhyNotMove", move);
+    document.querySelector("#tabContent").textContent = whyNotText(comparison);
+  } catch (err) {
+    showError(err);
+  }
+}
+
+function whyNotText(comparison) {
+  return [
+    comparison.summary || "No comparison available.",
+    "",
+    `Requested: ${comparison.requested_move || "unknown"}`,
+    `Selected: ${comparison.selected_move || "unknown"}`,
+    "",
+    "REQUESTED CANDIDATE",
+    JSON.stringify(comparison.requested || {}, null, 2),
+    "",
+    "SELECTED CANDIDATE",
+    JSON.stringify(comparison.selected || {}, null, 2)
+  ].join("\n");
+}
+
 function subscribeDecisionStageEvents() {
   if (!window.runtime?.EventsOn) return;
   window.runtime.EventsOn("decision.stage", (event) => {
@@ -688,6 +717,7 @@ document.querySelector("#undoBtn").addEventListener("click", async () => {
 });
 document.querySelector("#flipBtn").addEventListener("click", () => { flipped = !flipped; renderBoard(); });
 document.querySelector("#moveBtn").addEventListener("click", () => makeMove(document.querySelector("#moveInput").value.trim()));
+document.querySelector("#whyBtn").addEventListener("click", whyNotMove);
 document.querySelector("#settingsBtn").addEventListener("click", async () => {
   try {
     await loadSettings();

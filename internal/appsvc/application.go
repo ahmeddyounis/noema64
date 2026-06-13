@@ -31,6 +31,14 @@ const (
 
 type EventSink func(name string, payload any)
 
+type MoveComparison struct {
+	RequestedMove string `json:"requested_move"`
+	SelectedMove  string `json:"selected_move"`
+	Summary       string `json:"summary"`
+	Requested     any    `json:"requested,omitempty"`
+	Selected      any    `json:"selected,omitempty"`
+}
+
 func NewApplication(settingsPath string) *Application {
 	settings, err := storage.LoadSettings(settingsPath)
 	if err != nil {
@@ -229,6 +237,48 @@ func (a *Application) ExportTrace() (string, error) {
 	}
 	trace, err := a.traces.ReadGame(context.Background(), state.Snapshot.GameID)
 	return trace, appErr("ERR_EXPORT_TRACE", err, true)
+}
+
+func (a *Application) WhyNotMove(moveUCI string) (*MoveComparison, error) {
+	moveUCI = strings.TrimSpace(moveUCI)
+	if moveUCI == "" {
+		return nil, &AppError{Code: "ERR_INVALID_MOVE", Message: "Move is required", Recoverable: true}
+	}
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return nil, appErr("ERR_GAME_STATE", err, true)
+	}
+	dec := state.LastDecision
+	if dec == nil {
+		return nil, &AppError{Code: "ERR_NO_DECISION", Message: "No engine decision is available to compare against.", Recoverable: true}
+	}
+	selected := dec.SelectedMove.UCI
+	var requestedCandidate any
+	var selectedCandidate any
+	for _, candidate := range dec.CandidateMoves {
+		if candidate.UCI == moveUCI || strings.EqualFold(candidate.SAN, moveUCI) {
+			requestedCandidate = candidate
+			moveUCI = candidate.UCI
+		}
+		if candidate.UCI == selected {
+			selectedCandidate = candidate
+		}
+	}
+	summary := "Noema64 selected " + selected + " because: " + dec.Explanation
+	if moveUCI == selected {
+		summary = "That is the selected engine move. " + dec.Explanation
+	} else if requestedCandidate != nil {
+		summary = "Noema64 preferred " + selected + " over " + moveUCI + " based on final score, verifier status, and plan alignment in the recorded decision trace."
+	} else {
+		summary = "Move " + moveUCI + " was not in the recorded candidate set for the last engine decision. Compare it from the analysis view before applying moves."
+	}
+	return &MoveComparison{
+		RequestedMove: moveUCI,
+		SelectedMove:  selected,
+		Summary:       summary,
+		Requested:     requestedCandidate,
+		Selected:      selectedCandidate,
+	}, nil
 }
 
 func (a *Application) ImportFEN(fen string) (*engine.GameState, error) {
