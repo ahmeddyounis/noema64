@@ -233,7 +233,10 @@ func SaveSettings(path string, settings Settings) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o600)
+	if err := os.WriteFile(path, b, 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
 }
 
 func NormalizeSettings(settings Settings) Settings {

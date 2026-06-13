@@ -25,6 +25,23 @@ func TestSettingsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSaveSettingsForcesPrivateFilePermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("schema_version: \"1.0\"\n"), 0o644); err != nil {
+		t.Fatalf("write loose config: %v", err)
+	}
+	if err := SaveSettings(path, DefaultSettings()); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("config permissions = %o, want 600", got)
+	}
+}
+
 func TestLoadSettingsMergesDefaults(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(path, []byte("schema_version: \"1.0\"\n"), 0o600); err != nil {
