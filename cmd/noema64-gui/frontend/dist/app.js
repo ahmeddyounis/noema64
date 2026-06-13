@@ -1356,15 +1356,17 @@ function renderDecision() {
   tab.classList.toggle("empty-copy", !dec);
   const box = document.querySelector("#candidates");
   box.innerHTML = "";
+  box.setAttribute("role", "list");
+  box.setAttribute("aria-label", "Candidate moves");
   if (!candidates.length) {
-    box.textContent = dec ? "No candidate moves recorded." : "No candidates recorded.";
-    box.classList.add("empty-copy");
+    renderCandidatesEmpty(dec ? "No candidate moves recorded." : "No candidates recorded.");
     return;
   }
   box.classList.remove("empty-copy");
   for (const c of candidates) {
     const div = document.createElement("div");
     div.className = c?.rank === 1 ? "candidate top-candidate" : "candidate";
+    div.setAttribute("role", "listitem");
     const move = document.createElement("strong");
     move.textContent = c?.san || c?.uci || "candidate";
     const detail = document.createElement("span");
@@ -1385,6 +1387,16 @@ function renderDecision() {
     div.append(move, detail, score);
     box.appendChild(div);
   }
+}
+
+function renderCandidatesEmpty(message) {
+  const box = document.querySelector("#candidates");
+  box.innerHTML = "";
+  box.classList.add("empty-copy");
+  const empty = document.createElement("div");
+  empty.setAttribute("role", "listitem");
+  empty.textContent = message;
+  box.appendChild(empty);
 }
 
 function formatScore(value) {

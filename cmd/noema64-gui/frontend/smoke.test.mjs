@@ -44,6 +44,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /aria-label="Chess board workspace"/);
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
+  assert.match(indexHTML, /id="candidates" class="candidates" role="list" aria-label="Candidate moves"/);
   assert.match(indexHTML, /role="status" aria-live="polite"/);
   assert.match(indexHTML, /role="tablist" aria-label="Decision trace views"/);
   assert.match(indexHTML, /id="summaryTab"[\s\S]*tabindex="0"/);
@@ -431,6 +432,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "document.querySelector(\"#clearActivityBtn\").addEventListener(\"click\"",
     "No decision recorded.",
     "No candidates recorded.",
+    "renderCandidatesEmpty",
+    "div.setAttribute(\"role\", \"listitem\")",
     "No moves recorded.",
     "Engine move applied.",
     "Position imported.",
