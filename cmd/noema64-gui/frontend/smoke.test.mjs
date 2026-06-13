@@ -514,6 +514,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "document.querySelector(\"#importText\").focus()",
     "document.querySelector(\"#moveInput\").value = \"\"",
     "renderRecentGamesEmpty",
+    "Loading recent games...",
     "Recent games could not be loaded.",
     "focusDialogInitialControl(\"#recentDialog button[value='cancel']\")",
     "Load ${title.textContent} from ${formatSavedAt(savedAt)}, ${outcomeStatus}",

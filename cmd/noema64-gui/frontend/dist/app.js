@@ -2511,7 +2511,7 @@ function renderRecentGamesEmpty(message) {
 async function openRecentGames() {
   try {
     document.querySelector("#recentOutput").textContent = "";
-    document.querySelector("#recentList").textContent = "Loading...";
+    renderRecentGamesEmpty("Loading recent games...");
     document.querySelector("#recentDialog").showModal();
     renderRecentGames(await call("RecentGames", 10));
     focusDialogInitialControl("#recentList button:not(:disabled)", "#recentDialog button[value='cancel']");
