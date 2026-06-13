@@ -53,9 +53,19 @@ OUTPUT_SCHEMA
 const PromptTemplateDirEnv = "NOEMA64_PROMPT_DIR"
 
 type PromptTemplates struct {
-	System string
-	User   string
-	Schema string
+	Manifest PromptManifest
+	System   string
+	User     string
+	Schema   string
+}
+
+type PromptManifest struct {
+	SchemaVersion         string `json:"schema_version"`
+	PromptID              string `json:"prompt_id"`
+	Version               string `json:"version"`
+	DecisionSchemaVersion string `json:"decision_schema_version"`
+	CreatedAt             string `json:"created_at,omitempty"`
+	AppVersion            string `json:"app_version,omitempty"`
 }
 
 func BuildPrompt(req StrategyRequest) (system string, user string, err error) {
@@ -73,6 +83,14 @@ func BuildPrompt(req StrategyRequest) (system string, user string, err error) {
 func DefaultPromptTemplates() PromptTemplates {
 	schema, _ := json.MarshalIndent(ExampleSchema(), "", "  ")
 	return PromptTemplates{
+		Manifest: PromptManifest{
+			SchemaVersion:         PromptTemplateSchemaVersion,
+			PromptID:              PromptID,
+			Version:               "1.0.0",
+			DecisionSchemaVersion: DecisionSchemaVersion,
+			CreatedAt:             "2026-06-12T00:00:00Z",
+			AppVersion:            "0.1.0",
+		},
 		System: SystemPrompt,
 		User:   UserPromptTemplate,
 		Schema: string(schema),
@@ -80,6 +98,17 @@ func DefaultPromptTemplates() PromptTemplates {
 }
 
 func LoadPromptTemplates(dir string) (PromptTemplates, error) {
+	manifestBytes, err := os.ReadFile(filepath.Join(dir, "manifest.json"))
+	if err != nil {
+		return PromptTemplates{}, err
+	}
+	var manifest PromptManifest
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		return PromptTemplates{}, fmt.Errorf("prompt manifest is invalid JSON: %w", err)
+	}
+	if err := validatePromptManifest(manifest); err != nil {
+		return PromptTemplates{}, err
+	}
 	system, err := os.ReadFile(filepath.Join(dir, "system.md"))
 	if err != nil {
 		return PromptTemplates{}, err
@@ -92,11 +121,44 @@ func LoadPromptTemplates(dir string) (PromptTemplates, error) {
 	if err != nil {
 		return PromptTemplates{}, err
 	}
+	if err := validatePromptSchema(schema); err != nil {
+		return PromptTemplates{}, err
+	}
 	return PromptTemplates{
-		System: strings.TrimRight(string(system), "\n"),
-		User:   strings.TrimRight(string(user), "\n") + "\n",
-		Schema: strings.TrimSpace(string(schema)),
+		Manifest: manifest,
+		System:   strings.TrimRight(string(system), "\n"),
+		User:     strings.TrimRight(string(user), "\n") + "\n",
+		Schema:   strings.TrimSpace(string(schema)),
 	}, nil
+}
+
+func validatePromptManifest(manifest PromptManifest) error {
+	if manifest.SchemaVersion != PromptTemplateSchemaVersion {
+		return fmt.Errorf("unsupported prompt manifest schema_version %q", manifest.SchemaVersion)
+	}
+	if manifest.PromptID != PromptID {
+		return fmt.Errorf("unsupported prompt_id %q", manifest.PromptID)
+	}
+	if strings.TrimSpace(manifest.Version) == "" {
+		return fmt.Errorf("prompt manifest version is required")
+	}
+	if manifest.DecisionSchemaVersion != DecisionSchemaVersion {
+		return fmt.Errorf("unsupported prompt decision_schema_version %q", manifest.DecisionSchemaVersion)
+	}
+	return nil
+}
+
+func validatePromptSchema(schema []byte) error {
+	var out struct {
+		SchemaVersion string `json:"schema_version"`
+	}
+	if err := json.Unmarshal(schema, &out); err != nil {
+		return fmt.Errorf("prompt output schema is invalid JSON: %w", err)
+	}
+	if out.SchemaVersion != DecisionSchemaVersion {
+		return fmt.Errorf("unsupported prompt output schema_version %q", out.SchemaVersion)
+	}
+	return nil
 }
 
 func BuildPromptWithTemplates(req StrategyRequest, templates PromptTemplates) (system string, user string, err error) {

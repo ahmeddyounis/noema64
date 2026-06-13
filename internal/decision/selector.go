@@ -92,12 +92,15 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	})
 	providerMS := time.Since(providerStart).Milliseconds()
 	providerTrace := ProviderTrace{
-		Name:          req.Provider.Name(),
-		Model:         req.Model,
-		PromptVersion: strategy.PromptVersion,
-		Temperature:   req.Temperature,
-		MaxTokens:     req.MaxTokens,
-		RetryCount:    req.ProviderRetries,
+		Name:                  req.Provider.Name(),
+		Model:                 req.Model,
+		PromptID:              strategy.PromptID,
+		PromptVersion:         strategy.PromptVersion,
+		PromptSchemaVersion:   strategy.PromptTemplateSchemaVersion,
+		DecisionSchemaVersion: strategy.DecisionSchemaVersion,
+		Temperature:           req.Temperature,
+		MaxTokens:             req.MaxTokens,
+		RetryCount:            req.ProviderRetries,
 	}
 	if req.LogRawPrompts {
 		providerTrace.RawPrompt = &PromptTrace{System: system, User: user}
@@ -212,7 +215,17 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 
 func fallbackDecision(req Request, decisionID string, mem strategy.StrategyMemory, reason string, start time.Time, providerTrace *ProviderTrace, stages []StageTrace) *MoveDecision {
 	if providerTrace == nil {
-		providerTrace = &ProviderTrace{Name: req.Provider.Name(), Model: req.Model, PromptVersion: strategy.PromptVersion, Temperature: req.Temperature, MaxTokens: req.MaxTokens, RetryCount: req.ProviderRetries}
+		providerTrace = &ProviderTrace{
+			Name:                  req.Provider.Name(),
+			Model:                 req.Model,
+			PromptID:              strategy.PromptID,
+			PromptVersion:         strategy.PromptVersion,
+			PromptSchemaVersion:   strategy.PromptTemplateSchemaVersion,
+			DecisionSchemaVersion: strategy.DecisionSchemaVersion,
+			Temperature:           req.Temperature,
+			MaxTokens:             req.MaxTokens,
+			RetryCount:            req.ProviderRetries,
+		}
 	}
 	snapshot := req.Game.Snapshot()
 	mv := chooseFallback(req.Game)

@@ -290,7 +290,10 @@ function promptInspectorText(dec) {
   const provider = dec.provider || {};
   const prompt = provider.raw_prompt || {};
   const lines = [
+    `Prompt ID: ${provider.prompt_id || "unknown"}`,
     `Prompt version: ${provider.prompt_version || "unknown"}`,
+    `Prompt schema: ${provider.prompt_schema_version || "unknown"}`,
+    `Decision schema: ${provider.decision_schema_version || dec.schema_version || "unknown"}`,
     `Provider: ${provider.name || "unknown"}`,
     `Model: ${provider.model || "unknown"}`,
     `Parse status: ${provider.parse_status || "unknown"}`,

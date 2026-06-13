@@ -151,40 +151,55 @@ func stripRawFields(value any) {
 }
 
 func decisionTraceRecord(trace *decision.MoveDecision) map[string]any {
+	promptID := trace.Provider.PromptID
+	if promptID == "" {
+		promptID = strategy.PromptID
+	}
 	promptVersion := trace.Provider.PromptVersion
 	if promptVersion == "" {
 		promptVersion = strategy.PromptVersion
 	}
+	promptSchemaVersion := trace.Provider.PromptSchemaVersion
+	if promptSchemaVersion == "" {
+		promptSchemaVersion = strategy.PromptTemplateSchemaVersion
+	}
+	decisionSchemaVersion := trace.Provider.DecisionSchemaVersion
+	if decisionSchemaVersion == "" {
+		decisionSchemaVersion = strategy.DecisionSchemaVersion
+	}
 	return map[string]any{
-		"schema_version":       "1.0",
-		"event_type":           "move_decision",
-		"timestamp":            time.Now().UTC().Format(time.RFC3339Nano),
-		"engine_version":       "0.1.0",
-		"game_id":              trace.GameID,
-		"ply":                  trace.Ply,
-		"fen_before":           trace.FENBefore,
-		"legal_moves_count":    trace.LegalMovesCount,
-		"mode":                 trace.Mode,
-		"provider":             trace.Provider.Name,
-		"model":                trace.Provider.Model,
-		"prompt_version":       promptVersion,
-		"temperature":          trace.Provider.Temperature,
-		"max_tokens":           trace.Provider.MaxTokens,
-		"retry_count":          trace.Provider.RetryCount,
-		"llm_raw_available":    trace.Provider.RawAvailable,
-		"llm_parse_status":     trace.Provider.ParseStatus,
-		"selected_move":        trace.SelectedMove.UCI,
-		"analysis_only":        trace.AnalysisOnly,
-		"fallback_used":        trace.FallbackUsed,
-		"candidate_moves":      trace.CandidateMoves,
-		"verifier_result":      trace.VerifierTrace,
-		"stages":               trace.Stages,
-		"strategy_before_hash": strategyMemoryHash(trace.StrategyBefore),
-		"strategy_after_hash":  strategyMemoryHash(trace.StrategyAfter),
-		"strategy_before":      trace.StrategyBefore,
-		"strategy_after":       trace.StrategyAfter,
-		"timing_ms":            traceTimingRecord(trace.Timing),
-		"trace":                trace,
+		"schema_version":          "1.0",
+		"event_type":              "move_decision",
+		"timestamp":               time.Now().UTC().Format(time.RFC3339Nano),
+		"engine_version":          "0.1.0",
+		"game_id":                 trace.GameID,
+		"ply":                     trace.Ply,
+		"fen_before":              trace.FENBefore,
+		"legal_moves_count":       trace.LegalMovesCount,
+		"mode":                    trace.Mode,
+		"provider":                trace.Provider.Name,
+		"model":                   trace.Provider.Model,
+		"prompt_id":               promptID,
+		"prompt_version":          promptVersion,
+		"prompt_schema_version":   promptSchemaVersion,
+		"decision_schema_version": decisionSchemaVersion,
+		"temperature":             trace.Provider.Temperature,
+		"max_tokens":              trace.Provider.MaxTokens,
+		"retry_count":             trace.Provider.RetryCount,
+		"llm_raw_available":       trace.Provider.RawAvailable,
+		"llm_parse_status":        trace.Provider.ParseStatus,
+		"selected_move":           trace.SelectedMove.UCI,
+		"analysis_only":           trace.AnalysisOnly,
+		"fallback_used":           trace.FallbackUsed,
+		"candidate_moves":         trace.CandidateMoves,
+		"verifier_result":         trace.VerifierTrace,
+		"stages":                  trace.Stages,
+		"strategy_before_hash":    strategyMemoryHash(trace.StrategyBefore),
+		"strategy_after_hash":     strategyMemoryHash(trace.StrategyAfter),
+		"strategy_before":         trace.StrategyBefore,
+		"strategy_after":          trace.StrategyAfter,
+		"timing_ms":               traceTimingRecord(trace.Timing),
+		"trace":                   trace,
 	}
 }
 

@@ -191,9 +191,15 @@ func TestBuildPromptIncludesStructuredPersonalityProfile(t *testing.T) {
 
 func TestBuildPromptUsesEditableTemplateDirectory(t *testing.T) {
 	dir := t.TempDir()
+	writePromptManifest(t, dir, PromptManifest{
+		SchemaVersion:         PromptTemplateSchemaVersion,
+		PromptID:              PromptID,
+		Version:               "1.0.0",
+		DecisionSchemaVersion: DecisionSchemaVersion,
+	})
 	writePromptFile(t, dir, "system.md", "custom system")
 	writePromptFile(t, dir, "move_decision.md", "FEN={{fen}}\nMOVES={{legal_moves_json}}\nSCHEMA={{schema_json}}\n")
-	writePromptFile(t, dir, "schema.json", `{"schema_version":"custom"}`)
+	writePromptFile(t, dir, "schema.json", `{"schema_version":"decision-output.v1.2"}`)
 	t.Setenv(PromptTemplateDirEnv, dir)
 
 	game := chesscore.NewGame()
@@ -215,8 +221,36 @@ func TestBuildPromptUsesEditableTemplateDirectory(t *testing.T) {
 	if system != "custom system" {
 		t.Fatalf("system = %q, want custom system", system)
 	}
-	if !strings.Contains(user, "SCHEMA={\"schema_version\":\"custom\"}") || !strings.Contains(user, "FEN="+game.FEN()) {
+	if !strings.Contains(user, `SCHEMA={"schema_version":"decision-output.v1.2"}`) || !strings.Contains(user, "FEN="+game.FEN()) {
 		t.Fatalf("custom template was not rendered:\n%s", user)
+	}
+}
+
+func TestLoadPromptTemplatesRejectsUnsupportedSchemaVersions(t *testing.T) {
+	dir := t.TempDir()
+	writePromptManifest(t, dir, PromptManifest{
+		SchemaVersion:         PromptTemplateSchemaVersion,
+		PromptID:              PromptID,
+		Version:               "1.0.0",
+		DecisionSchemaVersion: "decision-output.v99",
+	})
+	writePromptFile(t, dir, "system.md", "custom system")
+	writePromptFile(t, dir, "move_decision.md", "FEN={{fen}}\nSCHEMA={{schema_json}}\n")
+	writePromptFile(t, dir, "schema.json", `{"schema_version":"decision-output.v1.2"}`)
+
+	if _, err := LoadPromptTemplates(dir); err == nil {
+		t.Fatal("expected unsupported manifest decision schema to fail")
+	}
+
+	writePromptManifest(t, dir, PromptManifest{
+		SchemaVersion:         PromptTemplateSchemaVersion,
+		PromptID:              PromptID,
+		Version:               "1.0.0",
+		DecisionSchemaVersion: DecisionSchemaVersion,
+	})
+	writePromptFile(t, dir, "schema.json", `{"schema_version":"decision-output.v99"}`)
+	if _, err := LoadPromptTemplates(dir); err == nil {
+		t.Fatal("expected unsupported output schema to fail")
 	}
 }
 
@@ -247,4 +281,10 @@ func writePromptFile(t *testing.T, dir, name, body string) {
 	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
 		t.Fatalf("write prompt file %s: %v", name, err)
 	}
+}
+
+func writePromptManifest(t *testing.T, dir string, manifest PromptManifest) {
+	t.Helper()
+	body := `{"schema_version":"` + manifest.SchemaVersion + `","prompt_id":"` + manifest.PromptID + `","version":"` + manifest.Version + `","decision_schema_version":"` + manifest.DecisionSchemaVersion + `"}`
+	writePromptFile(t, dir, "manifest.json", body)
 }

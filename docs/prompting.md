@@ -18,8 +18,11 @@ The selected profile also contributes a bounded `personality_score` to each cand
 
 Versioned editable templates live under `prompts/v1`:
 
+- `manifest.json`
 - `system.md`
 - `move_decision.md`
 - `schema.json`
 
-At runtime, set `NOEMA64_PROMPT_DIR=/path/to/templates` to use an edited template set without changing code. The directory must contain all three files, and unknown `{{placeholder}}` tokens are rejected.
+`manifest.json` declares the prompt template schema version, prompt ID, prompt version, app version, and the decision-output schema version targeted by the pack. At runtime, set `NOEMA64_PROMPT_DIR=/path/to/templates` to use an edited template set without changing code. The directory must contain all four files, unknown `{{placeholder}}` tokens are rejected, and incompatible manifest or output schema versions fail before a provider call is made.
+
+Decision traces record `prompt_id`, `prompt_version`, `prompt_schema_version`, and `decision_schema_version` for replay and audit tooling.

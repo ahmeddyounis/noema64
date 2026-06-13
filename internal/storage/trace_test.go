@@ -41,17 +41,20 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 			VerifierScore:      strategy.VerifierScore{Status: "accepted", Reason: "test"},
 		}},
 		Provider: decision.ProviderTrace{
-			Name:          "mock",
-			Model:         "mock-balanced",
-			PromptVersion: strategy.PromptVersion,
-			Temperature:   0.2,
-			MaxTokens:     1600,
-			RetryCount:    2,
-			ParseStatus:   "ok",
-			RawAvailable:  false,
-			Error:         "api_key: abc123",
-			RawPrompt:     &decision.PromptTrace{System: "system prompt with api_key: raw-secret", User: "user prompt"},
-			RawResponse:   `{"candidate_moves":[{"uci":"g1f3"}],"api_key":"raw-secret"}`,
+			Name:                  "mock",
+			Model:                 "mock-balanced",
+			PromptID:              strategy.PromptID,
+			PromptVersion:         strategy.PromptVersion,
+			PromptSchemaVersion:   strategy.PromptTemplateSchemaVersion,
+			DecisionSchemaVersion: strategy.DecisionSchemaVersion,
+			Temperature:           0.2,
+			MaxTokens:             1600,
+			RetryCount:            2,
+			ParseStatus:           "ok",
+			RawAvailable:          false,
+			Error:                 "api_key: abc123",
+			RawPrompt:             &decision.PromptTrace{System: "system prompt with api_key: raw-secret", User: "user prompt"},
+			RawResponse:           `{"candidate_moves":[{"uci":"g1f3"}],"api_key":"raw-secret"}`,
 		},
 		Timing:        decision.Timing{TotalMS: 10, ProviderMS: 6, VerifierMS: 3, SearchMS: 1},
 		VerifierTrace: &verifier.Result{Enabled: true, Used: true, Name: "static_safety"},
@@ -92,7 +95,10 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		Mode               strategy.EngineMode `json:"mode"`
 		Provider           string              `json:"provider"`
 		Model              string              `json:"model"`
+		PromptID           string              `json:"prompt_id"`
 		PromptVersion      string              `json:"prompt_version"`
+		PromptSchema       string              `json:"prompt_schema_version"`
+		DecisionSchema     string              `json:"decision_schema_version"`
 		Temperature        float64             `json:"temperature"`
 		MaxTokens          int                 `json:"max_tokens"`
 		RetryCount         int                 `json:"retry_count"`
@@ -162,8 +168,11 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	if !record.AnalysisOnly {
 		t.Fatalf("missing analysis-only disclosure: %+v", record)
 	}
-	if record.Mode != strategy.ModeBlunderguard || record.Provider != "mock" || record.Model != "mock-balanced" || record.PromptVersion != strategy.PromptVersion {
+	if record.Mode != strategy.ModeBlunderguard || record.Provider != "mock" || record.Model != "mock-balanced" || record.PromptID != strategy.PromptID || record.PromptVersion != strategy.PromptVersion {
 		t.Fatalf("missing DATA-005 provider metadata: %+v", record)
+	}
+	if record.PromptSchema != strategy.PromptTemplateSchemaVersion || record.DecisionSchema != strategy.DecisionSchemaVersion {
+		t.Fatalf("missing prompt/schema replay metadata: %+v", record)
 	}
 	if record.Temperature != 0.2 || record.MaxTokens != 1600 || record.RetryCount != 2 {
 		t.Fatalf("missing provider runtime metadata: %+v", record)

@@ -3,9 +3,11 @@ package strategy
 import "github.com/ahmedyounis/noema64/internal/chesscore"
 
 const (
-	MemorySchemaVersion   = "strategy-memory.v1.2"
-	DecisionSchemaVersion = "decision-output.v1.2"
-	PromptVersion         = "move_selection/1.0.0"
+	MemorySchemaVersion         = "strategy-memory.v1.2"
+	DecisionSchemaVersion       = "decision-output.v1.2"
+	PromptTemplateSchemaVersion = "prompt-template.v1"
+	PromptID                    = "move_selection"
+	PromptVersion               = "move_selection/1.0.0"
 )
 
 type EngineMode string

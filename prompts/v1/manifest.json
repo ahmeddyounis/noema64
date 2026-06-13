@@ -1,0 +1,8 @@
+{
+  "schema_version": "prompt-template.v1",
+  "prompt_id": "move_selection",
+  "version": "1.0.0",
+  "decision_schema_version": "decision-output.v1.2",
+  "created_at": "2026-06-12T00:00:00Z",
+  "app_version": "0.1.0"
+}

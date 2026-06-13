@@ -39,6 +39,26 @@ func TestPublicSchemaFilesTrackStrategyVersions(t *testing.T) {
 	}
 }
 
+func TestBundledPromptPackTracksStrategyVersions(t *testing.T) {
+	root := repoRoot(t)
+	templates, err := LoadPromptTemplates(filepath.Join(root, "prompts", "v1"))
+	if err != nil {
+		t.Fatalf("load bundled prompt templates: %v", err)
+	}
+	if templates.Manifest.SchemaVersion != PromptTemplateSchemaVersion {
+		t.Fatalf("prompt manifest schema_version = %q, want %q", templates.Manifest.SchemaVersion, PromptTemplateSchemaVersion)
+	}
+	if templates.Manifest.PromptID != PromptID {
+		t.Fatalf("prompt_id = %q, want %q", templates.Manifest.PromptID, PromptID)
+	}
+	if got := templates.Manifest.PromptID + "/" + templates.Manifest.Version; got != PromptVersion {
+		t.Fatalf("prompt version = %q, want %q", got, PromptVersion)
+	}
+	if templates.Manifest.DecisionSchemaVersion != DecisionSchemaVersion {
+		t.Fatalf("decision schema version = %q, want %q", templates.Manifest.DecisionSchemaVersion, DecisionSchemaVersion)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

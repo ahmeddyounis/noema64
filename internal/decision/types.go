@@ -55,18 +55,21 @@ type MoveDecision struct {
 }
 
 type ProviderTrace struct {
-	Name           string                   `json:"name"`
-	Model          string                   `json:"model"`
-	PromptVersion  string                   `json:"prompt_version"`
-	Temperature    float64                  `json:"temperature"`
-	MaxTokens      int                      `json:"max_tokens"`
-	RetryCount     int                      `json:"retry_count"`
-	ParseStatus    string                   `json:"parse_status"`
-	RawAvailable   bool                     `json:"raw_available"`
-	Error          string                   `json:"error,omitempty"`
-	RawPrompt      *PromptTrace             `json:"raw_prompt,omitempty"`
-	RawResponse    string                   `json:"raw_response,omitempty"`
-	ParsedDecision *strategy.DecisionOutput `json:"parsed_decision,omitempty"`
+	Name                  string                   `json:"name"`
+	Model                 string                   `json:"model"`
+	PromptID              string                   `json:"prompt_id"`
+	PromptVersion         string                   `json:"prompt_version"`
+	PromptSchemaVersion   string                   `json:"prompt_schema_version"`
+	DecisionSchemaVersion string                   `json:"decision_schema_version"`
+	Temperature           float64                  `json:"temperature"`
+	MaxTokens             int                      `json:"max_tokens"`
+	RetryCount            int                      `json:"retry_count"`
+	ParseStatus           string                   `json:"parse_status"`
+	RawAvailable          bool                     `json:"raw_available"`
+	Error                 string                   `json:"error,omitempty"`
+	RawPrompt             *PromptTrace             `json:"raw_prompt,omitempty"`
+	RawResponse           string                   `json:"raw_response,omitempty"`
+	ParsedDecision        *strategy.DecisionOutput `json:"parsed_decision,omitempty"`
 }
 
 type PromptTrace struct {

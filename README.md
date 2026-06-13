@@ -9,7 +9,7 @@ It is not a Stockfish replacement. The MVP is optimized for legal full-game play
 Implemented in this repository:
 
 - Go chess core wrapper with legal moves, FEN, PGN, move history, outcomes, promotions, castling, and en passant through `github.com/corentings/chess/v2`.
-- Strategy memory v1.2 structs, diffing, prompt builder, strict JSON parsing, candidate repair, and schema validation.
+- Strategy memory v1.2 structs, diffing, versioned editable prompt packs, strict JSON parsing, candidate repair, and schema validation.
 - Mock provider that works offline and an OpenAI-compatible HTTP adapter shape.
 - Deterministic fallback ladder that always chooses a legal move when legal moves exist.
 - Static blunderguard verifier plus optional external UCI verifier and external tablebase probe path support.
