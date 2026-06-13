@@ -1127,7 +1127,9 @@ function renderPromotionChoices(moves) {
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.promotion = promotion;
-    button.title = promotionTitle(promotion);
+    const label = promotionTitle(promotion);
+    button.title = label;
+    button.setAttribute("aria-label", label);
     button.textContent = promotionGlyph(promotion);
     button.addEventListener("click", () => finishPromotion(promotion));
     grid.appendChild(button);
@@ -2384,8 +2386,12 @@ function isTraceTabAvailable(button) {
   return activeWorkspaceView === "lab" || button.dataset.labOnly !== "true";
 }
 
+function availableTraceTabs() {
+  return [...document.querySelectorAll(".tabs button")].filter(isTraceTabAvailable);
+}
+
 function moveTraceTabFocus(current, delta) {
-  const tabs = [...document.querySelectorAll(".tabs button")].filter(isTraceTabAvailable);
+  const tabs = availableTraceTabs();
   const index = tabs.indexOf(current);
   if (index < 0) return;
   const next = tabs[(index + delta + tabs.length) % tabs.length];
@@ -2405,11 +2411,11 @@ document.querySelectorAll(".tabs button").forEach((btn) => {
     }
     if (event.key === "Home") {
       event.preventDefault();
-      activateTraceTab(document.querySelector(".tabs button"), true);
+      activateTraceTab(availableTraceTabs()[0], true);
     }
     if (event.key === "End") {
       event.preventDefault();
-      activateTraceTab([...document.querySelectorAll(".tabs button")].at(-1), true);
+      activateTraceTab(availableTraceTabs().at(-1), true);
     }
   });
 });
