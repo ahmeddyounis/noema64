@@ -57,6 +57,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
     "exportDialog",
     "recentDialog",
     "promotionDialog",
+    "promotionGrid",
   ]) {
     expectMarkupID(id);
   }
@@ -200,6 +201,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "boardDimensions",
     "splitUCIMoveSquares",
     "pieceGlyph",
+    "renderPromotionChoices",
+    "promotionGlyph",
     "handleBoardKeyboard",
     "renderBoardOverlay",
     "tablebase_enabled",

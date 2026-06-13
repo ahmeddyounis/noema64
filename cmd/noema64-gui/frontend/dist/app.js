@@ -333,10 +333,50 @@ function pieceGlyph(piece) {
 
 function choosePromotion(moves) {
   const dialog = document.querySelector("#promotionDialog");
+  renderPromotionChoices(moves);
   return new Promise((resolve) => {
     pendingPromotion = { moves, resolve };
     dialog.showModal();
   });
+}
+
+function renderPromotionChoices(moves) {
+  const grid = document.querySelector("#promotionGrid");
+  grid.innerHTML = "";
+  const seen = new Set();
+  for (const move of moves) {
+    const promotion = move.promotion;
+    if (!promotion || seen.has(promotion)) continue;
+    seen.add(promotion);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.promotion = promotion;
+    button.title = promotionTitle(promotion);
+    button.textContent = promotionGlyph(promotion);
+    button.addEventListener("click", () => finishPromotion(promotion));
+    grid.appendChild(button);
+  }
+}
+
+function promotionGlyph(promotion) {
+  const symbol = String(promotion || "").trim();
+  if (!symbol) return "";
+  return pieceGlyph(symbol.toUpperCase()) || symbol.toUpperCase();
+}
+
+function promotionTitle(promotion) {
+  switch (String(promotion || "").toLowerCase()) {
+    case "q":
+      return "Queen";
+    case "r":
+      return "Rook";
+    case "b":
+      return "Bishop";
+    case "n":
+      return "Knight";
+    default:
+      return `Promote to ${String(promotion || "").toUpperCase()}`;
+  }
 }
 
 function finishPromotion(promotion) {
@@ -1453,9 +1493,6 @@ document.querySelector("#runImportBtn").addEventListener("click", async () => {
   } catch (err) {
     document.querySelector("#importOutput").textContent = String(err);
   }
-});
-document.querySelectorAll("#promotionDialog [data-promotion]").forEach((btn) => {
-  btn.addEventListener("click", () => finishPromotion(btn.dataset.promotion));
 });
 document.querySelector("#promotionDialog").addEventListener("close", () => {
   if (!pendingPromotion) return;

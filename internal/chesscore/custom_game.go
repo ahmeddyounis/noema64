@@ -189,13 +189,14 @@ func (c *customGame) applyUCI(raw string, ply int) (MoveRecord, error) {
 
 func (c *customGame) applyLegalMove(mv LegalMove) {
 	piece := c.board[mv.From]
+	movingPiece := piece
 	delete(c.board, mv.From)
 	if mv.Promotion != "" {
 		piece = customPieceForSide([]rune(strings.ToUpper(mv.Promotion))[0], c.side)
 	}
 	capture := c.board[mv.To] != 0
 	c.board[mv.To] = piece
-	if capture || strings.EqualFold(customPieceSymbol(piece), "P") {
+	if capture || c.isPawn(movingPiece) {
 		c.halfmove = 0
 	} else {
 		c.halfmove++
@@ -331,11 +332,13 @@ func (c *customGame) pseudoMoves(side string, attacksOnly bool) []LegalMove {
 		if customPieceSide(piece) != side {
 			continue
 		}
-		if strings.EqualFold(customPieceSymbol(piece), "P") {
-			out = append(out, c.pawnMoves(from, piece, attacksOnly)...)
-			continue
-		}
 		rule := c.ruleForPiece(piece)
+		if ruleHasPawnMovement(rule) {
+			out = append(out, c.pawnMoves(from, piece, attacksOnly)...)
+			if !ruleHasNonPawnMovement(rule) {
+				continue
+			}
+		}
 		movement := c.movementForRule(rule)
 		out = append(out, c.leaperMoves(from, piece, movement.leapers, attacksOnly)...)
 		out = append(out, c.sliderMoves(from, piece, movement.sliders, attacksOnly)...)
@@ -496,7 +499,7 @@ func (c *customGame) buildMove(piece rune, from string, to string, promotion str
 func (c *customGame) moveSAN(piece rune, from string, to string, promotion string, capture bool) string {
 	symbol := customPieceSymbol(piece)
 	prefix := symbol
-	if strings.EqualFold(symbol, "P") {
+	if c.isPawn(piece) {
 		prefix = ""
 		if capture && len(from) > 0 {
 			prefix = from[:1]
@@ -561,6 +564,10 @@ func (c *customGame) isRoyal(piece rune) bool {
 		return true
 	}
 	return c.ruleForPiece(piece).Royal
+}
+
+func (c *customGame) isPawn(piece rune) bool {
+	return ruleHasPawnMovement(c.ruleForPiece(piece))
 }
 
 func (c *customGame) ruleForPiece(piece rune) CustomPieceRule {
@@ -648,13 +655,16 @@ func (c *customGame) movementForRule(rule CustomPieceRule) customMovement {
 			}
 		}
 	}
-	if len(movement.leapers) == 0 && len(movement.sliders) == 0 {
+	if len(movement.leapers) == 0 && len(movement.sliders) == 0 && !ruleHasPawnMovement(rule) {
 		movement.leapers = appendDeltas(movement.leapers, allKingDeltas()...)
 	}
 	return movement
 }
 
 func (c *customGame) pieceValue(piece rune) int {
+	if c.isPawn(piece) {
+		return 100
+	}
 	switch strings.ToUpper(customPieceSymbol(piece)) {
 	case "P":
 		return 100
@@ -749,17 +759,109 @@ func validateCustomPieceRules(rules []CustomPieceRule) ([]CustomPieceRule, error
 			return nil, fmt.Errorf("duplicate custom piece symbol %q", rule.Symbol)
 		}
 		seen[rule.Symbol] = true
+		offsets := make([]string, 0, len(rule.LeaperOffsets))
 		for _, offset := range rule.LeaperOffsets {
+			offset = strings.TrimSpace(offset)
 			if _, ok := parseCustomDelta(offset); !ok {
 				return nil, fmt.Errorf("invalid leaper offset %q for custom piece %s", offset, rule.Symbol)
 			}
+			offsets = append(offsets, offset)
 		}
-		if rule.Move == "" && len(rule.LeaperOffsets) == 0 {
-			return nil, fmt.Errorf("custom piece %s requires move or leaper_offsets", rule.Symbol)
-		}
+		rule.LeaperOffsets = offsets
 		out = append(out, rule)
 	}
+	validSymbols := map[string]bool{"K": true, "Q": true, "R": true, "B": true, "N": true, "P": true}
+	ruleBySymbol := map[string]CustomPieceRule{}
+	for _, rule := range out {
+		validSymbols[rule.Symbol] = true
+		ruleBySymbol[rule.Symbol] = rule
+	}
+	for i := range out {
+		if err := validateCustomMoveSpec(out[i]); err != nil {
+			return nil, err
+		}
+		promotions, err := normalizeCustomPromotions(out[i].Symbol, out[i].PromotesTo, validSymbols, ruleBySymbol)
+		if err != nil {
+			return nil, err
+		}
+		out[i].PromotesTo = promotions
+	}
 	return out, nil
+}
+
+func validateCustomMoveSpec(rule CustomPieceRule) error {
+	if rule.Move == "" && len(rule.LeaperOffsets) == 0 {
+		return fmt.Errorf("custom piece %s requires move or leaper_offsets", rule.Symbol)
+	}
+	for _, token := range movementTokens(rule.Move) {
+		switch token {
+		case "", "pawn", "king", "queen", "rook", "orthogonal", "slide:orthogonal", "bishop", "diagonal", "slide:diagonal", "knight", "archbishop", "cardinal", "princess", "chancellor", "empress", "marshall", "amazon", "camel", "wazir", "ferz", "alfil", "dabbaba":
+			continue
+		default:
+			if strings.HasPrefix(token, "leaper:") {
+				if _, ok := parseCustomDelta(strings.TrimPrefix(token, "leaper:")); ok {
+					continue
+				}
+				return fmt.Errorf("invalid leaper move token %q for custom piece %s", token, rule.Symbol)
+			}
+			if strings.HasPrefix(token, "slide:") {
+				if _, ok := parseCustomDelta(strings.TrimPrefix(token, "slide:")); ok {
+					continue
+				}
+				return fmt.Errorf("invalid slide move token %q for custom piece %s", token, rule.Symbol)
+			}
+			return fmt.Errorf("unsupported move token %q for custom piece %s", token, rule.Symbol)
+		}
+	}
+	return nil
+}
+
+func normalizeCustomPromotions(symbol string, raw []string, validSymbols map[string]bool, ruleBySymbol map[string]CustomPieceRule) ([]string, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(raw))
+	seen := map[string]bool{}
+	for _, promotion := range raw {
+		normalized := strings.ToUpper(strings.TrimSpace(promotion))
+		runes := []rune(normalized)
+		if len(runes) != 1 || !unicode.IsLetter(runes[0]) {
+			return nil, fmt.Errorf("promotion target %q for custom piece %s must be one letter", promotion, symbol)
+		}
+		if !validSymbols[normalized] {
+			return nil, fmt.Errorf("promotion target %q for custom piece %s requires a piece rule or standard piece", normalized, symbol)
+		}
+		if normalized == "K" || ruleBySymbol[normalized].Royal {
+			return nil, fmt.Errorf("promotion target %q for custom piece %s cannot be royal", normalized, symbol)
+		}
+		if seen[normalized] {
+			continue
+		}
+		seen[normalized] = true
+		out = append(out, normalized)
+	}
+	return out, nil
+}
+
+func ruleHasPawnMovement(rule CustomPieceRule) bool {
+	for _, token := range movementTokens(rule.Move) {
+		if token == "pawn" {
+			return true
+		}
+	}
+	return false
+}
+
+func ruleHasNonPawnMovement(rule CustomPieceRule) bool {
+	if len(rule.LeaperOffsets) > 0 {
+		return true
+	}
+	for _, token := range movementTokens(rule.Move) {
+		if token != "" && token != "pawn" {
+			return true
+		}
+	}
+	return false
 }
 
 func movementTokens(move string) []string {

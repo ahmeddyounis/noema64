@@ -499,9 +499,11 @@ dialog h2 {
 
 .promotion-grid {
   display: grid;
-  grid-template-columns: repeat(4, 64px);
+  grid-template-columns: repeat(auto-fit, minmax(56px, 64px));
   gap: 10px;
   justify-content: center;
+  min-width: min(100%, 286px);
+  max-width: min(100%, 434px);
   padding: 18px;
 }
 

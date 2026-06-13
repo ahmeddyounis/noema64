@@ -169,6 +169,89 @@ func TestCustomBoardDefinitionSupportsCustomRoyalPieces(t *testing.T) {
 	}
 }
 
+func TestCustomBoardDefinitionRejectsInvalidRuleMovementAndPromotions(t *testing.T) {
+	base := CustomBoardDefinition{
+		SchemaVersion: CustomBoardDefinitionSchemaVersion,
+		ID:            "bad-rules",
+		Name:          "Bad Rules",
+		InitialFEN:    "4k3/8/8/8/3A4/8/8/4K3 w - - 0 1",
+		RuleSet:       "custom-piece-lab",
+		BoardWidth:    8,
+		BoardHeight:   8,
+		PieceRules: []CustomPieceRule{{
+			Symbol: "A",
+			Name:   "Archbishop",
+			Move:   "teleport",
+		}},
+	}
+	if _, err := CustomBoardStartFromDefinition(base); err == nil || !strings.Contains(err.Error(), "unsupported move token") {
+		t.Fatalf("expected invalid movement token failure, got %v", err)
+	}
+
+	base.PieceRules = []CustomPieceRule{{
+		Symbol:     "A",
+		Name:       "Archbishop",
+		Move:       "bishop+knight",
+		PromotesTo: []string{"Z"},
+	}}
+	if _, err := CustomBoardStartFromDefinition(base); err == nil || !strings.Contains(err.Error(), "requires a piece rule") {
+		t.Fatalf("expected undefined promotion target failure, got %v", err)
+	}
+
+	base.PieceRules[0].PromotesTo = []string{"K"}
+	if _, err := CustomBoardStartFromDefinition(base); err == nil || !strings.Contains(err.Error(), "cannot be royal") {
+		t.Fatalf("expected royal promotion target failure, got %v", err)
+	}
+}
+
+func TestCustomPawnRuleCanPromoteToCustomPiece(t *testing.T) {
+	start, err := CustomBoardStartFromDefinition(CustomBoardDefinition{
+		SchemaVersion: CustomBoardDefinitionSchemaVersion,
+		ID:            "serpent-pawn-lab",
+		Name:          "Serpent Pawn Lab",
+		InitialFEN:    "4k3/1S6/8/8/8/8/8/4K3 w - - 0 1",
+		RuleSet:       "custom-pawn-lab",
+		BoardWidth:    8,
+		BoardHeight:   8,
+		PieceRules: []CustomPieceRule{
+			{
+				Symbol:     "S",
+				Name:       "Serpent",
+				Move:       "pawn",
+				PromotesTo: []string{"A", "A"},
+			},
+			{
+				Symbol: "A",
+				Name:   "Archbishop",
+				Move:   "bishop+knight",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("custom pawn board: %v", err)
+	}
+	if got := start.BoardDefinition.PieceRules[0].PromotesTo; len(got) != 1 || got[0] != "A" {
+		t.Fatalf("promotions were not normalized/deduped: %+v", got)
+	}
+	game, err := FromVariantStart(start)
+	if err != nil {
+		t.Fatalf("custom pawn game: %v", err)
+	}
+	if game.IsLegalUCI("b7a7") {
+		t.Fatalf("custom pawn fell back to king movement: %+v", game.LegalMoves())
+	}
+	if !game.IsLegalUCI("b7b8a") {
+		t.Fatalf("custom pawn promotion missing: %+v", game.LegalMoves())
+	}
+	rec, err := game.ApplyUCI("b7b8a")
+	if err != nil {
+		t.Fatalf("apply custom pawn promotion: %v", err)
+	}
+	if rec.SAN != "b8=A" || game.BoardMap()["b8"] != "A" {
+		t.Fatalf("custom pawn promotion record=%+v board=%+v", rec, game.BoardMap())
+	}
+}
+
 func backRankFromFEN(fen string) string {
 	for i, r := range fen {
 		if r == '/' {
