@@ -44,7 +44,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /aria-label="Chess board workspace"/);
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
-  assert.match(indexHTML, /id="candidates" class="candidates" role="list" aria-label="Candidate moves"/);
+  assert.match(indexHTML, /id="candidates" class="candidates" role="list" aria-label="Candidate moves" aria-live="polite"/);
   assert.match(indexHTML, /role="status" aria-live="polite"/);
   assert.match(indexHTML, /role="tablist" aria-label="Decision trace views"/);
   assert.match(indexHTML, /id="summaryTab"[\s\S]*tabindex="0"/);
@@ -124,7 +124,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
   assert.match(indexHTML, /id="settingClockInitial" type="number" min="0"/);
   assert.match(indexHTML, /dialog id="settingsDialog" aria-labelledby="settingsTitle"/);
   assert.match(indexHTML, /dialog id="promotionDialog" aria-labelledby="promotionTitle"/);
-  assert.match(indexHTML, /id="recentList" class="recent-list" role="list" aria-label="Recent games"/);
+  assert.match(indexHTML, /id="recentList" class="recent-list" role="list" aria-label="Recent games" aria-live="polite"/);
   assert.match(indexHTML, /aria-keyshortcuts="N"/);
   assert.match(indexHTML, /aria-keyshortcuts="Space"/);
   assert.match(indexHTML, /id="moveBtn"[\s\S]*aria-keyshortcuts="Enter"/);
