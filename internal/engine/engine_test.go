@@ -143,6 +143,50 @@ func TestEngineNewGamePersistsVariantMetadata(t *testing.T) {
 	}
 }
 
+func TestEngineNewGameSupportsCustomBoardDefinition(t *testing.T) {
+	def := chesscore.CustomBoardDefinition{
+		SchemaVersion: chesscore.CustomBoardDefinitionSchemaVersion,
+		ID:            "archbishop-lab",
+		Name:          "Archbishop Lab",
+		InitialFEN:    "4k3/8/8/8/3A4/8/8/4K3 w - - 0 1",
+		RuleSet:       "custom-piece-lab",
+		BoardWidth:    8,
+		BoardHeight:   8,
+		PieceRules: []chesscore.CustomPieceRule{{
+			Symbol: "A",
+			Name:   "Archbishop",
+			Move:   "bishop+knight",
+		}},
+	}
+	e := New(Options{})
+	state, err := e.NewGame(context.Background(), NewGameOptions{
+		Side:            "white",
+		Variant:         chesscore.VariantCustom,
+		BoardDefinition: &def,
+	})
+	if err != nil {
+		t.Fatalf("new custom game: %v", err)
+	}
+	if state.Variant.BoardDefinition == nil || state.Features.LegalMoveCount == 0 || !containsLegalMove(state.Snapshot.LegalMoves, "d4e6") {
+		t.Fatalf("custom state not playable: variant=%+v features=%+v moves=%+v", state.Variant, state.Features, state.Snapshot.LegalMoves)
+	}
+	state, err = e.ApplyUserMove(context.Background(), "d4e6")
+	if err != nil {
+		t.Fatalf("custom user move: %v", err)
+	}
+	if state.Snapshot.Board["e6"] != "A" || !strings.Contains(state.Snapshot.PGN, "1. Ae6") {
+		t.Fatalf("custom move not reflected in state: board=%+v pgn=%s", state.Snapshot.Board, state.Snapshot.PGN)
+	}
+	restored := New(Options{})
+	restoredState, err := restored.LoadState(context.Background(), *state)
+	if err != nil {
+		t.Fatalf("load custom state: %v", err)
+	}
+	if restoredState.Snapshot.Board["e6"] != "A" || restoredState.Variant.BoardDefinition == nil {
+		t.Fatalf("custom state did not restore: %+v", restoredState)
+	}
+}
+
 func TestEngineExportPGNIncludesNoema64MetadataAndComments(t *testing.T) {
 	e := New(Options{
 		Mode:     strategy.ModeHybrid,
@@ -368,4 +412,13 @@ func (p *lateProvider) CompleteJSON(ctx context.Context, req providers.Completio
 	close(p.started)
 	<-p.release
 	return providers.MockProvider{}.CompleteJSON(context.Background(), req)
+}
+
+func containsLegalMove(moves []chesscore.LegalMove, uci string) bool {
+	for _, move := range moves {
+		if move.UCI == uci {
+			return true
+		}
+	}
+	return false
 }

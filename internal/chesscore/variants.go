@@ -124,20 +124,24 @@ func CustomBoardStartFromDefinition(def CustomBoardDefinition) (VariantStart, er
 	if err != nil {
 		return VariantStart{}, err
 	}
-	start, err := CustomBoardStart(def.InitialFEN)
-	if err != nil {
-		return VariantStart{}, err
+	return VariantStart{
+		SchemaVersion:   VariantStartSchemaVersion,
+		Variant:         VariantCustom,
+		FEN:             def.InitialFEN,
+		RuleSet:         def.RuleSet,
+		CastlingEnabled: false,
+		CastlingMode:    CastlingModeNone,
+		CastlingRights:  "-",
+		BoardDefinition: &def,
+		Notes:           []string{"Custom board uses Noema64's custom variant move generator."},
+	}, nil
+}
+
+func HasCustomRules(start VariantStart) bool {
+	if start.BoardDefinition == nil {
+		return false
 	}
-	start.BoardDefinition = &def
-	start.RuleSet = def.RuleSet
-	if def.RuleSet != "standard" && def.RuleSet != "chess960" {
-		start.UnsupportedRules = append(start.UnsupportedRules, "custom_rule_execution")
-		start.Notes = append(start.Notes, "Custom rule metadata is persisted for tooling; live play uses validated FEN and standard legal move generation.")
-	}
-	if len(def.PieceRules) > 0 {
-		start.UnsupportedRules = append(start.UnsupportedRules, "custom_piece_move_generation")
-	}
-	return start, nil
+	return start.BoardDefinition.RuleSet != "" && start.BoardDefinition.RuleSet != "standard" || len(start.BoardDefinition.PieceRules) > 0
 }
 
 func ValidateCustomBoardDefinition(def CustomBoardDefinition) (CustomBoardDefinition, error) {
@@ -159,11 +163,8 @@ func ValidateCustomBoardDefinition(def CustomBoardDefinition) (CustomBoardDefini
 	if def.InitialFEN == "" {
 		return CustomBoardDefinition{}, fmt.Errorf("custom board initial_fen is required")
 	}
-	if _, err := FromFEN(def.InitialFEN); err != nil {
-		return CustomBoardDefinition{}, err
-	}
 	if def.RuleSet == "" {
-		def.RuleSet = "standard"
+		def.RuleSet = "custom"
 	}
 	if def.BoardWidth == 0 {
 		def.BoardWidth = 8
@@ -171,13 +172,16 @@ func ValidateCustomBoardDefinition(def CustomBoardDefinition) (CustomBoardDefini
 	if def.BoardHeight == 0 {
 		def.BoardHeight = 8
 	}
-	if def.BoardWidth != 8 || def.BoardHeight != 8 {
-		return CustomBoardDefinition{}, fmt.Errorf("only 8x8 custom boards are playable in this release")
+	if def.BoardWidth < 1 || def.BoardWidth > 26 || def.BoardHeight < 1 || def.BoardHeight > 99 {
+		return CustomBoardDefinition{}, fmt.Errorf("custom board dimensions must be between 1x1 and 26x99")
 	}
-	for _, rule := range def.PieceRules {
-		if strings.TrimSpace(rule.Symbol) == "" || strings.TrimSpace(rule.Name) == "" {
-			return CustomBoardDefinition{}, fmt.Errorf("custom piece rules require symbol and name")
-		}
+	rules, err := validateCustomPieceRules(def.PieceRules)
+	if err != nil {
+		return CustomBoardDefinition{}, err
+	}
+	def.PieceRules = rules
+	if _, _, _, _, err := parseCustomFEN(def.InitialFEN, def.BoardWidth, def.BoardHeight); err != nil {
+		return CustomBoardDefinition{}, err
 	}
 	return def, nil
 }

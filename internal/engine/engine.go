@@ -32,13 +32,14 @@ type Options struct {
 }
 
 type NewGameOptions struct {
-	Side        string               `json:"side"`
-	FEN         string               `json:"fen,omitempty"`
-	Variant     chesscore.Variant    `json:"variant,omitempty"`
-	Seed        int64                `json:"seed,omitempty"`
-	TimeControl TimeControl          `json:"time_control,omitempty"`
-	Mode        strategy.EngineMode  `json:"mode,omitempty"`
-	Personality strategy.Personality `json:"personality,omitempty"`
+	Side            string                           `json:"side"`
+	FEN             string                           `json:"fen,omitempty"`
+	Variant         chesscore.Variant                `json:"variant,omitempty"`
+	Seed            int64                            `json:"seed,omitempty"`
+	BoardDefinition *chesscore.CustomBoardDefinition `json:"board_definition,omitempty"`
+	TimeControl     TimeControl                      `json:"time_control,omitempty"`
+	Mode            strategy.EngineMode              `json:"mode,omitempty"`
+	Personality     strategy.Personality             `json:"personality,omitempty"`
 }
 
 type TimeControl struct {
@@ -590,6 +591,17 @@ func newVariantGame(opts NewGameOptions) (*chesscore.Game, chesscore.VariantStar
 		}
 		return game, start, nil
 	case chesscore.VariantCustom:
+		if opts.BoardDefinition != nil {
+			start, err := chesscore.CustomBoardStartFromDefinition(*opts.BoardDefinition)
+			if err != nil {
+				return nil, chesscore.VariantStart{}, err
+			}
+			game, err := chesscore.FromVariantStart(start)
+			if err != nil {
+				return nil, chesscore.VariantStart{}, err
+			}
+			return game, start, nil
+		}
 		start, err := chesscore.CustomBoardStart(fen)
 		if err != nil {
 			return nil, chesscore.VariantStart{}, err
@@ -696,7 +708,7 @@ func gameFromState(ctx context.Context, state GameState) (*chesscore.Game, error
 	}
 	gameID := state.Snapshot.GameID
 	pgn := strings.TrimSpace(state.Snapshot.PGN)
-	if pgn != "" && pgn != "*" {
+	if state.Variant.Variant != chesscore.VariantCustom && pgn != "" && pgn != "*" {
 		if game, err := chesscore.FromPGNWithID(strings.NewReader(pgn), gameID); err == nil {
 			return game, nil
 		}
@@ -715,7 +727,7 @@ func gameFromReplayState(ctx context.Context, state GameState) (*chesscore.Game,
 	}
 	var game *chesscore.Game
 	var err error
-	if state.Variant.Variant == chesscore.VariantChess960 {
+	if state.Variant.Variant == chesscore.VariantChess960 || state.Variant.Variant == chesscore.VariantCustom && state.Variant.BoardDefinition != nil {
 		start := chesscore.NormalizeVariantStart(state.Variant, initialFEN)
 		if strings.TrimSpace(start.FEN) == "" {
 			start.FEN = initialFEN

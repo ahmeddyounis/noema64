@@ -85,7 +85,7 @@ func TestCustomBoardDefinitionPersistsRuleMetadata(t *testing.T) {
 		SchemaVersion: CustomBoardDefinitionSchemaVersion,
 		ID:            "archbishop-lab",
 		Name:          "Archbishop Lab",
-		InitialFEN:    "8/8/8/8/8/8/8/R3K2R w KQ - 0 1",
+		InitialFEN:    "4k3/8/8/8/3A4/8/8/4K3 w - - 0 1",
 		RuleSet:       "custom-piece-lab",
 		BoardWidth:    8,
 		BoardHeight:   8,
@@ -98,8 +98,25 @@ func TestCustomBoardDefinitionPersistsRuleMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("custom board definition: %v", err)
 	}
-	if start.BoardDefinition == nil || start.RuleSet != "custom-piece-lab" || len(start.UnsupportedRules) == 0 {
+	if start.BoardDefinition == nil || start.RuleSet != "custom-piece-lab" || len(start.UnsupportedRules) != 0 {
 		t.Fatalf("custom rule metadata was not preserved: %+v", start)
+	}
+	game, err := FromVariantStart(start)
+	if err != nil {
+		t.Fatalf("custom variant game: %v", err)
+	}
+	if !game.IsLegalUCI("d4e6") || !game.IsLegalUCI("d4h8") {
+		t.Fatalf("custom archbishop moves missing: %+v", game.LegalMoves())
+	}
+	rec, err := game.ApplyUCI("d4e6")
+	if err != nil {
+		t.Fatalf("apply custom archbishop move: %v", err)
+	}
+	if rec.SAN != "Ae6" || game.BoardMap()["e6"] != "A" || !strings.Contains(game.PGN(), "1. Ae6") {
+		t.Fatalf("custom move was not recorded correctly: rec=%+v board=%+v pgn=%s", rec, game.BoardMap(), game.PGN())
+	}
+	if game.Features().MaterialBalance <= 0 {
+		t.Fatalf("custom material balance did not value archbishop: %+v", game.Features())
 	}
 }
 

@@ -8,6 +8,9 @@ import (
 )
 
 func (g *Game) Features() FeatureSummary {
+	if g.custom != nil {
+		return g.custom.features(g.Ply())
+	}
 	legal := g.LegalMoves()
 	board := g.g.Position().Board().SquareMap()
 	side := g.g.Position().Turn()
@@ -233,6 +236,9 @@ func signInt(value int) int {
 }
 
 func (g *Game) materialBalance() int {
+	if g.custom != nil {
+		return g.custom.materialBalance()
+	}
 	score := 0
 	for _, piece := range g.g.Position().Board().SquareMap() {
 		value := pieceValue(piece.Type())
@@ -247,6 +253,9 @@ func (g *Game) materialBalance() int {
 }
 
 func (g *Game) phase() string {
+	if g.custom != nil {
+		return g.custom.phase(g.Ply())
+	}
 	pieceCount := 0
 	queenCount := 0
 	for _, piece := range g.g.Position().Board().SquareMap() {

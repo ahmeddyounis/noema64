@@ -13,6 +13,7 @@ import (
 type Game struct {
 	id              string
 	g               *chess.Game
+	custom          *customGame
 	initialFEN      string
 	appliedUCI      []string
 	history         []MoveRecord
@@ -47,6 +48,13 @@ func FromFENWithID(fen, id string) (*Game, error) {
 
 func FromVariantStart(start VariantStart) (*Game, error) {
 	start = NormalizeVariantStart(start, "")
+	if start.Variant == VariantCustom && start.BoardDefinition != nil {
+		custom, err := newCustomGameFromDefinition(*start.BoardDefinition)
+		if err != nil {
+			return nil, err
+		}
+		return &Game{id: uuid.NewString(), custom: custom, initialFEN: custom.fen()}, nil
+	}
 	game, err := FromFEN(start.FEN)
 	if err != nil {
 		return nil, err
@@ -104,9 +112,14 @@ func (g *Game) ID() string {
 }
 
 func (g *Game) Clone() *Game {
+	var cloned *chess.Game
+	if g.g != nil {
+		cloned = g.g.Clone()
+	}
 	return &Game{
 		id:              g.id,
-		g:               g.g.Clone(),
+		g:               cloned,
+		custom:          g.custom.clone(),
 		initialFEN:      g.initialFEN,
 		appliedUCI:      append([]string(nil), g.appliedUCI...),
 		history:         append([]MoveRecord(nil), g.history...),
@@ -124,6 +137,9 @@ func (g *Game) AppliedUCI() []string {
 }
 
 func (g *Game) FEN() string {
+	if g.custom != nil {
+		return g.custom.fen()
+	}
 	return g.g.FEN()
 }
 
@@ -132,6 +148,9 @@ func (g *Game) PGN() string {
 		if result := resultToken(g.Outcome()); result != "" {
 			return result
 		}
+	}
+	if g.custom != nil {
+		return pgnFromHistory(g.initialFEN, g.history, g.Outcome())
 	}
 	if len(g.history) == len(g.appliedUCI) && len(g.history) > 0 && len(g.g.Moves()) != len(g.history) {
 		return pgnFromHistory(g.initialFEN, g.history, g.Outcome())
@@ -144,16 +163,25 @@ func (g *Game) Ply() int {
 }
 
 func (g *Game) SideToMove() string {
+	if g.custom != nil {
+		return g.custom.sideName()
+	}
 	return colorName(g.g.Position().Turn())
 }
 
 func (g *Game) Outcome() Outcome {
+	if g.custom != nil {
+		return g.custom.outcome()
+	}
 	return outcomeDTO(g.g.Outcome(), g.g.Method())
 }
 
 func (g *Game) LegalMoves() []LegalMove {
 	if g.Outcome().Status != "ongoing" {
 		return []LegalMove{}
+	}
+	if g.custom != nil {
+		return g.custom.legalMoves()
 	}
 	pos := g.g.Position()
 	moves := g.g.ValidMoves()
@@ -169,6 +197,9 @@ func (g *Game) LegalMoves() []LegalMove {
 func (g *Game) Resign(side string) error {
 	if g.Outcome().Status != "ongoing" {
 		return fmt.Errorf("game is over")
+	}
+	if g.custom != nil {
+		return g.custom.resign(side)
 	}
 	color, err := colorFromName(side)
 	if err != nil {
@@ -189,6 +220,17 @@ func (g *Game) applyUCI(moveUCI string, record bool) (MoveRecord, error) {
 	moveUCI = strings.TrimSpace(moveUCI)
 	if moveUCI == "" {
 		return MoveRecord{}, fmt.Errorf("empty move")
+	}
+	if g.custom != nil {
+		rec, err := g.custom.applyUCI(moveUCI, len(g.appliedUCI)+1)
+		if err != nil {
+			return MoveRecord{}, err
+		}
+		if record {
+			g.appliedUCI = append(g.appliedUCI, rec.UCI)
+			g.history = append(g.history, rec)
+		}
+		return rec, nil
 	}
 	if rec, handled, err := g.applyVariantCastle(moveUCI, record); handled || err != nil {
 		return rec, err
@@ -252,6 +294,9 @@ func (g *Game) Snapshot() Snapshot {
 
 func (g *Game) MoveHistory() []MoveRecord {
 	if len(g.history) == len(g.appliedUCI) {
+		return append([]MoveRecord(nil), g.history...)
+	}
+	if g.custom != nil {
 		return append([]MoveRecord(nil), g.history...)
 	}
 	return moveHistoryFromChessGame(g.g, g.appliedUCI)
@@ -328,6 +373,9 @@ func pgnFromHistory(initialFEN string, history []MoveRecord, outcome Outcome) st
 }
 
 func (g *Game) BoardMap() map[string]string {
+	if g.custom != nil {
+		return g.custom.boardMap()
+	}
 	out := make(map[string]string, 32)
 	for sq, piece := range g.g.Position().Board().SquareMap() {
 		if piece == chess.NoPiece {
@@ -341,6 +389,9 @@ func (g *Game) BoardMap() map[string]string {
 func (g *Game) AnnotateLastMove(comment string) {
 	if len(g.history) > 0 {
 		g.history[len(g.history)-1].Comment = sanitizePGNComment(comment)
+	}
+	if g.custom != nil {
+		return
 	}
 	moves := g.g.Moves()
 	if len(moves) == 0 {
@@ -357,6 +408,22 @@ func (g *Game) Undo(plies int) int {
 		plies = len(g.appliedUCI)
 	}
 	target := len(g.appliedUCI) - plies
+	if g.custom != nil {
+		replayed, err := newCustomGameFromDefinition(g.custom.def)
+		if err != nil {
+			return 0
+		}
+		kept := append([]string(nil), g.appliedUCI[:target]...)
+		g.custom = replayed
+		g.appliedUCI = nil
+		g.history = nil
+		for _, moveUCI := range kept {
+			if _, err := g.applyUCI(moveUCI, true); err != nil {
+				return 0
+			}
+		}
+		return plies
+	}
 	replayed, err := newChessGameFromFEN(g.initialFEN)
 	if err != nil {
 		return 0
@@ -375,6 +442,9 @@ func (g *Game) Undo(plies int) int {
 }
 
 func (g *Game) NormalizeMove(raw string) (LegalMove, bool) {
+	if g.custom != nil {
+		return g.custom.normalizeMove(raw)
+	}
 	return NormalizeMove(g.g.Position(), raw, g.LegalMoves())
 }
 

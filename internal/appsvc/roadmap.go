@@ -668,7 +668,7 @@ func gameForStudyState(state *engine.GameState) (*chesscore.Game, error) {
 	}
 	var game *chesscore.Game
 	var err error
-	if state.Variant.Variant == chesscore.VariantChess960 {
+	if state.Variant.Variant == chesscore.VariantChess960 || state.Variant.Variant == chesscore.VariantCustom && state.Variant.BoardDefinition != nil {
 		start := chesscore.NormalizeVariantStart(state.Variant, initialFEN)
 		game, err = chesscore.FromVariantStart(start)
 	} else {

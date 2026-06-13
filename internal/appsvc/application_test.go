@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ahmedyounis/noema64/internal/analysis"
+	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/experiments"
@@ -848,6 +849,47 @@ func TestNewGameAcceptsChess960Variant(t *testing.T) {
 	}
 }
 
+func TestNewGameAcceptsCustomBoardDefinition(t *testing.T) {
+	app, _ := newTestApplication(t)
+	def := chesscore.CustomBoardDefinition{
+		SchemaVersion: chesscore.CustomBoardDefinitionSchemaVersion,
+		ID:            "archbishop-lab",
+		Name:          "Archbishop Lab",
+		InitialFEN:    "4k3/8/8/8/3A4/8/8/4K3 w - - 0 1",
+		RuleSet:       "custom-piece-lab",
+		BoardWidth:    8,
+		BoardHeight:   8,
+		PieceRules: []chesscore.CustomPieceRule{{
+			Symbol: "A",
+			Name:   "Archbishop",
+			Move:   "bishop+knight",
+		}},
+	}
+	state, err := app.NewGame(engine.NewGameOptions{Side: "white", Variant: chesscore.VariantCustom, BoardDefinition: &def})
+	if err != nil {
+		t.Fatalf("new custom game: %v", err)
+	}
+	if state.Variant.BoardDefinition == nil || !containsAppLegalMove(state.Snapshot.LegalMoves, "d4e6") {
+		t.Fatalf("custom game was not playable: variant=%+v moves=%+v", state.Variant, state.Snapshot.LegalMoves)
+	}
+	state, err = app.MakeUserMove("d4e6")
+	if err != nil {
+		t.Fatalf("apply custom move: %v", err)
+	}
+	if state.Snapshot.Board["e6"] != "A" {
+		t.Fatalf("custom board did not update: %+v", state.Snapshot.Board)
+	}
+
+	restored := NewApplication(filepath.Join(filepath.Dir(app.settingsPath), "config.yaml"))
+	restoredState, err := restored.GetGame()
+	if err != nil {
+		t.Fatalf("restored state: %v", err)
+	}
+	if restoredState.Snapshot.Board["e6"] != "A" || restoredState.Variant.BoardDefinition == nil {
+		t.Fatalf("custom game did not persist: %+v", restoredState)
+	}
+}
+
 func TestResignPersistsTerminalOutcome(t *testing.T) {
 	app, _ := newTestApplication(t)
 	state, err := app.NewGame(engine.NewGameOptions{Side: "white"})
@@ -953,6 +995,15 @@ func hasAgentRole(reviews []analysis.AgentReview, role string) bool {
 func containsString(items []string, want string) bool {
 	for _, item := range items {
 		if item == want {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAppLegalMove(moves []chesscore.LegalMove, want string) bool {
+	for _, move := range moves {
+		if move.UCI == want {
 			return true
 		}
 	}
