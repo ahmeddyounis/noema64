@@ -67,6 +67,18 @@ func TestEvaluateCandidateDiversityScoresMoveFamilies(t *testing.T) {
 	}
 }
 
+func TestEvaluateCandidateDiversityParsesCustomBoardDestinations(t *testing.T) {
+	candidates := []CandidateMove{
+		{UCI: "a9b10"},
+		{UCI: "c9b11"},
+		{UCI: "d9b12"},
+	}
+	report := EvaluateCandidateDiversity(candidates)
+	if report.Score <= 0.45 || report.Status == "narrow" {
+		t.Fatalf("custom multi-digit destinations collapsed: %+v", report)
+	}
+}
+
 func testLegalMove(check, capture bool, promotion string) chesscore.LegalMove {
 	return chesscore.LegalMove{Capture: capture, Check: check, Promotion: promotion}
 }

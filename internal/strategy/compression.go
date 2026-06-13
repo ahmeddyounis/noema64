@@ -5,6 +5,8 @@ import (
 	"math"
 	"sort"
 	"strings"
+
+	"github.com/ahmedyounis/noema64/internal/chesscore"
 )
 
 const (
@@ -147,8 +149,8 @@ func EvaluateCandidateDiversity(candidates []CandidateMove) CandidateDiversityRe
 	for _, candidate := range candidates {
 		family := candidateFamily(candidate)
 		families[family]++
-		if len(candidate.UCI) >= 4 {
-			destinations[candidate.UCI[2:4]] = struct{}{}
+		if _, to, ok := chesscore.SplitUCIMoveSquares(candidate.UCI); ok {
+			destinations[to] = struct{}{}
 		}
 		for _, token := range strings.Fields(strings.ToLower(candidate.Purpose)) {
 			if len(token) > 4 {

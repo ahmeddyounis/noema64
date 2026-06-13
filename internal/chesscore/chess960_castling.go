@@ -127,11 +127,13 @@ func (g *Game) applyVariantCastle(moveUCI string, record bool) (MoveRecord, bool
 }
 
 func (g *Game) updateVariantCastlingRights(uci string, boardBefore map[string]rune) {
-	if g.castling == nil || len(uci) < 4 {
+	if g.castling == nil {
 		return
 	}
-	from := uci[:2]
-	to := uci[2:4]
+	from, to, ok := SplitUCIMoveSquares(uci)
+	if !ok {
+		return
+	}
 	moved := boardBefore[from]
 	captured := boardBefore[to]
 	remove := ""

@@ -589,8 +589,8 @@ func heatmapForDecision(decision *decision.MoveDecision) []StudyHeat {
 	out := []StudyHeat{}
 	for _, candidate := range decision.CandidateMoves {
 		square := ""
-		if len(candidate.UCI) >= 4 {
-			square = candidate.UCI[2:4]
+		if _, to, ok := chesscore.SplitUCIMoveSquares(candidate.UCI); ok {
+			square = to
 		}
 		out = append(out, StudyHeat{
 			Square: square,

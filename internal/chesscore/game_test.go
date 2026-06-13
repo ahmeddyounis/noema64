@@ -22,6 +22,29 @@ func TestStartPositionLegalMovesAndApply(t *testing.T) {
 	}
 }
 
+func TestSplitUCIMoveSquaresSupportsMultiDigitRanks(t *testing.T) {
+	tests := []struct {
+		uci  string
+		from string
+		to   string
+		ok   bool
+	}{
+		{uci: "e2e4", from: "e2", to: "e4", ok: true},
+		{uci: "a7a8q", from: "a7", to: "a8", ok: true},
+		{uci: "b9b10a", from: "b9", to: "b10", ok: true},
+		{uci: "a10z99", from: "a10", to: "z99", ok: true},
+		{uci: "a10", ok: false},
+		{uci: "10a11", ok: false},
+		{uci: "a10b", ok: false},
+	}
+	for _, tt := range tests {
+		from, to, ok := SplitUCIMoveSquares(tt.uci)
+		if ok != tt.ok || from != tt.from || to != tt.to {
+			t.Fatalf("SplitUCIMoveSquares(%q) = (%q, %q, %t), want (%q, %q, %t)", tt.uci, from, to, ok, tt.from, tt.to, tt.ok)
+		}
+	}
+}
+
 func TestStartPositionPerft(t *testing.T) {
 	game := NewGame()
 	tests := []struct {

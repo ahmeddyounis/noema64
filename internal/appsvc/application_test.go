@@ -627,6 +627,18 @@ func TestStudyDashboardAndMultiAgentAnalysis(t *testing.T) {
 	}
 }
 
+func TestStudyHeatmapParsesCustomBoardDestinations(t *testing.T) {
+	heatmap := heatmapForDecision(&decision.MoveDecision{
+		CandidateMoves: []strategy.CandidateMove{
+			{UCI: "a9b10"},
+			{UCI: "c9b11"},
+		},
+	})
+	if len(heatmap) != 2 || heatmap[0].Square != "b10" || heatmap[1].Square != "b11" {
+		t.Fatalf("custom board heatmap squares parsed incorrectly: %+v", heatmap)
+	}
+}
+
 func TestRoadmapComparisonAndBuilderAPIs(t *testing.T) {
 	app, _ := newTestApplication(t)
 	book, err := app.OpeningBook()
