@@ -16,6 +16,10 @@ import (
 
 func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "trace.jsonl")
+	memBefore := strategy.NewMemory("game_test", "white")
+	memAfter := memBefore
+	memAfter.Ply = 7
+	memAfter.LastUpdate.MovePlayed = "g1f3"
 	trace := &decision.MoveDecision{
 		SchemaVersion:   "decision-trace.v1",
 		DecisionID:      "dec_test",
@@ -25,6 +29,17 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		SelectedMove:    chesscore.LegalMove{UCI: "g1f3"},
 		FENBefore:       "startpos",
 		LegalMovesCount: 20,
+		StrategyBefore:  memBefore,
+		StrategyAfter:   memAfter,
+		CandidateMoves: []strategy.CandidateMove{{
+			UCI:                "g1f3",
+			LLMConfidence:      0.8,
+			PlanAlignmentScore: 0.2,
+			SearchScore:        0.3,
+			PersonalityScore:   0.1,
+			FinalScore:         0.7,
+			VerifierScore:      strategy.VerifierScore{Status: "accepted", Reason: "test"},
+		}},
 		Provider: decision.ProviderTrace{
 			Name:          "mock",
 			Model:         "mock-balanced",
@@ -65,26 +80,39 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 
 	var record struct {
-		SchemaVersion   string              `json:"schema_version"`
-		EventType       string              `json:"event_type"`
-		EngineVersion   string              `json:"engine_version"`
-		GameID          string              `json:"game_id"`
-		Ply             int                 `json:"ply"`
-		FENBefore       string              `json:"fen_before"`
-		LegalMovesCount int                 `json:"legal_moves_count"`
-		Mode            strategy.EngineMode `json:"mode"`
-		Provider        string              `json:"provider"`
-		Model           string              `json:"model"`
-		PromptVersion   string              `json:"prompt_version"`
-		Temperature     float64             `json:"temperature"`
-		MaxTokens       int                 `json:"max_tokens"`
-		RetryCount      int                 `json:"retry_count"`
-		LLMParseStatus  string              `json:"llm_parse_status"`
-		SelectedMove    string              `json:"selected_move"`
-		AnalysisOnly    bool                `json:"analysis_only"`
-		FallbackUsed    bool                `json:"fallback_used"`
-		TimingMS        map[string]int64    `json:"timing_ms"`
-		Stages          []struct {
+		SchemaVersion      string              `json:"schema_version"`
+		EventType          string              `json:"event_type"`
+		EngineVersion      string              `json:"engine_version"`
+		GameID             string              `json:"game_id"`
+		Ply                int                 `json:"ply"`
+		FENBefore          string              `json:"fen_before"`
+		LegalMovesCount    int                 `json:"legal_moves_count"`
+		Mode               strategy.EngineMode `json:"mode"`
+		Provider           string              `json:"provider"`
+		Model              string              `json:"model"`
+		PromptVersion      string              `json:"prompt_version"`
+		Temperature        float64             `json:"temperature"`
+		MaxTokens          int                 `json:"max_tokens"`
+		RetryCount         int                 `json:"retry_count"`
+		LLMParseStatus     string              `json:"llm_parse_status"`
+		SelectedMove       string              `json:"selected_move"`
+		AnalysisOnly       bool                `json:"analysis_only"`
+		FallbackUsed       bool                `json:"fallback_used"`
+		StrategyBeforeHash string              `json:"strategy_before_hash"`
+		StrategyAfterHash  string              `json:"strategy_after_hash"`
+		CandidateMoves     []struct {
+			UCI                string  `json:"uci"`
+			LLMConfidence      float64 `json:"confidence"`
+			PlanAlignmentScore float64 `json:"plan_alignment_score"`
+			SearchScore        float64 `json:"search_score"`
+			PersonalityScore   float64 `json:"personality_score"`
+			FinalScore         float64 `json:"final_score"`
+			VerifierScore      struct {
+				Status string `json:"status"`
+			} `json:"verifier_score"`
+		} `json:"candidate_moves"`
+		TimingMS map[string]int64 `json:"timing_ms"`
+		Stages   []struct {
 			Name       string `json:"name"`
 			Status     string `json:"status"`
 			DurationMS int64  `json:"duration_ms"`
@@ -118,6 +146,16 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 	if record.FENBefore != "startpos" || record.LegalMovesCount != 20 || record.SelectedMove != "g1f3" {
 		t.Fatalf("missing top-level position fields: %+v", record)
+	}
+	if len(record.StrategyBeforeHash) != 64 || len(record.StrategyAfterHash) != 64 || record.StrategyBeforeHash == record.StrategyAfterHash {
+		t.Fatalf("missing or unchanged strategy memory hashes: before=%q after=%q", record.StrategyBeforeHash, record.StrategyAfterHash)
+	}
+	if len(record.CandidateMoves) != 1 || record.CandidateMoves[0].UCI != "g1f3" {
+		t.Fatalf("missing top-level candidate moves: %+v", record.CandidateMoves)
+	}
+	candidate := record.CandidateMoves[0]
+	if candidate.LLMConfidence != 0.8 || candidate.PlanAlignmentScore != 0.2 || candidate.SearchScore != 0.3 || candidate.PersonalityScore != 0.1 || candidate.FinalScore != 0.7 || candidate.VerifierScore.Status != "accepted" {
+		t.Fatalf("missing candidate scoring components: %+v", candidate)
 	}
 	if !record.AnalysisOnly {
 		t.Fatalf("missing analysis-only disclosure: %+v", record)

@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -94,34 +96,45 @@ func decisionTraceRecord(trace *decision.MoveDecision) map[string]any {
 		promptVersion = strategy.PromptVersion
 	}
 	return map[string]any{
-		"schema_version":    "1.0",
-		"event_type":        "move_decision",
-		"timestamp":         time.Now().UTC().Format(time.RFC3339Nano),
-		"engine_version":    "0.1.0",
-		"game_id":           trace.GameID,
-		"ply":               trace.Ply,
-		"fen_before":        trace.FENBefore,
-		"legal_moves_count": trace.LegalMovesCount,
-		"mode":              trace.Mode,
-		"provider":          trace.Provider.Name,
-		"model":             trace.Provider.Model,
-		"prompt_version":    promptVersion,
-		"temperature":       trace.Provider.Temperature,
-		"max_tokens":        trace.Provider.MaxTokens,
-		"retry_count":       trace.Provider.RetryCount,
-		"llm_raw_available": trace.Provider.RawAvailable,
-		"llm_parse_status":  trace.Provider.ParseStatus,
-		"selected_move":     trace.SelectedMove.UCI,
-		"analysis_only":     trace.AnalysisOnly,
-		"fallback_used":     trace.FallbackUsed,
-		"candidate_moves":   trace.CandidateMoves,
-		"verifier_result":   trace.VerifierTrace,
-		"stages":            trace.Stages,
-		"strategy_before":   trace.StrategyBefore,
-		"strategy_after":    trace.StrategyAfter,
-		"timing_ms":         traceTimingRecord(trace.Timing),
-		"trace":             trace,
+		"schema_version":       "1.0",
+		"event_type":           "move_decision",
+		"timestamp":            time.Now().UTC().Format(time.RFC3339Nano),
+		"engine_version":       "0.1.0",
+		"game_id":              trace.GameID,
+		"ply":                  trace.Ply,
+		"fen_before":           trace.FENBefore,
+		"legal_moves_count":    trace.LegalMovesCount,
+		"mode":                 trace.Mode,
+		"provider":             trace.Provider.Name,
+		"model":                trace.Provider.Model,
+		"prompt_version":       promptVersion,
+		"temperature":          trace.Provider.Temperature,
+		"max_tokens":           trace.Provider.MaxTokens,
+		"retry_count":          trace.Provider.RetryCount,
+		"llm_raw_available":    trace.Provider.RawAvailable,
+		"llm_parse_status":     trace.Provider.ParseStatus,
+		"selected_move":        trace.SelectedMove.UCI,
+		"analysis_only":        trace.AnalysisOnly,
+		"fallback_used":        trace.FallbackUsed,
+		"candidate_moves":      trace.CandidateMoves,
+		"verifier_result":      trace.VerifierTrace,
+		"stages":               trace.Stages,
+		"strategy_before_hash": strategyMemoryHash(trace.StrategyBefore),
+		"strategy_after_hash":  strategyMemoryHash(trace.StrategyAfter),
+		"strategy_before":      trace.StrategyBefore,
+		"strategy_after":       trace.StrategyAfter,
+		"timing_ms":            traceTimingRecord(trace.Timing),
+		"trace":                trace,
 	}
+}
+
+func strategyMemoryHash(memory strategy.StrategyMemory) string {
+	b, err := json.Marshal(memory)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
 }
 
 func traceTimingRecord(timing decision.Timing) map[string]int64 {

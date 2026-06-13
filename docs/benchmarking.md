@@ -30,3 +30,11 @@ go run ./cmd/noema64-bench -games 100 -seed 64 -out runs/pure_vs_random_001
 ```
 
 The output directory contains `config.yaml`, `summary.json`, and `summary.csv`.
+
+Validate the current trace schema contract:
+
+```sh
+make trace-validate
+```
+
+This runs the storage trace tests that assert schema versioning, redaction, strategy memory hashes, candidate scoring components, verifier disclosure, and timing fields.

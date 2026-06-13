@@ -1,7 +1,7 @@
 GO ?= go
 NPM ?= npm
 
-.PHONY: test frontend-smoke uci-smoke bench-random build-uci build-cli build-bench build-gui fmt
+.PHONY: test frontend-smoke uci-smoke bench-random trace-validate build-uci build-cli build-bench build-gui fmt
 
 fmt:
 	$(GO)fmt -w ./cmd ./internal
@@ -18,6 +18,9 @@ uci-smoke:
 
 bench-random:
 	$(GO) run ./cmd/noema64-bench -games 100
+
+trace-validate:
+	$(GO) test ./internal/storage -run Trace
 
 build-uci:
 	$(GO) build -o bin/noema64-uci ./cmd/noema64-uci
