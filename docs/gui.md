@@ -13,7 +13,12 @@ It exposes:
 - Candidate move panel with confidence, plan alignment, final rank, and verifier status.
 - Decision trace tabs, prompt/raw-response/parsed-provider inspector, candidate `personality_score` display, and backend-emitted `decision.stage` progress updates.
 - “Why not this move?” comparison for a typed move against the last engine decision trace.
-- Provider health, random benchmark, and mode benchmark actions.
+- Strategy memory quality, completeness, consistency, drift, and alert status.
+- Post-game review dialog with last-decision summary, strategy metrics, and review recommendations.
+- Experiment dashboard for provider health, random benchmark, mode benchmark, position suite, and provider comparison runs.
+- Prompt editor dialog for loading, validating, and saving versioned prompt packs.
+- Provider profile import/export dialog with API-key redaction and redacted-key preservation on import.
+- Provider health, random benchmark, and mode benchmark actions from settings.
 
 The analysis button runs the same decision pipeline on the current imported or played position without applying the selected move to the board, clock, move history, or persistent strategy memory. The returned decision trace is marked `analysis_only`.
 
