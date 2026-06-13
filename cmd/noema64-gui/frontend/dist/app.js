@@ -2557,11 +2557,22 @@ async function validatePromptEditor() {
 }
 
 async function savePromptEditor() {
+  const promptSaveDir = document.querySelector("#promptSaveDir");
+  let saveAttempted = false;
   try {
     const dir = requireField("#promptSaveDir", "Enter a save directory before saving the prompt pack.");
-    const validation = await call("SavePromptTemplatePack", dir, promptPackFromInputs());
-    renderPromptValidation(validation, "Prompt pack saved.");
+    const pack = promptPackFromInputs();
+    saveAttempted = true;
+    const validation = await call("SavePromptTemplatePack", dir, pack);
+    if (renderPromptValidation(validation, "Prompt pack saved.")) {
+      clearFieldInvalid(promptSaveDir);
+    }
   } catch (err) {
+    if (saveAttempted) {
+      markFieldInvalid(promptSaveDir);
+      promptSaveDir?.focus();
+      promptSaveDir?.select?.();
+    }
     showError(err, "#promptOutput");
   }
 }
