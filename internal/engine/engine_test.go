@@ -170,6 +170,28 @@ func TestAnalyzePositionDoesNotMutateGameState(t *testing.T) {
 	}
 }
 
+func TestEngineStateIncludesFeaturesAndStrategyMetrics(t *testing.T) {
+	e := New(Options{Provider: providers.MockProvider{}})
+	initial, err := e.State(context.Background())
+	if err != nil {
+		t.Fatalf("initial state: %v", err)
+	}
+	if initial.Features.SideToMove != "white" || initial.Features.LegalMoveCount == 0 {
+		t.Fatalf("features not populated on initial state: %+v", initial.Features)
+	}
+	if initial.StrategyMetrics.SchemaVersion != strategy.MemoryMetricsSchemaVersion || initial.StrategyMetrics.Quality <= 0 {
+		t.Fatalf("strategy metrics not populated on initial state: %+v", initial.StrategyMetrics)
+	}
+
+	state, err := e.ApplyUserMove(context.Background(), "e2e4")
+	if err != nil {
+		t.Fatalf("user move: %v", err)
+	}
+	if state.Features.SideToMove != "black" || state.Features.Phase == "" {
+		t.Fatalf("features not updated after move: %+v", state.Features)
+	}
+}
+
 func TestEngineResignStopsGameAndRestoresFromState(t *testing.T) {
 	e := New(Options{})
 	state, err := e.Resign(context.Background(), "white")

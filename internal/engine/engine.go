@@ -53,13 +53,15 @@ type ClockState struct {
 }
 
 type GameState struct {
-	SchemaVersion  string                  `json:"schema_version"`
-	Snapshot       chesscore.Snapshot      `json:"snapshot"`
-	InitialFEN     string                  `json:"initial_fen"`
-	AppliedMoves   []string                `json:"applied_moves"`
-	Clock          ClockState              `json:"clock"`
-	StrategyMemory strategy.StrategyMemory `json:"strategy_memory"`
-	LastDecision   *decision.MoveDecision  `json:"last_decision,omitempty"`
+	SchemaVersion   string                   `json:"schema_version"`
+	Snapshot        chesscore.Snapshot       `json:"snapshot"`
+	Features        chesscore.FeatureSummary `json:"features"`
+	InitialFEN      string                   `json:"initial_fen"`
+	AppliedMoves    []string                 `json:"applied_moves"`
+	Clock           ClockState               `json:"clock"`
+	StrategyMemory  strategy.StrategyMemory  `json:"strategy_memory"`
+	StrategyMetrics strategy.MemoryMetrics   `json:"strategy_metrics"`
+	LastDecision    *decision.MoveDecision   `json:"last_decision,omitempty"`
 }
 
 type Engine struct {
@@ -408,14 +410,20 @@ func (e *Engine) stateLocked() *GameState {
 		snapshot.Outcome = outcome
 		snapshot.LegalMoves = []chesscore.LegalMove{}
 	}
+	var previous *strategy.StrategyMemory
+	if e.lastDecision != nil {
+		previous = &e.lastDecision.StrategyBefore
+	}
 	return &GameState{
-		SchemaVersion:  GameStateSchemaVersion,
-		Snapshot:       snapshot,
-		InitialFEN:     e.game.InitialFEN(),
-		AppliedMoves:   e.game.AppliedUCI(),
-		Clock:          e.clock,
-		StrategyMemory: e.memory,
-		LastDecision:   e.lastDecision,
+		SchemaVersion:   GameStateSchemaVersion,
+		Snapshot:        snapshot,
+		Features:        e.game.Features(),
+		InitialFEN:      e.game.InitialFEN(),
+		AppliedMoves:    e.game.AppliedUCI(),
+		Clock:           e.clock,
+		StrategyMemory:  e.memory,
+		StrategyMetrics: strategy.EvaluateMemory(e.memory, previous),
+		LastDecision:    e.lastDecision,
 	}
 }
 
