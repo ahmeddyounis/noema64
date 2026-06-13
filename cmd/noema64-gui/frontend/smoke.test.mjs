@@ -24,6 +24,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /data-tab="prompt"/);
   assert.match(indexHTML, /Trace JSONL/);
   assert.match(indexHTML, /Debug trace JSONL/);
+  assert.match(indexHTML, /Fine-tune JSONL/);
 });
 
 test("primary toolbar and dialogs expose expected controls", () => {
@@ -38,14 +39,18 @@ test("primary toolbar and dialogs expose expected controls", () => {
     "undoBtn",
     "flipBtn",
     "reviewBtn",
+    "studyBtn",
     "experimentsBtn",
+    "labBtn",
     "promptEditorBtn",
     "importBtn",
     "exportBtn",
     "settingsBtn",
     "settingsDialog",
     "reviewDialog",
+    "studyDialog",
     "experimentsDialog",
+    "labDialog",
     "promptDialog",
     "profilesDialog",
     "importDialog",
@@ -61,6 +66,8 @@ test("settings surface covers MVP and profile controls", () => {
   for (const id of [
     "settingMode",
     "settingPersonality",
+    "settingVariant",
+    "settingVariantSeed",
     "settingTimeControl",
     "settingMaxCandidates",
     "settingProfile",
@@ -85,6 +92,10 @@ test("settings surface covers MVP and profile controls", () => {
     "modeBenchBtn",
     "profilesBtn",
     "keychainBtn",
+    "backupDir",
+    "restoreArchive",
+    "restoreTarget",
+    "tournamentGames",
   ]) {
     expectMarkupID(id);
   }
@@ -112,8 +123,15 @@ test("bundle wires core actions and renders trace metadata", () => {
     "RunModeBenchmark",
     "RunPositionSuite",
     "RunProviderComparison",
+    "RunTournament",
     "ProviderDashboard",
     "PostGameReview",
+    "StudyDashboard",
+    "MultiAgentAnalysis",
+    "UpdateStrategyMemory",
+    "CreateBackup",
+    "RestoreBackup",
+    "ExportFineTuneDataset",
     "PromptTemplatePack",
     "ValidatePromptTemplatePack",
     "SavePromptTemplatePack",
@@ -125,6 +143,10 @@ test("bundle wires core actions and renders trace metadata", () => {
     "renderProviderComparison",
     "renderProviderDashboard",
     "renderReview",
+    "renderStudyDashboard",
+    "renderTournament",
+    "renderFineTuneWorkflow",
+    "newChess960Game",
     "promptPackFromInputs",
     "subscribeDecisionStageEvents",
     "stageSummary",
@@ -149,6 +171,10 @@ test("bundle wires core actions and renders trace metadata", () => {
     "strategy_metrics",
     "alert_level",
     "api_key_ref",
+    "variant",
+    "chess960",
+    "candidate_diversity",
+    "multi_agent",
   ]) {
     expectScriptToken(token);
   }

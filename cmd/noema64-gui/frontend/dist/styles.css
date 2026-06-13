@@ -278,9 +278,11 @@ dialog {
 }
 
 #experimentsDialog,
+#labDialog,
 #promptDialog,
 #profilesDialog,
-#reviewDialog {
+#reviewDialog,
+#studyDialog {
   width: min(920px, 94vw);
 }
 
@@ -311,7 +313,9 @@ dialog h2 {
 
 .prompt-editor,
 .profiles-editor,
-.experiments {
+.experiments,
+.study-tools,
+.lab-tools {
   display: grid;
   gap: 10px;
 }
@@ -330,6 +334,30 @@ dialog h2 {
 #promptManifest,
 #promptSchema {
   min-height: 120px;
+}
+
+#studyMemoryText {
+  min-height: 180px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  padding: 0 12px;
+}
+
+.lab-grid label {
+  display: grid;
+  gap: 4px;
+}
+
+.lab-grid input {
+  min-height: 34px;
+  border: 1px solid #c7ced8;
+  border-radius: 6px;
+  padding: 0 10px;
 }
 
 .settings .provider-warning {
@@ -494,6 +522,10 @@ textarea {
   }
 
   .time-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lab-grid {
     grid-template-columns: 1fr;
   }
 

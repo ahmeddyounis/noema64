@@ -23,7 +23,9 @@
           <button id="undoBtn" title="Undo">↶</button>
           <button id="flipBtn" title="Flip board">⇅</button>
           <button id="reviewBtn" title="Post-game review">◎</button>
+          <button id="studyBtn" title="Study tools">※</button>
           <button id="experimentsBtn" title="Experiments">Σ</button>
+          <button id="labBtn" title="Roadmap lab">⌬</button>
           <button id="promptEditorBtn" title="Prompt editor">✎</button>
           <button id="importBtn" title="Import PGN or FEN">⇧</button>
           <button id="exportBtn" title="Export PGN">⇩</button>
@@ -101,6 +103,14 @@
               <option value="random">Random</option>
             </select>
           </label>
+          <label>Variant
+            <select id="settingVariant">
+              <option value="standard">Standard</option>
+              <option value="chess960">Chess960</option>
+              <option value="custom">Custom FEN</option>
+            </select>
+          </label>
+          <label>Chess960 seed <input id="settingVariantSeed" type="number" min="0" max="959" step="1" /></label>
           <label>Time control
             <select id="settingTimeControl">
               <option value="untimed">Untimed</option>
@@ -183,6 +193,7 @@
             <button id="providerDashboardBtn" value="none" type="button">Providers</button>
             <button id="positionSuiteBtn" value="none" type="button">Position Suite</button>
             <button id="providerComparisonBtn" value="none" type="button">Compare Providers</button>
+            <button id="tournamentBtn" value="none" type="button">Tournament</button>
             <button id="experimentBenchBtn" value="none" type="button">Random 100</button>
             <button id="experimentModeBtn" value="none" type="button">Modes</button>
           </menu>
@@ -226,6 +237,45 @@
         </form>
       </dialog>
 
+      <dialog id="studyDialog">
+        <form method="dialog" class="study-tools">
+          <header>
+            <h2>Study</h2>
+            <button value="cancel" title="Close">×</button>
+          </header>
+          <menu class="dialog-actions">
+            <button id="refreshStudyBtn" value="none" type="button">Refresh</button>
+            <button id="multiAgentBtn" value="none" type="button">Agents</button>
+            <button id="saveMemoryBtn" value="none" type="button">Save Memory</button>
+          </menu>
+          <textarea id="studyMemoryText" spellcheck="false"></textarea>
+          <pre id="studyOutput"></pre>
+        </form>
+      </dialog>
+
+      <dialog id="labDialog">
+        <form method="dialog" class="lab-tools">
+          <header>
+            <h2>Lab</h2>
+            <button value="cancel" title="Close">×</button>
+          </header>
+          <div class="lab-grid">
+            <label>Backup directory <input id="backupDir" placeholder="logs/backups" /></label>
+            <label>Restore archive <input id="restoreArchive" placeholder="/path/to/noema64-backup.zip" /></label>
+            <label>Restore target <input id="restoreTarget" placeholder="/path/to/restore" /></label>
+            <label>Tournament games <input id="tournamentGames" type="number" min="1" max="20" step="1" /></label>
+          </div>
+          <menu class="dialog-actions">
+            <button id="newChess960Btn" value="none" type="button">Chess960</button>
+            <button id="createBackupBtn" value="none" type="button">Backup</button>
+            <button id="restoreBackupBtn" value="none" type="button">Restore</button>
+            <button id="fineTuneBtn" value="none" type="button">Fine Tune</button>
+            <button id="labTournamentBtn" value="none" type="button">Tournament</button>
+          </menu>
+          <pre id="labOutput"></pre>
+        </form>
+      </dialog>
+
       <dialog id="exportDialog">
         <form method="dialog">
           <header>
@@ -239,6 +289,7 @@
                 <option value="fen">FEN</option>
                 <option value="trace">Trace JSONL</option>
                 <option value="debug_trace">Debug trace JSONL</option>
+                <option value="fine_tune">Fine-tune JSONL</option>
               </select>
             </label>
             <button id="refreshExportBtn" value="none" type="button">Refresh</button>

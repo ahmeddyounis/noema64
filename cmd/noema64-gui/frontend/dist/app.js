@@ -12,6 +12,8 @@ let activeTab = "summary";
 let settings = null;
 let playerSide = "white";
 let autoReply = true;
+let gameVariant = "standard";
+let chess960Seed = 0;
 let pendingPromotion = null;
 let applyingProviderProfile = false;
 let lastStageEvent = null;
@@ -72,7 +74,8 @@ function render() {
 
 function renderStatus() {
   const s = state.snapshot;
-  document.querySelector("#statusText").textContent = `${s.side_to_move} to move · ${s.outcome.status} · ${s.fen}`;
+  const variant = state.variant?.variant || "standard";
+  document.querySelector("#statusText").textContent = `${s.side_to_move} to move · ${s.outcome.status} · ${variant} · ${s.fen}`;
   document.querySelector("#clockText").textContent = formatClock(state.clock);
   document.querySelector("#modeText").textContent = state.last_decision?.mode || settings?.engine?.default_mode || "blunderguard";
 }
@@ -452,6 +455,8 @@ async function loadSettings() {
   document.querySelector("#settingMode").value = settings.engine.default_mode;
   document.querySelector("#settingPersonality").value = settings.engine.personality;
   document.querySelector("#settingSide").value = playerSide;
+  document.querySelector("#settingVariant").value = gameVariant;
+  document.querySelector("#settingVariantSeed").value = chess960Seed;
   document.querySelector("#settingTimeControl").value = settings.gui?.time_control || "untimed";
   document.querySelector("#settingClockInitial").value = Math.max(1, Math.round((settings.gui?.clock_initial_ms || 300000) / 60000));
   document.querySelector("#settingClockIncrement").value = Math.max(0, Math.round((settings.gui?.clock_increment_ms || 0) / 1000));
@@ -536,6 +541,8 @@ async function saveSettings() {
     playerSide = document.querySelector("#settingSide").value;
     if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
     autoReply = document.querySelector("#settingAutoReply").checked;
+    gameVariant = document.querySelector("#settingVariant").value || "standard";
+    chess960Seed = Number(document.querySelector("#settingVariantSeed").value) || 0;
     const timeControl = timeControlForNewGame();
     settings.engine.default_mode = document.querySelector("#settingMode").value;
     settings.engine.personality = document.querySelector("#settingPersonality").value;
@@ -688,6 +695,78 @@ function renderProviderDashboard(dashboard) {
   ].join("\n");
 }
 
+function renderStudyDashboard(dashboard) {
+  if (!dashboard) return "No study dashboard result.";
+  const memory = dashboard.memory || {};
+  const coherence = dashboard.coherence || {};
+  const diversity = dashboard.candidate_diversity || {};
+  const lesson = dashboard.lesson || {};
+  const multi = dashboard.multi_agent || {};
+  const agents = (multi.reviews || []).map((review) => `${review.role}: ${review.summary} (${formatMetric(review.confidence)})`).join("\n");
+  const heat = (dashboard.heatmap || []).map((item) => `${item.move} -> ${item.square} · ${formatScore(item.weight)} · ${item.label || "candidate"}`).join("\n");
+  return [
+    `Study · ${dashboard.game_id || "unknown"} · ply ${dashboard.ply || 0} · ${dashboard.variant?.variant || "standard"}`,
+    `Memory: ${memory.plan_status || "unknown"} · confidence ${formatMetric(memory.plan_confidence)} · retained ${memory.retained_items || 0} · dropped ${memory.dropped_items || 0}`,
+    `Coherence: ${coherence.status || "unknown"} · ${formatMetric(coherence.score)}`,
+    `Diversity: ${diversity.status || "unknown"} · ${formatMetric(diversity.score)} · ${diversity.candidate_count || 0} candidates`,
+    "",
+    "LESSON",
+    `${lesson.title || "Study"} · ${lesson.focus || ""}`,
+    ...(lesson.steps || []),
+    "",
+    "AGENTS",
+    agents || multi.arbiter || "No agent review.",
+    "",
+    "HEATMAP",
+    heat || "No candidate heatmap.",
+    "",
+    "PUZZLE",
+    `${dashboard.puzzle?.goal || "No puzzle."}\nSolution: ${dashboard.puzzle?.solution || "pending"}`
+  ].join("\n");
+}
+
+function renderTournament(summary) {
+  if (!summary) return "No tournament result.";
+  const ratings = (summary.ratings || []).map((rating) => `${rating.id} · ${formatMetric(rating.elo)} · ${rating.wins}-${rating.draws}-${rating.losses}`).join("\n");
+  const games = (summary.results || []).slice(0, 12).map((game) => `${game.game_index}. ${game.white_id}-${game.black_id} · ${game.outcome || "unknown"} · ${game.winner_id || "draw"} · ${game.plies || 0} plies`).join("\n");
+  return [
+    `Tournament · ${summary.games_played || 0} games · seed ${summary.seed || 64}`,
+    "",
+    "RATINGS",
+    ratings || "No ratings.",
+    "",
+    "GAMES",
+    games || "No games."
+  ].join("\n");
+}
+
+function renderBackupManifest(manifest) {
+  if (!manifest) return "No backup manifest.";
+  const files = (manifest.files || []).map((file) => `${file.path} · ${file.bytes || 0} bytes`).join("\n");
+  return [
+    `Archive: ${manifest.archive_path || "unknown"}`,
+    `SHA-256: ${manifest.sha256 || "pending"}`,
+    `Files: ${(manifest.files || []).length} · bytes ${manifest.bytes || 0}`,
+    "",
+    files
+  ].join("\n");
+}
+
+function renderFineTuneWorkflow(workflow) {
+  if (!workflow) return "No fine-tune workflow.";
+  const spec = workflow.workflow || {};
+  return [
+    `Fine tune · ${spec.example_count || 0} examples`,
+    spec.intended_use || "",
+    "",
+    "SAFETY",
+    ...(spec.safety_notes || []),
+    "",
+    "JSONL",
+    workflow.dataset_jsonl || ""
+  ].join("\n");
+}
+
 function renderReview(review) {
   if (!review) return "No review available.";
   const metrics = review.strategy_metrics || {};
@@ -723,9 +802,108 @@ async function refreshReview() {
   }
 }
 
+async function openStudy() {
+  document.querySelector("#studyOutput").textContent = "Loading study tools...";
+  document.querySelector("#studyDialog").showModal();
+  await refreshStudy();
+}
+
+async function refreshStudy() {
+  try {
+    const dashboard = await call("StudyDashboard");
+    const current = await call("GetGame");
+    document.querySelector("#studyMemoryText").value = JSON.stringify(current.strategy_memory || {}, null, 2);
+    document.querySelector("#studyOutput").textContent = renderStudyDashboard(dashboard);
+  } catch (err) {
+    showError(err, "#studyOutput");
+  }
+}
+
+async function refreshMultiAgent() {
+  try {
+    document.querySelector("#studyOutput").textContent = JSON.stringify(await call("MultiAgentAnalysis"), null, 2);
+  } catch (err) {
+    showError(err, "#studyOutput");
+  }
+}
+
+async function saveStudyMemory() {
+  try {
+    const memory = JSON.parse(document.querySelector("#studyMemoryText").value);
+    state = await call("UpdateStrategyMemory", memory);
+    render();
+    await refreshStudy();
+  } catch (err) {
+    showError(err, "#studyOutput");
+  }
+}
+
 function openExperiments() {
   document.querySelector("#experimentsOutput").textContent = "";
   document.querySelector("#experimentsDialog").showModal();
+}
+
+function openLab() {
+  document.querySelector("#labOutput").textContent = "";
+  document.querySelector("#tournamentGames").value = document.querySelector("#tournamentGames").value || "1";
+  document.querySelector("#labDialog").showModal();
+}
+
+async function newChess960Game() {
+  try {
+    const seed = Math.floor(Date.now() % 960);
+    chess960Seed = seed;
+    gameVariant = "chess960";
+    state = await call("NewGame", {
+      side: playerSide || "white",
+      variant: "chess960",
+      seed,
+      mode: document.querySelector("#settingMode")?.value || "blunderguard",
+      personality: document.querySelector("#settingPersonality")?.value || "balanced",
+      time_control: timeControlForNewGame()
+    });
+    render();
+    document.querySelector("#labOutput").textContent = JSON.stringify(state.variant || {}, null, 2);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function createBackup() {
+  try {
+    const manifest = await call("CreateBackup", document.querySelector("#backupDir").value.trim());
+    document.querySelector("#restoreArchive").value = manifest.archive_path || "";
+    document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function restoreBackup() {
+  try {
+    const manifest = await call("RestoreBackup", document.querySelector("#restoreArchive").value.trim(), document.querySelector("#restoreTarget").value.trim());
+    document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function exportFineTuneWorkflow() {
+  try {
+    document.querySelector("#labOutput").textContent = renderFineTuneWorkflow(await call("ExportFineTuneDataset"));
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function runTournamentFromLab() {
+  try {
+    const games = Number(document.querySelector("#tournamentGames").value) || 1;
+    document.querySelector("#labOutput").textContent = "Running tournament...";
+    document.querySelector("#labOutput").textContent = renderTournament(await call("RunTournament", games, 64));
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
 }
 
 async function runExperiment(action, label, renderResult) {
@@ -876,6 +1054,8 @@ document.querySelector("#newGameBtn").addEventListener("click", async () => {
     playerSide = side;
     state = await call("NewGame", {
       side,
+      variant: document.querySelector("#settingVariant")?.value || gameVariant,
+      seed: Number(document.querySelector("#settingVariantSeed")?.value) || chess960Seed,
       mode: document.querySelector("#settingMode")?.value || "blunderguard",
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
@@ -917,7 +1097,9 @@ document.querySelector("#undoBtn").addEventListener("click", async () => {
 });
 document.querySelector("#flipBtn").addEventListener("click", () => { flipped = !flipped; renderBoard(); });
 document.querySelector("#reviewBtn").addEventListener("click", openReview);
+document.querySelector("#studyBtn").addEventListener("click", openStudy);
 document.querySelector("#experimentsBtn").addEventListener("click", openExperiments);
+document.querySelector("#labBtn").addEventListener("click", openLab);
 document.querySelector("#promptEditorBtn").addEventListener("click", openPromptEditor);
 document.querySelector("#moveBtn").addEventListener("click", () => makeMove(document.querySelector("#moveInput").value.trim()));
 document.querySelector("#whyBtn").addEventListener("click", whyNotMove);
@@ -981,6 +1163,14 @@ document.querySelector("#modeBenchBtn").addEventListener("click", async () => {
   }
 });
 document.querySelector("#refreshReviewBtn").addEventListener("click", refreshReview);
+document.querySelector("#refreshStudyBtn").addEventListener("click", refreshStudy);
+document.querySelector("#multiAgentBtn").addEventListener("click", refreshMultiAgent);
+document.querySelector("#saveMemoryBtn").addEventListener("click", saveStudyMemory);
+document.querySelector("#newChess960Btn").addEventListener("click", newChess960Game);
+document.querySelector("#createBackupBtn").addEventListener("click", createBackup);
+document.querySelector("#restoreBackupBtn").addEventListener("click", restoreBackup);
+document.querySelector("#fineTuneBtn").addEventListener("click", exportFineTuneWorkflow);
+document.querySelector("#labTournamentBtn").addEventListener("click", runTournamentFromLab);
 document.querySelector("#providerDashboardBtn").addEventListener("click", () => runExperiment(
   () => call("ProviderDashboard"),
   "Checking providers",
@@ -995,6 +1185,11 @@ document.querySelector("#providerComparisonBtn").addEventListener("click", () =>
   () => call("RunProviderComparison"),
   "Comparing providers",
   renderProviderComparison
+));
+document.querySelector("#tournamentBtn").addEventListener("click", () => runExperiment(
+  () => call("RunTournament", 1, 64),
+  "Running tournament",
+  renderTournament
 ));
 document.querySelector("#experimentBenchBtn").addEventListener("click", () => runExperiment(
   () => call("RunRandomBenchmark", 100, 64),
@@ -1024,6 +1219,11 @@ async function refreshExport() {
   if (type === "debug_trace") {
     if (!confirmDebugTraceExport()) return false;
     document.querySelector("#exportText").value = await call("ExportDebugTrace");
+    return true;
+  }
+  if (type === "fine_tune") {
+    const workflow = await call("ExportFineTuneDataset");
+    document.querySelector("#exportText").value = workflow.dataset_jsonl || "";
     return true;
   }
   document.querySelector("#exportText").value = await call("ExportPGN");
