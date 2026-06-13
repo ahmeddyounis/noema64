@@ -2250,6 +2250,8 @@ async function newChess960Game() {
 }
 
 async function startCustomBoardFromLab() {
+  const customBoardDefinition = document.querySelector("#customBoardDefinition");
+  let boardLoaded = false;
   try {
     const definition = parseJSONField("#customBoardDefinition", "Custom board definition");
     let side = document.querySelector("#settingSide")?.value || playerSide || "white";
@@ -2264,10 +2266,17 @@ async function startCustomBoardFromLab() {
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     }));
+    boardLoaded = true;
+    clearFieldInvalid(customBoardDefinition);
     document.querySelector("#labOutput").textContent = JSON.stringify(state?.variant || {}, null, 2);
     showSuccess("Custom board ready.");
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
+    if (!boardLoaded) {
+      markFieldInvalid(customBoardDefinition);
+      customBoardDefinition?.focus();
+      customBoardDefinition?.select?.();
+    }
     showError(err, "#labOutput");
   }
 }

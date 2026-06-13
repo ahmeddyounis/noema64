@@ -526,6 +526,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "clearFieldInvalid(policyModelPath)",
     "clearFieldInvalid(openingBookPath)",
     "clearFieldInvalid(customBoardDefinition)",
+    "markFieldInvalid(customBoardDefinition)",
+    "customBoardDefinition?.focus()",
     "finishExport(workflow?.dataset_jsonl, \"Fine-tune export ready.\")",
     "clearFieldInvalid(memoryField)",
     "markFieldInvalid(memoryField)",
