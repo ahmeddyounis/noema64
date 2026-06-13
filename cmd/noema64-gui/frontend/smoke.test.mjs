@@ -608,6 +608,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.board-area \{[\s\S]*grid-template-rows: auto auto auto minmax\(96px, auto\);[\s\S]*min-height: 0;/);
   assert.match(stylesCSS, /\.board \{[\s\S]*width: min\(100%, calc\(100vw - 44px\)\);[\s\S]*max-height: none;/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.square \{[\s\S]*min\(calc\(37vh \/ var\(--board-ranks, 8\)\), calc\(52vh \/ var\(--board-files, 8\)\), 9vw\)/);
+  assert.match(stylesCSS, /\.move-entry input \{[\s\S]*font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;/);
   assert.match(stylesCSS, /\.move-list \{[\s\S]*max-height: 160px;/);
   assert.match(stylesCSS, /pre,\ntextarea \{[\s\S]*font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;/);
   assert.match(stylesCSS, /pre,\n  textarea \{[\s\S]*min-height: 160px;/);

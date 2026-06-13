@@ -616,6 +616,10 @@ body[data-theme="classic"] .dark {
   padding: 0 10px;
 }
 
+.move-entry input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .move-list {
   margin: 0;
   padding: 8px 8px 8px 28px;
