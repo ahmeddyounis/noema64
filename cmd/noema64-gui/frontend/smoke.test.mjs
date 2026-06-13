@@ -203,6 +203,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "promptPackFromInputs",
     "subscribeDecisionStageEvents",
     "stageSummary",
+    "statusSummary",
+    "statusDetail",
+    "compactFen",
     "decisionSummaryText",
     "candidatePurpose",
     "formatStrategyAlert",
@@ -260,9 +263,15 @@ test("bundle wires core actions and renders trace metadata", () => {
 
 test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /button:focus-visible/);
+  assert.match(stylesCSS, /-webkit-line-clamp: 2/);
+  assert.match(stylesCSS, /\.tabs \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /dialog > form/);
   assert.match(stylesCSS, /position: sticky/);
   assert.match(stylesCSS, /\.settings menu \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /@media \(max-width: 520px\)/);
   assert.match(stylesCSS, /\.settings menu button,\n  \.dialog-actions button \{[\s\S]*flex: 1 1 128px;/);
+  assert.match(stylesCSS, /\.candidate \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) max-content;/);
+  assert.match(stylesCSS, /\.candidate strong \{[\s\S]*grid-column: 1;/);
+  assert.match(stylesCSS, /\.candidate span \{[\s\S]*grid-column: 1 \/ -1;/);
+  assert.match(stylesCSS, /\.candidate-score \{[\s\S]*grid-column: 2;[\s\S]*grid-row: 1;/);
 });

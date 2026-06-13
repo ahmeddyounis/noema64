@@ -75,9 +75,38 @@ function render() {
 function renderStatus() {
   const s = state.snapshot;
   const variant = state.variant?.variant || "standard";
-  document.querySelector("#statusText").textContent = `${s.side_to_move} to move · ${s.outcome.status} · ${variant} · ${s.fen}`;
+  const status = document.querySelector("#statusText");
+  status.textContent = statusSummary(s, variant);
+  status.title = statusDetail(s, variant);
   document.querySelector("#clockText").textContent = formatClock(state.clock);
   document.querySelector("#modeText").textContent = state.last_decision?.mode || settings?.engine?.default_mode || "blunderguard";
+}
+
+function statusSummary(snapshot, variant) {
+  const parts = [
+    `${snapshot.side_to_move || "unknown"} to move`,
+    snapshot.outcome?.status || "unknown",
+    variant || "standard"
+  ];
+  const fen = compactFen(snapshot.fen);
+  if (fen) parts.push(`FEN ${fen}`);
+  return parts.join(" · ");
+}
+
+function statusDetail(snapshot, variant) {
+  return [
+    `${snapshot.side_to_move || "unknown"} to move`,
+    snapshot.outcome?.status || "unknown",
+    variant || "standard",
+    snapshot.fen || "No FEN recorded"
+  ].join(" · ");
+}
+
+function compactFen(fen) {
+  const text = String(fen || "").trim();
+  if (!text) return "";
+  const core = text.split(/\s+/).slice(0, 6).join(" ");
+  return core.length > 72 ? `${core.slice(0, 69)}...` : core;
 }
 
 function formatClock(clock) {
