@@ -44,6 +44,40 @@ func TestUCISmoke(t *testing.T) {
 	}
 }
 
+func TestUCIHundredScriptedSessions(t *testing.T) {
+	settings := storage.DefaultSettings()
+	settings.Engine.TraceEnabled = false
+	settings.Logging.OutputDir = t.TempDir()
+	script := strings.Join([]string{
+		"uci",
+		"isready",
+		"ucinewgame",
+		"position startpos moves e2e4 e7e5 g1f3 b8c6",
+		"go movetime 50",
+		"quit",
+		"",
+	}, "\n")
+	for i := 0; i < 100; i++ {
+		var out bytes.Buffer
+		server := NewServer(strings.NewReader(script), &out, &bytes.Buffer{}, settings)
+		if err := server.Run(context.Background()); err != nil {
+			t.Fatalf("session %d run: %v", i, err)
+		}
+		text := out.String()
+		if !strings.Contains(text, "uciok") || !strings.Contains(text, "readyok") || !strings.Contains(text, "bestmove ") {
+			t.Fatalf("session %d missing required UCI output:\n%s", i, text)
+		}
+		if strings.Contains(text, "bestmove 0000") {
+			t.Fatalf("session %d returned null move despite legal moves:\n%s", i, text)
+		}
+		for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
+			if !validUCILine(line) {
+				t.Fatalf("session %d non-UCI stdout line: %q\n%s", i, line, text)
+			}
+		}
+	}
+}
+
 func TestUCITraceFileOption(t *testing.T) {
 	tracePath := filepath.Join(t.TempDir(), "trace.jsonl")
 	input := strings.Join([]string{
