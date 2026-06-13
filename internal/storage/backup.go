@@ -225,8 +225,13 @@ func closeZipWithError(zipWriter *zip.Writer, file *os.File, archivePath string,
 
 func safeArchiveName(name string) bool {
 	name = filepath.ToSlash(strings.TrimSpace(name))
-	if name == "" || strings.HasPrefix(name, "/") || strings.Contains(name, "../") || name == ".." || strings.Contains(name, "\x00") {
+	if name == "" || strings.HasPrefix(name, "/") || strings.Contains(name, "\x00") || strings.Contains(name, "\\") {
 		return false
+	}
+	for _, part := range strings.Split(name, "/") {
+		if part == "" || part == "." || part == ".." {
+			return false
+		}
 	}
 	return true
 }

@@ -74,3 +74,33 @@ func TestRestoreBackupRejectsPathTraversal(t *testing.T) {
 		t.Fatal("expected path traversal archive to fail")
 	}
 }
+
+func TestSafeArchiveNameRejectsAmbiguousSegments(t *testing.T) {
+	valid := []string{
+		"config/config.yaml",
+		"logs/games/game.json",
+		"logs/trace.jsonl",
+	}
+	for _, name := range valid {
+		if !safeArchiveName(name) {
+			t.Fatalf("safeArchiveName(%q) = false, want true", name)
+		}
+	}
+	invalid := []string{
+		"",
+		"/absolute",
+		"../escape",
+		"logs/..",
+		"logs/../escape",
+		"logs/./trace.jsonl",
+		"logs//trace.jsonl",
+		`..\escape`,
+		"logs\\escape",
+		"bad\x00name",
+	}
+	for _, name := range invalid {
+		if safeArchiveName(name) {
+			t.Fatalf("safeArchiveName(%q) = true, want false", name)
+		}
+	}
+}
