@@ -1,0 +1,50 @@
+name: Requirement-tracked issue
+description: Track work against the Noema64 PRD.
+title: "[REQ] "
+labels:
+  - needs-design
+body:
+  - type: input
+    id: requirement_ids
+    attributes:
+      label: Requirement IDs
+      description: Comma-separated PRD IDs such as CHESS-001, STRAT-001, MOVE-002, UCI-001, GUI-003, DATA-005, SEC-001, TEST-005, DOC-001.
+      placeholder: "MOVE-002, TEST-005"
+    validations:
+      required: true
+  - type: textarea
+    id: user_value
+    attributes:
+      label: User value
+      description: Who benefits, and what becomes possible?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_test
+    attributes:
+      label: Acceptance test
+      description: Concrete behavior, command, test, or manual QA signal that proves this is done.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - "area:engine"
+        - "area:gui"
+        - "area:llm"
+        - "area:uci"
+        - "area:verifier"
+        - "area:docs"
+        - "area:tests"
+        - "security"
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk
+      description: What can break, regress, leak, or become misleading?
+    validations:
+      required: true

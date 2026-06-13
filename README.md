@@ -111,6 +111,8 @@ quit
 
 The UCI process writes protocol output only to stdout. JSON traces are written to local files when enabled. GUI game snapshots are stored under `logging.output_dir/games`.
 
+For bot bridge usage, see [docs/lichess-bot.md](docs/lichess-bot.md).
+
 ## Limitations
 
 - The static verifier is intentionally shallow.
