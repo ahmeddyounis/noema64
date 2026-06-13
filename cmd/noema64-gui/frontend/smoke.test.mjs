@@ -507,6 +507,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "document.querySelector(\"#settingsOutput\").textContent = \"\"",
     "clearFieldInvalid(document.querySelector(\"#settingKey\"))",
     "const settingsSaveErrorFields",
+    "llm\\.endpoint",
+    "llm\\.model",
     "llm\\.temperature",
     "llm\\.timeout_ms",
     "verifier\\.movetime_ms",

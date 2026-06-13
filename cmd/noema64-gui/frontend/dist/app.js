@@ -1826,7 +1826,12 @@ function markProviderProfileCustom() {
 }
 
 const settingsSaveErrorFields = [
+  [/engine\.default_mode|default mode/i, "#settingMode"],
+  [/engine\.personality|personality/i, "#settingPersonality"],
   [/engine\.max_candidates|max candidates/i, "#settingMaxCandidates"],
+  [/llm\.provider|provider is invalid/i, "#settingProvider"],
+  [/llm\.endpoint|endpoint/i, "#settingEndpoint"],
+  [/llm\.model|model/i, "#settingModel"],
   [/llm\.temperature|temperature/i, "#settingTemperature"],
   [/llm\.timeout_ms|llm timeout/i, "#settingTimeout"],
   [/verifier\.movetime_ms|verifier movetime|movetime/i, "#settingVerifierMoveTime"],
