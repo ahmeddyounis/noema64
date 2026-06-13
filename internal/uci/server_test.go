@@ -408,6 +408,32 @@ func TestUCIPonderhitDuringActiveSearch(t *testing.T) {
 	}
 }
 
+func TestUCIPonderHoldsBestmoveUntilPonderhit(t *testing.T) {
+	var out bytes.Buffer
+	settings := storage.DefaultSettings()
+	settings.Logging.OutputDir = t.TempDir()
+	server := NewServer(strings.NewReader(""), &out, &bytes.Buffer{}, settings)
+	server.opts.Provider = providers.MockProvider{Behavior: "slow"}
+	server.engine.SetOptions(server.opts)
+	if err := server.handle(context.Background(), "position startpos"); err != nil {
+		t.Fatalf("position: %v", err)
+	}
+	if err := server.handle(context.Background(), "go ponder movetime 1000"); err != nil {
+		t.Fatalf("go ponder: %v", err)
+	}
+	time.Sleep(120 * time.Millisecond)
+	if strings.Contains(out.String(), "bestmove ") {
+		t.Fatalf("ponder emitted bestmove before ponderhit:\n%s", out.String())
+	}
+	if err := server.handle(context.Background(), "ponderhit"); err != nil {
+		t.Fatalf("ponderhit: %v", err)
+	}
+	server.stop()
+	if !strings.Contains(out.String(), "bestmove ") {
+		t.Fatalf("missing bestmove after ponderhit:\n%s", out.String())
+	}
+}
+
 func TestUCIPonderhitWithoutActiveSearch(t *testing.T) {
 	var out bytes.Buffer
 	server := NewServer(strings.NewReader(""), &out, &bytes.Buffer{}, storage.DefaultSettings())

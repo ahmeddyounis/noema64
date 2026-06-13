@@ -49,6 +49,8 @@ type Server struct {
 	traceEnabled     bool
 	searchCancel     context.CancelFunc
 	searchDone       chan struct{}
+	searchPonder     bool
+	ponderRelease    chan struct{}
 }
 
 func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.Settings) *Server {
@@ -356,19 +358,49 @@ func (s *Server) goCommand(ctx context.Context, args []string) error {
 			budget = 50 * time.Millisecond
 		}
 	}
+	ponder := indexOf(args, "ponder") >= 0
 	searchCtx, cancel := context.WithTimeout(ctx, budget)
 	done := make(chan struct{})
+	var release chan struct{}
+	if ponder {
+		release = make(chan struct{})
+	}
 	s.searchCancel = cancel
 	s.searchDone = done
+	s.searchPonder = ponder
+	s.ponderRelease = release
 	s.mu.Unlock()
 
 	go func() {
 		defer close(done)
 		defer cancel()
+		defer s.clearSearch(done)
+		if ponder {
+			dec, err := s.engine.AnalyzePosition(searchCtx)
+			select {
+			case <-release:
+			case <-searchCtx.Done():
+				s.bestmove(s.bestKnownMove())
+				return
+			}
+			if err != nil {
+				s.bestmove(s.bestKnownMove())
+				return
+			}
+			if s.traceEnabled {
+				_ = s.traceStore.AppendDecision(context.Background(), dec)
+			}
+			s.emitDecisionInfo(dec)
+			if _, err := s.engine.ApplyUserMove(context.Background(), dec.SelectedMove.UCI); err != nil {
+				s.bestmove(s.bestKnownMove())
+				return
+			}
+			s.bestmove(dec.SelectedMove.UCI)
+			return
+		}
 		dec, _, err := s.engine.ChooseMove(searchCtx)
 		if err != nil {
 			s.bestmove(s.bestKnownMove())
-			s.clearSearch(done)
 			return
 		}
 		if s.traceEnabled {
@@ -376,7 +408,6 @@ func (s *Server) goCommand(ctx context.Context, args []string) error {
 		}
 		s.emitDecisionInfo(dec)
 		s.bestmove(dec.SelectedMove.UCI)
-		s.clearSearch(done)
 	}()
 	return nil
 }
@@ -393,6 +424,11 @@ func (s *Server) stop() {
 	s.mu.Lock()
 	cancel := s.searchCancel
 	done := s.searchDone
+	release := s.ponderRelease
+	if release != nil {
+		close(release)
+		s.ponderRelease = nil
+	}
 	s.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -410,6 +446,11 @@ func (s *Server) stop() {
 func (s *Server) ponderhit() {
 	s.mu.Lock()
 	active := s.searchCancel != nil
+	release := s.ponderRelease
+	if release != nil {
+		close(release)
+		s.ponderRelease = nil
+	}
 	s.mu.Unlock()
 	if active {
 		s.info("ponderhit accepted")
@@ -424,6 +465,8 @@ func (s *Server) clearSearch(done chan struct{}) {
 	if s.searchDone == done {
 		s.searchCancel = nil
 		s.searchDone = nil
+		s.searchPonder = false
+		s.ponderRelease = nil
 	}
 }
 
