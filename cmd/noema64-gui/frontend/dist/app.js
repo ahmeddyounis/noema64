@@ -2522,15 +2522,17 @@ async function loadPromptEditor() {
     clearFieldInvalid(document.querySelector("#promptSaveDir"));
     renderWorkflowPanel();
     showSuccess("Prompt pack loaded.");
+    return true;
   } catch (err) {
     showError(err, "#promptOutput");
+    return false;
   }
 }
 
 async function openPromptEditor() {
   document.querySelector("#promptDialog").showModal();
-  await loadPromptEditor();
-  focusDialogInitialControl("#promptSaveDir");
+  const loaded = await loadPromptEditor();
+  focusDialogInitialControl(loaded ? "#promptSaveDir" : "#reloadPromptBtn");
 }
 
 function promptPackFromInputs() {
