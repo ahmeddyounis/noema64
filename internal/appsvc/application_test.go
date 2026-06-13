@@ -1,11 +1,13 @@
 package appsvc
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ahmedyounis/noema64/internal/analysis"
 	"github.com/ahmedyounis/noema64/internal/chesscore"
@@ -1127,6 +1129,61 @@ func TestApplicationRestoresLatestGameAndRecentRecords(t *testing.T) {
 	}
 	if loaded.Snapshot.GameID != before.Snapshot.GameID || len(loaded.Snapshot.MoveHistory) != len(before.Snapshot.MoveHistory) {
 		t.Fatalf("loaded game mismatch: %+v", loaded.Snapshot)
+	}
+}
+
+func TestNewApplicationSkipsUnrestorableLatestGame(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	settings := storage.DefaultSettings()
+	settings.Logging.OutputDir = filepath.Join(dir, "logs")
+	if err := storage.SaveSettings(configPath, settings); err != nil {
+		t.Fatalf("save settings: %v", err)
+	}
+
+	app := NewApplication(configPath)
+	if _, err := app.MakeUserMove("e2e4"); err != nil {
+		t.Fatalf("user move: %v", err)
+	}
+	valid, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get valid game: %v", err)
+	}
+	if len(valid.Snapshot.MoveHistory) != 1 {
+		t.Fatalf("valid game plies = %d, want 1", len(valid.Snapshot.MoveHistory))
+	}
+
+	invalidState := *valid
+	invalidState.SchemaVersion = "game-state.v99"
+	newer := storage.GameRecord{
+		SchemaVersion: "game-record.v1",
+		SavedAt:       time.Now().UTC().Add(time.Second).Format(time.RFC3339Nano),
+		GameID:        "future",
+		State:         invalidState,
+	}
+	b, err := json.MarshalIndent(newer, "", "  ")
+	if err != nil {
+		t.Fatalf("marshal invalid record: %v", err)
+	}
+	newerPath := filepath.Join(settings.Logging.OutputDir, "games", "future.json")
+	if err := os.WriteFile(newerPath, append(b, '\n'), 0o600); err != nil {
+		t.Fatalf("write invalid latest record: %v", err)
+	}
+	newerModTime := time.Now().Add(time.Second)
+	if err := os.Chtimes(newerPath, newerModTime, newerModTime); err != nil {
+		t.Fatalf("touch invalid latest record: %v", err)
+	}
+
+	restored := NewApplication(configPath)
+	state, err := restored.GetGame()
+	if err != nil {
+		t.Fatalf("get restored game: %v", err)
+	}
+	if state.Snapshot.GameID != valid.Snapshot.GameID {
+		t.Fatalf("restored game id = %s, want older valid %s", state.Snapshot.GameID, valid.Snapshot.GameID)
+	}
+	if len(state.Snapshot.MoveHistory) != len(valid.Snapshot.MoveHistory) {
+		t.Fatalf("restored plies = %d, want %d", len(state.Snapshot.MoveHistory), len(valid.Snapshot.MoveHistory))
 	}
 }
 

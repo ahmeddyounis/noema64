@@ -30,8 +30,9 @@ type Application struct {
 }
 
 const (
-	maxFENImportBytes = 512
-	maxPGNImportBytes = 1 << 20
+	maxFENImportBytes           = 512
+	maxPGNImportBytes           = 1 << 20
+	maxStartupRestoreCandidates = 25
 )
 
 type EventSink func(name string, payload any)
@@ -522,11 +523,18 @@ func (a *Application) Modes() []strategy.EngineMode {
 }
 
 func (a *Application) restoreLatestGame() {
-	record, err := a.games.LoadLatest(context.Background())
+	if a.games == nil {
+		return
+	}
+	records, err := a.games.List(context.Background(), maxStartupRestoreCandidates)
 	if err != nil {
 		return
 	}
-	_, _ = a.engine.LoadState(context.Background(), record.State)
+	for _, record := range records {
+		if _, err := a.engine.LoadState(context.Background(), record.State); err == nil {
+			return
+		}
+	}
 }
 
 func (a *Application) persistGameState(state *engine.GameState) error {
