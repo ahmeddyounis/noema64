@@ -39,6 +39,11 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /data-command="newGame"/);
   assert.match(indexHTML, /data-command="experiments"/);
   assert.match(indexHTML, /data-command="prompts"/);
+  const workflowLabels = [...indexHTML.matchAll(/<button type="button" data-command="[^"]+"[^>]*aria-label="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(workflowLabels.length, 18);
+  assert.equal(new Set(workflowLabels).size, workflowLabels.length);
+  assert.ok(workflowLabels.includes("Export review trace"));
+  assert.ok(workflowLabels.includes("Open local assets in developer lab"));
   assert.match(indexHTML, />Position Setup</);
   assert.match(indexHTML, />Provider Health</);
   assert.match(indexHTML, /aria-label="Chess board workspace"/);

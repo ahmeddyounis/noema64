@@ -70,8 +70,8 @@
                 <span id="playFlowMeta">Loading position</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="engine" data-requires="game" class="primary-command">Engine Move</button>
-                <button type="button" data-command="analyze" data-requires="game">Analyze</button>
+                <button type="button" data-command="engine" data-requires="game" class="primary-command" aria-label="Ask engine for current game">Engine Move</button>
+                <button type="button" data-command="analyze" data-requires="game" aria-label="Analyze current game">Analyze</button>
               </div>
             </article>
             <article class="workflow-card" data-workspace-card="play">
@@ -80,8 +80,8 @@
                 <span id="setupFlowMeta">Default setup</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="newGame" class="primary-command">New Game</button>
-                <button type="button" data-command="import">Import</button>
+                <button type="button" data-command="newGame" class="primary-command" aria-label="Start new game">New Game</button>
+                <button type="button" data-command="import" aria-label="Import position setup">Import</button>
               </div>
             </article>
             <article class="workflow-card" data-workspace-card="play">
@@ -90,8 +90,8 @@
                 <span id="recordFlowMeta">No moves recorded</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="recent">Recent</button>
-                <button type="button" data-command="export" data-requires="game">Export</button>
+                <button type="button" data-command="recent" aria-label="Open recent game records">Recent</button>
+                <button type="button" data-command="export" data-requires="game" aria-label="Export game record">Export</button>
               </div>
             </article>
 
@@ -101,8 +101,8 @@
                 <span id="reviewFlowMeta">No decision recorded</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="review" data-requires="game" class="primary-command">Review</button>
-                <button type="button" data-command="export" data-requires="game">Export</button>
+                <button type="button" data-command="review" data-requires="game" class="primary-command" aria-label="Review decision trace">Review</button>
+                <button type="button" data-command="export" data-requires="game" aria-label="Export review trace">Export</button>
               </div>
             </article>
             <article class="workflow-card" data-workspace-card="study">
@@ -111,8 +111,8 @@
                 <span id="studyFlowMeta">No game loaded</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="study" data-requires="game" class="primary-command">Study Tools</button>
-                <button type="button" data-command="recent">Recent</button>
+                <button type="button" data-command="study" data-requires="game" class="primary-command" aria-label="Open study tools">Study Tools</button>
+                <button type="button" data-command="recent" aria-label="Open recent study game">Recent</button>
               </div>
             </article>
             <article class="workflow-card" data-workspace-card="study">
@@ -121,8 +121,8 @@
                 <span id="memoryFlowMeta">No strategy recorded</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="analyze" data-requires="game">Analyze</button>
-                <button type="button" data-command="settings">Settings</button>
+                <button type="button" data-command="analyze" data-requires="game" aria-label="Analyze strategy memory">Analyze</button>
+                <button type="button" data-command="settings" aria-label="Open strategy memory settings">Settings</button>
               </div>
             </article>
 
@@ -132,8 +132,8 @@
                 <span id="providerFlowMeta">Mock provider</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="experiments" class="primary-command">Provider Tests</button>
-                <button type="button" data-command="settings">Settings</button>
+                <button type="button" data-command="experiments" class="primary-command" aria-label="Run provider tests">Provider Tests</button>
+                <button type="button" data-command="settings" aria-label="Open provider settings">Settings</button>
               </div>
             </article>
             <article class="workflow-card" data-workspace-card="lab">
@@ -142,8 +142,8 @@
                 <span id="promptFlowMeta">Default prompt pack</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="prompts" class="primary-command">Prompts</button>
-                <button type="button" data-command="lab">Developer Lab</button>
+                <button type="button" data-command="prompts" class="primary-command" aria-label="Open prompt editor">Prompts</button>
+                <button type="button" data-command="lab" aria-label="Open prompt workbench in developer lab">Developer Lab</button>
               </div>
             </article>
             <article class="workflow-card" data-workspace-card="lab">
@@ -152,8 +152,8 @@
                 <span id="assetFlowMeta">Logs and backups</span>
               </div>
               <div class="workflow-card-actions">
-                <button type="button" data-command="lab" class="primary-command">Developer Lab</button>
-                <button type="button" data-command="export" data-requires="game">Export</button>
+                <button type="button" data-command="lab" class="primary-command" aria-label="Open local assets in developer lab">Developer Lab</button>
+                <button type="button" data-command="export" data-requires="game" aria-label="Export local assets">Export</button>
               </div>
             </article>
           </div>
