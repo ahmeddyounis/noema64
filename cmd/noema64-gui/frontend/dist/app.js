@@ -779,13 +779,21 @@ async function refreshExport() {
   const type = document.querySelector("#exportType").value;
   if (type === "fen") {
     document.querySelector("#exportText").value = await call("ExportFEN");
-    return;
+    return true;
   }
   if (type === "trace") {
+    if (!confirmRawTraceExport()) return false;
     document.querySelector("#exportText").value = await call("ExportTrace");
-    return;
+    return true;
   }
   document.querySelector("#exportText").value = await call("ExportPGN");
+  return true;
+}
+
+function confirmRawTraceExport() {
+  const privacy = settings?.privacy || {};
+  if (!privacy.log_raw_prompts && !privacy.log_raw_llm_responses) return true;
+  return window.confirm("Trace export may include raw prompts or raw LLM responses because raw logging is enabled. Continue?");
 }
 
 document.querySelector("#refreshExportBtn").addEventListener("click", async () => {
@@ -804,7 +812,7 @@ document.querySelector("#exportType").addEventListener("change", async () => {
 });
 document.querySelector("#exportBtn").addEventListener("click", async () => {
   try {
-    await refreshExport();
+    if (!await refreshExport()) return;
     document.querySelector("#exportDialog").showModal();
   } catch (err) {
     showError(err);

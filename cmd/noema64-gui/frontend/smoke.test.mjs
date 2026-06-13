@@ -93,6 +93,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Undo",
     "ExportPGN",
     "ExportTrace",
+    "confirmRawTraceExport",
+    "raw logging is enabled",
     "ImportPGN",
     "RunRandomBenchmark",
     "RunModeBenchmark",
