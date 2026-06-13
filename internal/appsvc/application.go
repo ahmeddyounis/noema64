@@ -445,7 +445,7 @@ func selectedCustomPersonality(settings storage.Settings) *strategy.PersonalityP
 
 func providerRequiresPrivacyAck(provider string) bool {
 	switch provider {
-	case "openai_compatible", "anthropic", "gemini":
+	case "openai_compatible", "anthropic", "gemini", "ollama":
 		return true
 	default:
 		return false

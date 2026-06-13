@@ -238,6 +238,22 @@ func TestSaveSettingsRequiresCloudProviderAcknowledgement(t *testing.T) {
 	}
 }
 
+func TestSaveSettingsRequiresAcknowledgementForOllamaEndpoint(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.LLM.Provider = "ollama"
+	settings.LLM.Endpoint = "http://localhost:11434"
+	settings.LLM.Model = "llama3.1"
+	settings.Privacy.CloudProviderWarningAcknowledged = false
+	if err := app.SaveSettings(settings); err == nil {
+		t.Fatal("expected ollama endpoint settings without acknowledgement to fail")
+	}
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save acknowledged ollama settings: %v", err)
+	}
+}
+
 func TestSaveSettingsStoresSelectedProviderProfile(t *testing.T) {
 	app, _ := newTestApplication(t)
 	settings := app.settings
@@ -715,6 +731,7 @@ func TestProviderDashboardHonorsProfilePrivacy(t *testing.T) {
 	}
 	var sawMockHealthy bool
 	var sawPrivacyGate bool
+	var sawOllamaPrivacyGate bool
 	for _, profile := range dashboard.Profiles {
 		if profile.Provider == "mock" && profile.Healthy {
 			sawMockHealthy = true
@@ -722,8 +739,11 @@ func TestProviderDashboardHonorsProfilePrivacy(t *testing.T) {
 		if profile.Provider == "openai_compatible" && profile.Status == "privacy_ack_required" {
 			sawPrivacyGate = true
 		}
+		if profile.Provider == "ollama" && profile.Status == "privacy_ack_required" {
+			sawOllamaPrivacyGate = true
+		}
 	}
-	if !sawMockHealthy || !sawPrivacyGate {
+	if !sawMockHealthy || !sawPrivacyGate || !sawOllamaPrivacyGate {
 		t.Fatalf("dashboard did not expose expected profile statuses: %+v", dashboard.Profiles)
 	}
 }

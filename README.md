@@ -100,7 +100,7 @@ llm:
   api_key: ""
 ```
 
-Cloud provider mode may send FEN, legal moves, move history, strategy memory, and settings to the configured provider. Raw prompt logging is off by default.
+Endpoint-backed provider modes may send FEN, legal moves, move history, strategy memory, and settings to the configured provider, including local or remote OpenAI-compatible and Ollama endpoints. Raw prompt logging is off by default.
 
 ## Verifier Setup
 

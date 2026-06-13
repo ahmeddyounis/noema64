@@ -28,7 +28,7 @@ The GUI experiment dashboard also exposes:
 
 - Position suite runs over deterministic FEN positions covering opening development, king safety, tactical tension, and endgame conversion.
 - Tournament runs over core engine modes and reports rating-pool standings.
-- Provider comparison runs the same position suite across configured provider profiles. Cloud or local OpenAI-compatible profiles are skipped until the cloud-provider acknowledgement is enabled, so comparison does not silently transmit game data.
+- Provider comparison runs the same position suite across configured provider profiles. Endpoint-backed profiles such as OpenAI-compatible, Anthropic, Gemini, and Ollama are skipped until the cloud-provider acknowledgement is enabled, so comparison does not silently transmit game data.
 - Provider dashboard health checks with provider capabilities, model, endpoint, timeout, retry, and privacy-gate status.
 
 JSON is the default output format. Use CSV for spreadsheet import or CI artifacts:
