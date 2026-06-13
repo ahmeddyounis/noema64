@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -177,6 +178,9 @@ func readGameRecord(path string) (GameRecord, error) {
 	}
 	if record.SchemaVersion == "" {
 		record.SchemaVersion = gameRecordSchemaVersion
+	}
+	if record.SchemaVersion != gameRecordSchemaVersion {
+		return GameRecord{}, fmt.Errorf("game record schema_version %q is unsupported by this release", record.SchemaVersion)
 	}
 	return record, nil
 }

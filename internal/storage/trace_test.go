@@ -35,6 +35,7 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		},
 		Timing:        decision.Timing{TotalMS: 10, ProviderMS: 6, VerifierMS: 3, SearchMS: 1},
 		VerifierTrace: &verifier.Result{Enabled: true, Used: true, Name: "static_safety"},
+		AnalysisOnly:  true,
 		Stages: []decision.StageTrace{{
 			Name:       "asking_provider",
 			Status:     "completed",
@@ -74,6 +75,7 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		PromptVersion   string              `json:"prompt_version"`
 		LLMParseStatus  string              `json:"llm_parse_status"`
 		SelectedMove    string              `json:"selected_move"`
+		AnalysisOnly    bool                `json:"analysis_only"`
 		FallbackUsed    bool                `json:"fallback_used"`
 		TimingMS        map[string]int64    `json:"timing_ms"`
 		Stages          []struct {
@@ -110,6 +112,9 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 	if record.FENBefore != "startpos" || record.LegalMovesCount != 20 || record.SelectedMove != "g1f3" {
 		t.Fatalf("missing top-level position fields: %+v", record)
+	}
+	if !record.AnalysisOnly {
+		t.Fatalf("missing analysis-only disclosure: %+v", record)
 	}
 	if record.Mode != strategy.ModeBlunderguard || record.Provider != "mock" || record.Model != "mock-balanced" || record.PromptVersion != strategy.PromptVersion {
 		t.Fatalf("missing DATA-005 provider metadata: %+v", record)

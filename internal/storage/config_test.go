@@ -48,6 +48,16 @@ func TestLoadSettingsMergesDefaults(t *testing.T) {
 	}
 }
 
+func TestLoadSettingsRejectsUnknownFutureSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("schema_version: \"99.0\"\n"), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := LoadSettings(path); err == nil {
+		t.Fatal("expected unknown future settings schema to fail")
+	}
+}
+
 func TestSaveSettingsStoresSelectedProviderProfile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	settings := DefaultSettings()

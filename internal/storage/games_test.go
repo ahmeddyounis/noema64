@@ -99,3 +99,14 @@ func TestGameStoreListSkipsCorruptRecords(t *testing.T) {
 		t.Fatalf("latest game = %s, want %s", latest.GameID, state.Snapshot.GameID)
 	}
 }
+
+func TestGameStoreRejectsUnknownFutureSchemaOnExplicitLoad(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "future.json"), []byte(`{"schema_version":"game-record.v99","game_id":"future"}`), 0o600); err != nil {
+		t.Fatalf("write future record: %v", err)
+	}
+	store := NewGameStore(dir)
+	if _, err := store.Load(context.Background(), "future"); err == nil {
+		t.Fatal("expected unknown future game record schema to fail")
+	}
+}

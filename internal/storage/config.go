@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -9,6 +10,8 @@ import (
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"gopkg.in/yaml.v3"
 )
+
+const settingsSchemaVersion = "1.0"
 
 type Settings struct {
 	SchemaVersion string           `json:"schema_version" yaml:"schema_version"`
@@ -92,7 +95,7 @@ type LoggingSettings struct {
 
 func DefaultSettings() Settings {
 	return Settings{
-		SchemaVersion: "1.0",
+		SchemaVersion: settingsSchemaVersion,
 		CreatedAt:     time.Now().UTC().Format(time.RFC3339),
 		AppVersion:    "0.1.0",
 		Engine: EngineSettings{
@@ -377,6 +380,9 @@ func findProviderProfile(profiles []ProviderProfile, id string) (ProviderProfile
 func validateSettings(settings Settings) error {
 	if settings.SchemaVersion == "" {
 		return errors.New("settings schema_version is required")
+	}
+	if settings.SchemaVersion != settingsSchemaVersion {
+		return fmt.Errorf("settings schema_version %q is unsupported by this release", settings.SchemaVersion)
 	}
 	switch settings.Engine.DefaultMode {
 	case "pure", "blunderguard", "hybrid", "coach":
