@@ -16,9 +16,15 @@ function expectScriptToken(token) {
 }
 
 test("main GUI screen exposes critical panels", () => {
-  for (const id of ["board", "statusText", "clockText", "modeText", "moveInput", "moveList", "tabContent", "candidates", "strategyMemory"]) {
+  for (const id of ["workspaceNav", "viewPlayBtn", "viewStudyBtn", "viewLabBtn", "mainWorkspace", "board", "statusText", "clockText", "modeText", "moveInput", "moveList", "tabContent", "candidates", "strategyMemory"]) {
     expectMarkupID(id);
   }
+  assert.match(indexHTML, /body data-workspace-view="play"/);
+  assert.match(indexHTML, /id="workspaceNav" class="workspace-nav" role="tablist" aria-label="Workspace"/);
+  assert.match(indexHTML, /id="viewPlayBtn"[\s\S]*data-workspace-target="play"[\s\S]*aria-selected="true"/);
+  assert.match(indexHTML, /id="viewStudyBtn"[\s\S]*data-workspace-target="study"/);
+  assert.match(indexHTML, /id="viewLabBtn"[\s\S]*data-workspace-target="lab"/);
+  assert.match(indexHTML, /id="mainWorkspace" class="workspace" role="tabpanel" aria-labelledby="viewPlayBtn"/);
   assert.match(indexHTML, /aria-label="Chess board workspace"/);
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
@@ -30,6 +36,8 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /board-empty-state/);
   assert.match(indexHTML, /Loading board/);
   assert.match(indexHTML, /data-tab="prompt"/);
+  assert.match(indexHTML, /id="promptTab"[\s\S]*data-lab-only="true"/);
+  assert.match(indexHTML, /id="rawTab"[\s\S]*data-lab-only="true"/);
   assert.match(indexHTML, /Trace JSONL/);
   assert.match(indexHTML, /Debug trace JSONL/);
   assert.match(indexHTML, /Fine-tune JSONL/);
@@ -82,8 +90,14 @@ test("primary toolbar and dialogs expose expected controls", () => {
     assert.match(indexHTML, new RegExp(`aria-label="${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `missing aria-label for ${label}`);
   }
   assert.match(indexHTML, /aria-label="Close dialog"/);
-  assert.match(indexHTML, /role="toolbar" aria-label="Game controls"/);
-  assert.match(indexHTML, /class="toolbar-group" role="group" aria-label="Game"/);
+  assert.match(indexHTML, /role="toolbar" aria-label="Workspace actions"/);
+  assert.match(indexHTML, /class="toolbar-group" data-action-scope="play" role="group" aria-label="Play actions"/);
+  assert.match(indexHTML, /class="toolbar-group" data-action-scope="study" role="group" aria-label="Study actions"/);
+  assert.match(indexHTML, /class="toolbar-group" data-action-scope="lab" role="group" aria-label="Lab actions"/);
+  assert.match(indexHTML, /class="toolbar-group toolbar-group-global" data-action-scope="global"/);
+  assert.match(indexHTML, />New Game</);
+  assert.match(indexHTML, />Engine Move</);
+  assert.match(indexHTML, />Developer Lab</);
   assert.match(indexHTML, /class="check-label"><input id="settingAutoReply"/);
   assert.match(indexHTML, /id="settingClockInitial" type="number" min="0"/);
   assert.match(indexHTML, /dialog id="settingsDialog" aria-labelledby="settingsTitle"/);
@@ -254,6 +268,22 @@ test("bundle wires core actions and renders trace metadata", () => {
     "arrowGeometry",
     "renderBoardOverlay",
     "renderUnavailableState",
+    "function asArray(value)",
+    "function asObject(value)",
+    "function asText(value",
+    "function textAreaValue(value)",
+    "function normalizePromptPack(value)",
+    "function gameStateFromResult(value)",
+    "function applyGameStateResult(value)",
+    "normalizeRenderableState",
+    "snapshot.move_history = asArray(snapshot.move_history)",
+    "snapshot.legal_moves = asArray(snapshot.legal_moves)",
+    "snapshot.board = snapshot.board && typeof snapshot.board === \"object\" ? snapshot.board : {}",
+    "normalized.llm.profiles = asArray(normalized.llm.profiles)",
+    "const candidates = asArray(dec?.candidate_moves)",
+    "const results = asArray(summary.results)",
+    "const recommendations = asArray(review.recommendations)",
+    "const items = asArray(records)",
     "renderBoardEmpty",
     "renderMoveListEmpty",
     "renderStrategyRows",
@@ -265,9 +295,33 @@ test("bundle wires core actions and renders trace metadata", () => {
     "setControlBusy",
     "withBusyControl",
     "bindBusyButton",
+    "workspaceViews",
+    "setWorkspaceView",
+    "bindWorkspaceNavigation",
+    "moveWorkspaceViewFocus",
+    "document.body.dataset.workspaceView",
+    "data-workspace-target",
+    "next !== \"lab\" && [\"prompt\", \"raw\"].includes(activeTab)",
+    "bindDialogCloseButtons",
+    "dialog button[value='cancel']",
+    "dialog.close(\"cancel\")",
+    "button.disabled = !gameID",
+    "Cannot load ${title.textContent}; missing game id",
     "controlFrom",
     "busyKey",
     "resetBoardEntry",
+    "defaultSettings",
+    "normalizeSettingsShape",
+    "settings = normalizeSettingsShape(await call(\"GetSettings\"))",
+    "settings = normalizeSettingsShape(settings)",
+    "renderBoardEmpty(\"Board unavailable\"",
+    "applyGameStateResult(await call(\"RequestEngineMove\"))",
+    "applyGameStateResult(await call(\"MakeUserMove\", normalizedMove))",
+    "applyGameStateResult(type === \"fen\" ? await call(\"ImportFEN\", text) : await call(\"ImportPGN\", text))",
+    "Analysis complete. No game state is loaded.",
+    "promptPack = normalizePromptPack(await call(\"PromptTemplatePack\"))",
+    "textAreaValue(await call(\"ExportProviderProfiles\"))",
+    "textAreaValue(workflow?.dataset_jsonl)",
     "parseJSONField",
     "field.focus()",
     "must be valid JSON",
@@ -333,6 +387,12 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /button\[aria-busy="true"\]::after/);
   assert.match(stylesCSS, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(stylesCSS, /\.toolbar-group/);
+  assert.match(stylesCSS, /#app \{[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);/);
+  assert.match(stylesCSS, /\.workspace-nav/);
+  assert.match(stylesCSS, /\.workspace-nav button\[aria-selected="true"\]/);
+  assert.match(stylesCSS, /body\[data-workspace-view="play"\] \[data-action-scope="study"\]/);
+  assert.match(stylesCSS, /body:not\(\[data-workspace-view="lab"\]\) \[data-lab-only="true"\]/);
+  assert.match(stylesCSS, /\.toolbar-group-global/);
   assert.match(stylesCSS, /\.board-empty-state/);
   assert.match(stylesCSS, /\.empty-copy/);
   assert.match(stylesCSS, /\.trace-panel \{[\s\S]*grid-template-rows:/);
@@ -346,9 +406,16 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /position: sticky/);
   assert.match(stylesCSS, /\.settings \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(stylesCSS, /\.settings menu \{[\s\S]*flex-wrap: wrap;/);
+  assert.match(stylesCSS, /calc\(\(74vh - 154px\) \* var\(--board-files, 8\) \/ var\(--board-ranks, 8\)\)/);
+  assert.match(stylesCSS, /body \{[\s\S]*min-width: 0;/);
+  assert.match(stylesCSS, /@media \(min-width: 1241px\)/);
   assert.match(stylesCSS, /@media \(max-width: 1240px\)/);
   assert.match(stylesCSS, /@media \(max-width: 760px\)/);
   assert.match(stylesCSS, /@media \(max-width: 520px\)/);
+  assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.board-area \{[\s\S]*grid-template-rows: auto auto auto minmax\(96px, auto\);[\s\S]*min-height: 0;/);
+  assert.match(stylesCSS, /\.board \{[\s\S]*width: min\(100%, calc\(100vw - 44px\)\);[\s\S]*max-height: none;/);
+  assert.match(stylesCSS, /\.move-list \{[\s\S]*max-height: 160px;/);
+  assert.match(stylesCSS, /pre,\n  textarea \{[\s\S]*min-height: 160px;/);
   assert.match(stylesCSS, /\.settings menu button,\n  \.dialog-actions button \{[\s\S]*flex: 1 1 128px;/);
   assert.match(stylesCSS, /\.candidate \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) max-content;/);
   assert.match(stylesCSS, /\.candidate strong \{[\s\S]*grid-column: 1;/);

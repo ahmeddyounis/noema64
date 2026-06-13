@@ -10,6 +10,7 @@ let focusedSquare = "e2";
 let boardKeyboardMode = false;
 let flipped = false;
 let activeTab = "summary";
+let activeWorkspaceView = "play";
 let settings = null;
 let playerSide = "white";
 let autoReply = true;
@@ -20,6 +21,7 @@ let applyingProviderProfile = false;
 let lastStageEvent = null;
 let promptPack = null;
 const busyControls = new Set();
+const workspaceViews = ["play", "study", "lab"];
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -28,6 +30,118 @@ const timeControlPresets = {
   rapid: { initial_ms: 600000, increment_ms: 0 },
   classical: { initial_ms: 1800000, increment_ms: 0 }
 };
+
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function asObject(value) {
+  return value && typeof value === "object" ? value : {};
+}
+
+function asText(value, fallback = "") {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return fallback;
+  return String(value);
+}
+
+function textAreaValue(value) {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch (err) {
+    return String(value);
+  }
+}
+
+function normalizePromptPack(value) {
+  const pack = asObject(value);
+  return {
+    schema_version: asText(pack.schema_version, "prompt-template-pack.v1"),
+    source: asText(pack.source, "default"),
+    manifest: asObject(pack.manifest),
+    system: asText(pack.system),
+    user: asText(pack.user),
+    schema: asText(pack.schema)
+  };
+}
+
+function gameStateFromResult(value) {
+  if (value?.state && typeof value.state === "object") return value.state;
+  return value && typeof value === "object" ? value : null;
+}
+
+function applyGameStateResult(value) {
+  state = gameStateFromResult(value);
+  resetBoardEntry();
+  render();
+  return state;
+}
+
+function defaultSettings() {
+  return {
+    engine: {
+      default_mode: "blunderguard",
+      personality: "balanced",
+      custom_personality_id: "",
+      custom_personalities: [],
+      max_candidates: 5,
+      trace_enabled: true
+    },
+    llm: {
+      provider: "mock",
+      endpoint: "",
+      model: "mock-balanced",
+      temperature: 0.2,
+      max_tokens: 1600,
+      timeout_ms: 12000,
+      retries: 1,
+      profile_id: "custom",
+      profiles: []
+    },
+    verifier: {
+      enabled: false,
+      path: "",
+      movetime_ms: 100,
+      max_centipawn_loss: 180,
+      tablebase_enabled: false,
+      tablebase_path: "",
+      tablebase_timeout_ms: 1000
+    },
+    gui: {
+      theme: "system",
+      time_control: "untimed",
+      clock_initial_ms: 0,
+      clock_increment_ms: 0
+    },
+    privacy: {
+      cloud_provider_warning_acknowledged: false,
+      log_raw_prompts: false,
+      log_raw_llm_responses: false
+    },
+    logging: {
+      output_dir: "logs"
+    }
+  };
+}
+
+function normalizeSettingsShape(value) {
+  const defaults = defaultSettings();
+  const source = value && typeof value === "object" ? value : {};
+  const normalized = {
+    ...source,
+    engine: { ...defaults.engine, ...(source.engine && typeof source.engine === "object" ? source.engine : {}) },
+    llm: { ...defaults.llm, ...(source.llm && typeof source.llm === "object" ? source.llm : {}) },
+    verifier: { ...defaults.verifier, ...(source.verifier && typeof source.verifier === "object" ? source.verifier : {}) },
+    gui: { ...defaults.gui, ...(source.gui && typeof source.gui === "object" ? source.gui : {}) },
+    privacy: { ...defaults.privacy, ...(source.privacy && typeof source.privacy === "object" ? source.privacy : {}) },
+    logging: { ...defaults.logging, ...(source.logging && typeof source.logging === "object" ? source.logging : {}) }
+  };
+  normalized.engine.custom_personalities = asArray(normalized.engine.custom_personalities);
+  normalized.llm.profiles = asArray(normalized.llm.profiles);
+  return normalized;
+}
 
 const api = () => window.go?.appsvc?.Application;
 
@@ -104,6 +218,66 @@ function bindBusyButton(selector, action) {
   });
 }
 
+function bindDialogCloseButtons() {
+  document.querySelectorAll("dialog button[value='cancel']").forEach((button) => {
+    button.type = "button";
+    button.addEventListener("click", () => {
+      const dialog = button.closest("dialog");
+      if (dialog?.open) dialog.close("cancel");
+    });
+  });
+}
+
+function setWorkspaceView(view, focus = false) {
+  const next = workspaceViews.includes(view) ? view : "play";
+  activeWorkspaceView = next;
+  document.body.dataset.workspaceView = next;
+  document.querySelectorAll("#workspaceNav button[data-workspace-target]").forEach((button) => {
+    const selectedView = button.dataset.workspaceTarget === next;
+    button.classList.toggle("active", selectedView);
+    button.setAttribute("aria-selected", selectedView ? "true" : "false");
+    button.tabIndex = selectedView ? 0 : -1;
+    if (selectedView && focus) button.focus();
+  });
+  const selected = document.querySelector(`#workspaceNav button[data-workspace-target="${next}"]`);
+  if (selected) document.querySelector("#mainWorkspace")?.setAttribute("aria-labelledby", selected.id);
+  if (next !== "lab" && ["prompt", "raw"].includes(activeTab)) {
+    activateTraceTab(document.querySelector("#summaryTab"));
+  }
+}
+
+function moveWorkspaceViewFocus(current, delta) {
+  const buttons = [...document.querySelectorAll("#workspaceNav button[data-workspace-target]")];
+  const index = buttons.indexOf(current);
+  if (index < 0) return;
+  const next = buttons[(index + delta + buttons.length) % buttons.length];
+  setWorkspaceView(next.dataset.workspaceTarget, true);
+}
+
+function bindWorkspaceNavigation() {
+  document.querySelectorAll("#workspaceNav button[data-workspace-target]").forEach((button) => {
+    button.addEventListener("click", () => setWorkspaceView(button.dataset.workspaceTarget));
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        event.preventDefault();
+        moveWorkspaceViewFocus(button, 1);
+      }
+      if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        event.preventDefault();
+        moveWorkspaceViewFocus(button, -1);
+      }
+      if (event.key === "Home") {
+        event.preventDefault();
+        setWorkspaceView(workspaceViews[0], true);
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        setWorkspaceView(workspaceViews[workspaceViews.length - 1], true);
+      }
+    });
+  });
+}
+
 function resetBoardEntry() {
   selected = null;
   document.querySelector("#moveInput").value = "";
@@ -142,11 +316,22 @@ function render() {
     renderUnavailableState("No game state is available.");
     return;
   }
+  normalizeRenderableState();
   renderBoard();
   renderStatus();
   renderMoves();
   renderStrategy();
   renderDecision();
+}
+
+function normalizeRenderableState() {
+  const snapshot = state.snapshot;
+  snapshot.board = snapshot.board && typeof snapshot.board === "object" ? snapshot.board : {};
+  snapshot.legal_moves = asArray(snapshot.legal_moves);
+  snapshot.move_history = asArray(snapshot.move_history);
+  snapshot.outcome = snapshot.outcome && typeof snapshot.outcome === "object" ? snapshot.outcome : { status: "unknown" };
+  state.clock = state.clock && typeof state.clock === "object" ? state.clock : {};
+  state.variant = state.variant && typeof state.variant === "object" ? state.variant : {};
 }
 
 function renderUnavailableState(message) {
@@ -269,6 +454,10 @@ function squareOrder() {
 }
 
 function renderBoard() {
+  if (!state?.snapshot) {
+    renderBoardEmpty("Board unavailable", "Open Noema64 through the desktop app to connect the game service.");
+    return;
+  }
   const board = document.querySelector("#board");
   board.innerHTML = "";
   board.classList.remove("board-empty-state");
@@ -280,10 +469,11 @@ function renderBoard() {
   board.style.aspectRatio = `${dims.width} / ${dims.height}`;
   board.setAttribute("aria-rowcount", String(dims.height));
   board.setAttribute("aria-colcount", String(dims.width));
+  const legalMoves = asArray(state.snapshot.legal_moves);
   const legalTargets = selected
-    ? state.snapshot.legal_moves.filter((m) => m.from === selected).map((m) => m.to)
+    ? legalMoves.filter((m) => m?.from === selected).map((m) => m?.to)
     : [];
-  const last = state.snapshot.move_history.at(-1);
+  const last = asArray(state.snapshot.move_history).at(-1);
   const lastSquares = splitUCIMoveSquares(last?.uci);
   for (const [index, sq] of order.entries()) {
     const parsed = parseBoardSquare(sq, dims);
@@ -319,17 +509,17 @@ function renderBoard() {
 }
 
 function renderBoardOverlay(board) {
-  const candidates = state?.last_decision?.candidate_moves || [];
+  const candidates = asArray(state?.last_decision?.candidate_moves);
   if (!candidates.length) return;
   const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   overlay.setAttribute("class", "board-overlay");
   overlay.setAttribute("viewBox", "0 0 100 100");
   overlay.setAttribute("aria-hidden", "true");
   for (const [index, candidate] of candidates.slice(0, 4).entries()) {
-    const move = candidate.legal_move || candidate;
-    const parsed = splitUCIMoveSquares(candidate.uci || move.uci);
-    const from = move.from || parsed?.from;
-    const to = move.to || parsed?.to;
+    const move = candidate?.legal_move || candidate || {};
+    const parsed = splitUCIMoveSquares(candidate?.uci || move?.uci);
+    const from = move?.from || parsed?.from;
+    const to = move?.to || parsed?.to;
     const start = squareCenter(from);
     const end = squareCenter(to);
     if (!start || !end) continue;
@@ -407,9 +597,9 @@ async function squareClicked(sq, fromKeyboard = false) {
 }
 
 async function playFromTo(from, to) {
-  const matches = state.snapshot.legal_moves.filter((m) => m.from === from && m.to === to);
+  const matches = asArray(state?.snapshot?.legal_moves).filter((m) => m?.from === from && m?.to === to);
   if (!matches.length) {
-    selected = state.snapshot.board[to] ? to : null;
+    selected = state?.snapshot?.board?.[to] ? to : null;
     renderBoard();
     return;
   }
@@ -437,7 +627,7 @@ function dragStarted(event, sq) {
 
 function dragOver(event, sq) {
   if (!selected) return;
-  if (state.snapshot.legal_moves.some((m) => m.from === selected && m.to === sq)) {
+  if (asArray(state?.snapshot?.legal_moves).some((m) => m?.from === selected && m?.to === sq)) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   }
@@ -535,8 +725,8 @@ function renderPromotionChoices(moves) {
   const grid = document.querySelector("#promotionGrid");
   grid.innerHTML = "";
   const seen = new Set();
-  for (const move of moves) {
-    const promotion = move.promotion;
+  for (const move of asArray(moves)) {
+    const promotion = move?.promotion;
     if (!promotion || seen.has(promotion)) continue;
     seen.add(promotion);
     const button = document.createElement("button");
@@ -575,7 +765,7 @@ function finishPromotion(promotion) {
   const { moves, resolve } = pendingPromotion;
   pendingPromotion = null;
   document.querySelector("#promotionDialog").close();
-  resolve(moves.find((m) => m.promotion === promotion) || null);
+  resolve(asArray(moves).find((m) => m?.promotion === promotion) || null);
 }
 
 function renderMoves() {
@@ -586,9 +776,11 @@ function renderMoves() {
     renderMoveListEmpty("No moves yet.");
     return;
   }
-  for (const move of state.snapshot.move_history) {
+  for (const move of asArray(state.snapshot.move_history)) {
     const item = document.createElement("li");
-    item.textContent = `${move.san} (${move.uci})`;
+    const san = move?.san || (typeof move === "string" ? move : "move");
+    const uci = move?.uci || "";
+    item.textContent = uci ? `${san} (${uci})` : san;
     list.appendChild(item);
   }
 }
@@ -605,6 +797,7 @@ function renderMoveListEmpty(message) {
 function renderStrategy() {
   const mem = state.strategy_memory || {};
   const metrics = state.strategy_metrics || {};
+  const targets = mem.targets || {};
   document.querySelector("#confidence").textContent = Number(mem.plan?.confidence || 0).toFixed(2);
   const rows = [
     ["Plan", mem.plan?.summary],
@@ -613,11 +806,11 @@ function renderStrategy() {
     ["Quality", formatMetric(metrics.quality)],
     ["Drift", `${formatMetric(metrics.drift)} · ${metrics.alert_level || "none"}`],
     ["Alerts", formatStrategyAlerts(metrics.alerts)],
-    ["Targets", [...(mem.targets?.squares || []), ...(mem.targets?.pieces || []), ...(mem.targets?.pawns || [])].join(", ")],
+    ["Targets", [...asArray(targets.squares), ...asArray(targets.pieces), ...asArray(targets.pawns)].join(", ")],
     ["Opponent", mem.opponent_model?.likely_plan],
-    ["Warnings", (mem.tactical_warnings || []).join("; ")],
-    ["Commitments", (mem.commitments || []).join("; ")],
-    ["Triggers", (mem.refutation_triggers || []).map((t) => t.condition || t).join("; ")],
+    ["Warnings", asArray(mem.tactical_warnings).join("; ")],
+    ["Commitments", asArray(mem.commitments).join("; ")],
+    ["Triggers", asArray(mem.refutation_triggers).map((t) => t?.condition || t).join("; ")],
     ["Last", mem.last_update?.summary]
   ];
   renderStrategyRows(rows);
@@ -641,8 +834,9 @@ function formatMetric(value) {
 }
 
 function formatStrategyAlerts(alerts) {
-  if (!alerts?.length) return "None";
-  return alerts.map(formatStrategyAlert).filter(Boolean).join("; ") || "None";
+  const items = asArray(alerts);
+  if (!items.length) return "None";
+  return items.map(formatStrategyAlert).filter(Boolean).join("; ") || "None";
 }
 
 function formatStrategyAlert(alert) {
@@ -663,30 +857,31 @@ function humanizeToken(value) {
 
 function renderDecision() {
   const dec = state?.last_decision;
+  const candidates = asArray(dec?.candidate_moves);
   document.querySelector("#thinkingStage").textContent = dec ? stageStatusText(lastDecisionStage(dec), "Decision finished") : "Idle";
   const tab = document.querySelector("#tabContent");
   tab.textContent = tabText(dec);
   tab.classList.toggle("empty-copy", !dec);
   const box = document.querySelector("#candidates");
   box.innerHTML = "";
-  if (!dec?.candidate_moves?.length) {
+  if (!candidates.length) {
     box.textContent = "Candidate moves will appear here while the engine is thinking.";
     box.classList.add("empty-copy");
     return;
   }
   box.classList.remove("empty-copy");
-  for (const c of dec.candidate_moves) {
+  for (const c of candidates) {
     const div = document.createElement("div");
-    div.className = c.rank === 1 ? "candidate top-candidate" : "candidate";
+    div.className = c?.rank === 1 ? "candidate top-candidate" : "candidate";
     const move = document.createElement("strong");
-    move.textContent = c.san || c.uci;
+    move.textContent = c?.san || c?.uci || "candidate";
     const detail = document.createElement("span");
     detail.append(document.createTextNode(candidatePurpose(c)));
     detail.append(document.createElement("br"));
     const meta = document.createElement("small");
-    meta.textContent = `conf ${formatScore(c.confidence)} · plan ${formatScore(c.plan_alignment_score)} · style ${formatScore(c.personality_score)} · search ${formatScore(c.search_score)} · verifier ${c.verifier_score?.status || "not_checked"}`;
+    meta.textContent = `conf ${formatScore(c?.confidence)} · plan ${formatScore(c?.plan_alignment_score)} · style ${formatScore(c?.personality_score)} · search ${formatScore(c?.search_score)} · verifier ${c?.verifier_score?.status || "not_checked"}`;
     detail.append(meta);
-    if (c.risk) {
+    if (c?.risk) {
       detail.append(document.createElement("br"));
       const risk = document.createElement("small");
       risk.textContent = c.risk;
@@ -694,7 +889,7 @@ function renderDecision() {
     }
     const score = document.createElement("small");
     score.className = "candidate-score";
-    score.textContent = `#${c.rank || "-"} ${formatScore(c.final_score)}`;
+    score.textContent = `#${c?.rank || "-"} ${formatScore(c?.final_score)}`;
     div.append(move, detail, score);
     box.appendChild(div);
   }
@@ -719,7 +914,7 @@ function tabText(dec) {
 
 function decisionSummaryText(dec) {
   const move = dec.selected_move?.san || dec.selected_move?.uci || "Selected move";
-  const explanation = dec.explanation || candidatePurpose((dec.candidate_moves || [])[0], "Explanation unavailable.");
+  const explanation = dec.explanation || candidatePurpose(asArray(dec.candidate_moves)[0], "Explanation unavailable.");
   const position = dec.position_summary || "Position summary unavailable.";
   const fallback = dec.fallback_used ? `Yes${dec.fallback_reason ? `, ${dec.fallback_reason}` : ""}` : "No";
   return `${move}: ${explanation}\n\n${position}\n\nFallback used: ${fallback}\n\n${stageSummary(dec)}`;
@@ -760,12 +955,14 @@ function promptInspectorText(dec) {
 }
 
 function lastDecisionStage(dec) {
-  return dec?.stages?.length ? dec.stages[dec.stages.length - 1] : null;
+  const stages = asArray(dec?.stages);
+  return stages.length ? stages[stages.length - 1] : null;
 }
 
 function stageSummary(dec) {
-  if (!dec?.stages?.length) return "Stages: not recorded";
-  return `Stages:\n${dec.stages.map((stage) => `${stageLabel(stage.name)} · ${stage.status || "unknown"} · ${stage.duration_ms || 0} ms`).join("\n")}`;
+  const stages = asArray(dec?.stages);
+  if (!stages.length) return "Stages: not recorded";
+  return `Stages:\n${stages.map((stage) => `${stageLabel(stage?.name)} · ${stage?.status || "unknown"} · ${stage?.duration_ms || 0} ms`).join("\n")}`;
 }
 
 function stageStatusText(stage, fallback = "Idle") {
@@ -791,9 +988,7 @@ async function makeMove(move) {
   return withBusyControl("#moveBtn", async () => {
     try {
       document.querySelector("#thinkingStage").textContent = "Applying user move";
-      state = await call("MakeUserMove", normalizedMove);
-      resetBoardEntry();
-      render();
+      applyGameStateResult(await call("MakeUserMove", normalizedMove));
       if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
         await askEngine();
       }
@@ -809,10 +1004,7 @@ async function askEngine() {
     try {
       lastStageEvent = null;
       document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
-      const result = await call("RequestEngineMove");
-      state = result.state;
-      resetBoardEntry();
-      render();
+      applyGameStateResult(await call("RequestEngineMove"));
     } catch (err) {
       showError(err);
       document.querySelector("#thinkingStage").textContent = "Engine stopped";
@@ -826,10 +1018,18 @@ async function analyzeCurrentPosition() {
       lastStageEvent = null;
       document.querySelector("#thinkingStage").textContent = "Analyzing current position";
       const decision = await call("AnalyzeCurrentPosition");
-      if (state) {
+      if (!state || typeof state !== "object") {
+        state = { last_decision: decision };
+      } else {
         state.last_decision = decision;
       }
-      renderStatus();
+      if (state?.snapshot) {
+        renderStatus();
+      } else {
+        const status = document.querySelector("#statusText");
+        status.textContent = "Analysis complete. No game state is loaded.";
+        status.title = status.textContent;
+      }
       renderDecision();
     } catch (err) {
       showError(err);
@@ -855,17 +1055,18 @@ async function whyNotMove() {
 }
 
 function whyNotText(comparison) {
+  const data = asObject(comparison);
   return [
-    comparison.summary || "No comparison available.",
+    data.summary || "No comparison available.",
     "",
-    `Requested: ${comparison.requested_move || "unknown"}`,
-    `Selected: ${comparison.selected_move || "unknown"}`,
+    `Requested: ${data.requested_move || "unknown"}`,
+    `Selected: ${data.selected_move || "unknown"}`,
     "",
     "REQUESTED CANDIDATE",
-    JSON.stringify(comparison.requested || {}, null, 2),
+    JSON.stringify(asObject(data.requested), null, 2),
     "",
     "SELECTED CANDIDATE",
-    JSON.stringify(comparison.selected || {}, null, 2)
+    JSON.stringify(asObject(data.selected), null, 2)
   ].join("\n");
 }
 
@@ -883,9 +1084,7 @@ async function resignGame() {
   if (!window.confirm(`Resign as ${side}?`)) return;
   return withBusyControl("#resignBtn", async () => {
     try {
-      state = await call("Resign", side);
-      resetBoardEntry();
-      render();
+      applyGameStateResult(await call("Resign", side));
     } catch (err) {
       showError(err);
     }
@@ -893,7 +1092,7 @@ async function resignGame() {
 }
 
 async function loadSettings() {
-  settings = await call("GetSettings");
+  settings = normalizeSettingsShape(await call("GetSettings"));
   populateProviderProfiles(settings.llm?.profiles || []);
   populateCustomPersonalities(settings.engine?.custom_personalities || []);
   document.querySelector("#settingMode").value = settings.engine.default_mode;
@@ -944,7 +1143,7 @@ function populateProviderProfiles(profiles) {
   custom.value = "custom";
   custom.textContent = "Custom";
   select.appendChild(custom);
-  for (const profile of profiles || []) {
+  for (const profile of asArray(profiles)) {
     if (!profile?.id) continue;
     const option = document.createElement("option");
     option.value = profile.id;
@@ -960,7 +1159,7 @@ function populateCustomPersonalities(profiles) {
   none.value = "";
   none.textContent = "None";
   select.appendChild(none);
-  for (const profile of profiles || []) {
+  for (const profile of asArray(profiles)) {
     if (!profile?.id) continue;
     const option = document.createElement("option");
     option.value = profile.id;
@@ -977,7 +1176,7 @@ function providerProfileValue(profileID) {
 
 function selectedProviderProfile() {
   const profileID = document.querySelector("#settingProfile")?.value;
-  return (settings?.llm?.profiles || []).find((profile) => profile.id === profileID) || null;
+  return asArray(settings?.llm?.profiles).find((profile) => profile?.id === profileID) || null;
 }
 
 function applySelectedProviderProfile() {
@@ -1004,6 +1203,7 @@ function markProviderProfileCustom() {
 async function saveSettings() {
   return withBusyControl("#saveSettingsBtn", async () => {
     try {
+      settings = normalizeSettingsShape(settings);
       playerSide = document.querySelector("#settingSide").value;
       if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
       autoReply = document.querySelector("#settingAutoReply").checked;
@@ -1112,24 +1312,28 @@ function numericInputMS(selector, multiplier, fallbackMS) {
 function formatSavedAt(value) {
   if (!value) return "Unknown time";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+  if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleString();
 }
 
 function gameRecordFields(record) {
-  const gameID = record.game_id || record.GameID || "";
-  const savedAt = record.saved_at || record.SavedAt || "";
-  const stateValue = record.state || record.State || {};
-  const snapshot = stateValue.snapshot || stateValue.Snapshot || {};
+  const source = record && typeof record === "object" ? record : {};
+  const gameID = asText(source.game_id || source.GameID);
+  const savedAt = source.saved_at || source.SavedAt || "";
+  const stateValue = source.state || source.State || {};
+  const gameState = stateValue && typeof stateValue === "object" ? stateValue : {};
+  const snapshotValue = gameState.snapshot || gameState.Snapshot || {};
+  const snapshot = snapshotValue && typeof snapshotValue === "object" ? snapshotValue : {};
   return { gameID, savedAt, snapshot };
 }
 
 function renderBenchmarkSummary(summary) {
   if (!summary) return "No benchmark result.";
-  if (summary.results?.length && summary.results[0]?.summary) {
-    const rows = summary.results.map((result) => {
-      const s = result.summary || {};
-      return `${result.mode}: ${s.games_completed || 0}/${s.games_requested || summary.games_per_mode || 0} games · ${s.total_plies || 0} plies · ${s.fallbacks_used || 0} fallbacks · ${s.engine_errors || 0} errors`;
+  const results = asArray(summary.results);
+  if (results.length && results[0]?.summary) {
+    const rows = results.map((result) => {
+      const s = result?.summary || {};
+      return `${result?.mode || "mode"}: ${s.games_completed || 0}/${s.games_requested || summary.games_per_mode || 0} games · ${s.total_plies || 0} plies · ${s.fallbacks_used || 0} fallbacks · ${s.engine_errors || 0} errors`;
     });
     return `Mode benchmark · ${summary.games_per_mode || 0} games/mode · seed ${summary.seed || 64}\n${rows.join("\n")}`;
   }
@@ -1138,10 +1342,10 @@ function renderBenchmarkSummary(summary) {
 
 function renderPositionSuiteSummary(summary) {
   if (!summary) return "No position suite result.";
-  const rows = (summary.results || []).map((result) => {
-    const move = result.selected_san ? `${result.selected_san} (${result.selected_move})` : result.selected_move || "none";
-    const status = result.engine_error ? `error: ${result.engine_error}` : `${move} · ${result.candidate_count || 0} candidates · ${result.duration_ms || 0} ms`;
-    return `${result.index}. ${result.name || "Position"} · ${result.side_to_move || "unknown"} · ${status}`;
+  const rows = asArray(summary.results).map((result) => {
+    const move = result?.selected_san ? `${result.selected_san} (${result.selected_move})` : result?.selected_move || "none";
+    const status = result?.engine_error ? `error: ${result.engine_error}` : `${move} · ${result?.candidate_count || 0} candidates · ${result?.duration_ms || 0} ms`;
+    return `${result?.index || 0}. ${result?.name || "Position"} · ${result?.side_to_move || "unknown"} · ${status}`;
   });
   return [
     `Position suite · ${summary.positions_analyzed || 0}/${summary.positions_requested || 0} analyzed · ${summary.fallbacks_used || 0} fallbacks · ${summary.engine_errors || 0} errors`,
@@ -1151,22 +1355,22 @@ function renderPositionSuiteSummary(summary) {
 
 function renderProviderComparison(summary) {
   if (!summary) return "No provider comparison result.";
-  const rows = (summary.results || []).map((result) => {
-    const suite = result.summary || {};
-    return `${result.profile_id || "profile"} · ${result.status || "unknown"} · ${suite.positions_analyzed || 0}/${suite.positions_requested || 0} positions · ${suite.fallbacks_used || 0} fallbacks · ${result.error || ""}`.trim();
+  const rows = asArray(summary.results).map((result) => {
+    const suite = result?.summary || {};
+    return `${result?.profile_id || "profile"} · ${result?.status || "unknown"} · ${suite.positions_analyzed || 0}/${suite.positions_requested || 0} positions · ${suite.fallbacks_used || 0} fallbacks · ${result?.error || ""}`.trim();
   });
   return [
-    `Provider comparison · ${summary.profiles_compared || 0} profiles completed · ${summary.positions?.length || 0} positions`,
+    `Provider comparison · ${summary.profiles_compared || 0} profiles completed · ${asArray(summary.positions).length} positions`,
     ...rows
   ].join("\n");
 }
 
 function renderProviderDashboard(dashboard) {
   if (!dashboard) return "No provider dashboard result.";
-  const rows = (dashboard.profiles || []).map((profile) => {
-    const endpoint = profile.endpoint ? ` · ${profile.endpoint}` : "";
-    const error = profile.error ? ` · ${profile.error}` : "";
-    return `${profile.id || "profile"} · ${profile.provider || "provider"} · ${profile.model || "model"} · ${profile.status || "unknown"}${endpoint}${error}`;
+  const rows = asArray(dashboard.profiles).map((profile) => {
+    const endpoint = profile?.endpoint ? ` · ${profile.endpoint}` : "";
+    const error = profile?.error ? ` · ${profile.error}` : "";
+    return `${profile?.id || "profile"} · ${profile?.provider || "provider"} · ${profile?.model || "model"} · ${profile?.status || "unknown"}${endpoint}${error}`;
   });
   return [
     `Provider dashboard · active ${dashboard.active_profile || "custom"} · ${dashboard.active_provider || "unknown"} · ${dashboard.active_model || "model"}`,
@@ -1177,7 +1381,7 @@ function renderProviderDashboard(dashboard) {
 function renderPromptPlayground(result) {
   if (!result) return "No prompt playground result.";
   const renderSide = (label, side) => {
-    const candidates = (side?.candidates || []).map((c) => `${c.san || c.uci} · ${c.purpose || ""}`).join("\n");
+    const candidates = asArray(side?.candidates).map((c) => `${c?.san || c?.uci || "candidate"} · ${c?.purpose || ""}`).join("\n");
     return [
       label,
       `${side?.provider || "provider"} · ${side?.model || "model"} · valid ${!!side?.valid} · parse ${side?.parse_status || "none"}`,
@@ -1187,7 +1391,7 @@ function renderPromptPlayground(result) {
   };
   return [
     `Prompt playground · ${result.game_id || "unknown"} · ply ${result.ply || 0}`,
-    `Changed: ${(result.comparison?.changed_files || []).join(", ") || "none"}`,
+    `Changed: ${asArray(result.comparison?.changed_files).join(", ") || "none"}`,
     "",
     renderSide("LEFT", result.left),
     "",
@@ -1202,8 +1406,8 @@ function renderStudyDashboard(dashboard) {
   const diversity = dashboard.candidate_diversity || {};
   const lesson = dashboard.lesson || {};
   const multi = dashboard.multi_agent || {};
-  const agents = (multi.reviews || []).map((review) => `${review.role}: ${review.summary} (${formatMetric(review.confidence)})`).join("\n");
-  const heat = (dashboard.heatmap || []).map((item) => `${item.move} -> ${item.square} · ${formatScore(item.weight)} · ${item.label || "candidate"}`).join("\n");
+  const agents = asArray(multi.reviews).map((review) => `${review?.role || "agent"}: ${review?.summary || "No summary"} (${formatMetric(review?.confidence)})`).join("\n");
+  const heat = asArray(dashboard.heatmap).map((item) => `${item?.move || "move"} -> ${item?.square || "square"} · ${formatScore(item?.weight)} · ${item?.label || "candidate"}`).join("\n");
   return [
     `Study · ${dashboard.game_id || "unknown"} · ply ${dashboard.ply || 0} · ${dashboard.variant?.variant || "standard"}`,
     `Memory: ${memory.plan_status || "unknown"} · confidence ${formatMetric(memory.plan_confidence)} · retained ${memory.retained_items || 0} · dropped ${memory.dropped_items || 0}`,
@@ -1212,7 +1416,7 @@ function renderStudyDashboard(dashboard) {
     "",
     "LESSON",
     `${lesson.title || "Study"} · ${lesson.focus || ""}`,
-    ...(lesson.steps || []),
+    ...asArray(lesson.steps),
     "",
     "AGENTS",
     agents || multi.arbiter || "No agent review.",
@@ -1227,8 +1431,8 @@ function renderStudyDashboard(dashboard) {
 
 function renderTournament(summary) {
   if (!summary) return "No tournament result.";
-  const ratings = (summary.ratings || []).map((rating) => `${rating.id} · ${formatMetric(rating.elo)} · ${rating.wins}-${rating.draws}-${rating.losses}`).join("\n");
-  const games = (summary.results || []).slice(0, 12).map((game) => `${game.game_index}. ${game.white_id}-${game.black_id} · ${game.outcome || "unknown"} · ${game.winner_id || "draw"} · ${game.plies || 0} plies`).join("\n");
+  const ratings = asArray(summary.ratings).map((rating) => `${rating?.id || "profile"} · ${formatMetric(rating?.elo)} · ${rating?.wins || 0}-${rating?.draws || 0}-${rating?.losses || 0}`).join("\n");
+  const games = asArray(summary.results).slice(0, 12).map((game) => `${game?.game_index || 0}. ${game?.white_id || "white"}-${game?.black_id || "black"} · ${game?.outcome || "unknown"} · ${game?.winner_id || "draw"} · ${game?.plies || 0} plies`).join("\n");
   return [
     `Tournament · ${summary.games_played || 0} games · seed ${summary.seed || 64}`,
     "",
@@ -1242,11 +1446,12 @@ function renderTournament(summary) {
 
 function renderBackupManifest(manifest) {
   if (!manifest) return "No backup manifest.";
-  const files = (manifest.files || []).map((file) => `${file.path} · ${file.bytes || 0} bytes`).join("\n");
+  const filesList = asArray(manifest.files);
+  const files = filesList.map((file) => `${file?.path || "file"} · ${file?.bytes || 0} bytes`).join("\n");
   return [
     `Archive: ${manifest.archive_path || "unknown"}`,
     `SHA-256: ${manifest.sha256 || "pending"}`,
-    `Files: ${(manifest.files || []).length} · bytes ${manifest.bytes || 0}`,
+    `Files: ${filesList.length} · bytes ${manifest.bytes || 0}`,
     "",
     files
   ].join("\n");
@@ -1260,7 +1465,7 @@ function renderFineTuneWorkflow(workflow) {
     spec.intended_use || "",
     "",
     "SAFETY",
-    ...(spec.safety_notes || []),
+    ...asArray(spec.safety_notes),
     "",
     "JSONL",
     workflow.dataset_jsonl || ""
@@ -1270,7 +1475,7 @@ function renderFineTuneWorkflow(workflow) {
 function renderReview(review) {
   if (!review) return "No review available.";
   const metrics = review.strategy_metrics || {};
-  const recommendations = review.recommendations?.length ? review.recommendations.join("\n") : "No recommendations.";
+  const recommendations = asArray(review.recommendations);
   return [
     review.summary || "No review summary.",
     "",
@@ -1284,7 +1489,7 @@ function renderReview(review) {
     review.position_summary || "No position summary recorded.",
     "",
     "RECOMMENDATIONS",
-    recommendations
+    recommendations.length ? recommendations.join("\n") : "No recommendations."
   ].join("\n");
 }
 
@@ -1312,7 +1517,7 @@ async function refreshStudy() {
   try {
     const dashboard = await call("StudyDashboard");
     const current = await call("GetGame");
-    document.querySelector("#studyMemoryText").value = JSON.stringify(current.strategy_memory || {}, null, 2);
+    document.querySelector("#studyMemoryText").value = JSON.stringify(current?.strategy_memory || {}, null, 2);
     document.querySelector("#studyOutput").textContent = renderStudyDashboard(dashboard);
   } catch (err) {
     showError(err, "#studyOutput");
@@ -1330,8 +1535,7 @@ async function refreshMultiAgent() {
 async function saveStudyMemory() {
   try {
     const memory = parseJSONField("#studyMemoryText", "Strategy memory");
-    state = await call("UpdateStrategyMemory", memory);
-    render();
+    applyGameStateResult(await call("UpdateStrategyMemory", memory));
     await refreshStudy();
   } catch (err) {
     showError(err, "#studyOutput");
@@ -1376,17 +1580,15 @@ async function newChess960Game() {
     const seed = Math.floor(Date.now() % 960);
     chess960Seed = seed;
     gameVariant = "chess960";
-    state = await call("NewGame", {
+    applyGameStateResult(await call("NewGame", {
       side: playerSide || "white",
       variant: "chess960",
       seed,
       mode: document.querySelector("#settingMode")?.value || "blunderguard",
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
-    });
-    resetBoardEntry();
-    render();
-    document.querySelector("#labOutput").textContent = JSON.stringify(state.variant || {}, null, 2);
+    }));
+    document.querySelector("#labOutput").textContent = JSON.stringify(state?.variant || {}, null, 2);
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1399,17 +1601,15 @@ async function startCustomBoardFromLab() {
     if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
     playerSide = side;
     gameVariant = "custom";
-    state = await call("NewGame", {
+    applyGameStateResult(await call("NewGame", {
       side,
       variant: "custom",
       board_definition: definition,
       mode: document.querySelector("#settingMode")?.value || "blunderguard",
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
-    });
-    resetBoardEntry();
-    render();
-    document.querySelector("#labOutput").textContent = JSON.stringify(state.variant || {}, null, 2);
+    }));
+    document.querySelector("#labOutput").textContent = JSON.stringify(state?.variant || {}, null, 2);
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
     showError(err, "#labOutput");
@@ -1419,7 +1619,7 @@ async function startCustomBoardFromLab() {
 async function createBackup() {
   try {
     const manifest = await call("CreateBackup", document.querySelector("#backupDir").value.trim());
-    document.querySelector("#restoreArchive").value = manifest.archive_path || "";
+    document.querySelector("#restoreArchive").value = manifest?.archive_path || "";
     document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
   } catch (err) {
     showError(err, "#labOutput");
@@ -1459,13 +1659,13 @@ async function compareAnalysisModes() {
     document.querySelector("#labOutput").textContent = "Comparing modes...";
     const comparison = await call("ComparePureHybridAnalysis");
     document.querySelector("#labOutput").textContent = [
-      comparison.summary || "No comparison summary.",
+      comparison?.summary || "No comparison summary.",
       "",
       "PURE",
-      `${comparison.pure?.selected_move?.san || comparison.pure?.selected_move?.uci || "none"} · ${comparison.pure?.explanation || ""}`,
+      `${comparison?.pure?.selected_move?.san || comparison?.pure?.selected_move?.uci || "none"} · ${comparison?.pure?.explanation || ""}`,
       "",
       "HYBRID",
-      `${comparison.hybrid?.selected_move?.san || comparison.hybrid?.selected_move?.uci || "none"} · ${comparison.hybrid?.explanation || ""}`
+      `${comparison?.hybrid?.selected_move?.san || comparison?.hybrid?.selected_move?.uci || "none"} · ${comparison?.hybrid?.explanation || ""}`
     ].join("\n");
   } catch (err) {
     showError(err, "#labOutput");
@@ -1474,7 +1674,7 @@ async function compareAnalysisModes() {
 
 async function comparePromptPlayground() {
   try {
-    const base = await call("PromptTemplatePack");
+    const base = normalizePromptPack(await call("PromptTemplatePack"));
     const variant = { ...base, source: "playground", user: `${base.user || ""}\n\nPrefer concise contrast between the top two candidates.\n` };
     document.querySelector("#labOutput").textContent = renderPromptPlayground(await call("RunPromptPlayground", base, variant));
   } catch (err) {
@@ -1484,7 +1684,7 @@ async function comparePromptPlayground() {
 
 async function runPromptPlaygroundFromEditor() {
   try {
-    const base = await call("PromptTemplatePack");
+    const base = normalizePromptPack(await call("PromptTemplatePack"));
     const edited = promptPackFromInputs();
     document.querySelector("#promptOutput").textContent = renderPromptPlayground(await call("RunPromptPlayground", base, edited));
   } catch (err) {
@@ -1507,8 +1707,8 @@ async function trainPolicyPriorFromLab() {
   try {
     const workflow = await call("ExportFineTuneDataset");
     const path = document.querySelector("#policyModelPath").value.trim() || "logs/policy-prior-model.json";
-    const result = await call("TrainLocalPolicyPrior", workflow.dataset_jsonl || "", path);
-    document.querySelector("#policyModelPath").value = result.model_path || path;
+    const result = await call("TrainLocalPolicyPrior", workflow?.dataset_jsonl || "", path);
+    document.querySelector("#policyModelPath").value = result?.model_path || path;
     document.querySelector("#labOutput").textContent = JSON.stringify(result, null, 2);
   } catch (err) {
     showError(err, "#labOutput");
@@ -1556,7 +1756,7 @@ async function runExperiment(action, label, renderResult) {
 
 async function loadPromptEditor() {
   try {
-    promptPack = await call("PromptTemplatePack");
+    promptPack = normalizePromptPack(await call("PromptTemplatePack"));
     document.querySelector("#promptSource").value = promptPack.source || "default";
     document.querySelector("#promptManifest").value = JSON.stringify(promptPack.manifest || {}, null, 2);
     document.querySelector("#promptSystem").value = promptPack.system || "";
@@ -1613,7 +1813,7 @@ async function openProfilesEditor() {
 
 async function exportProfiles() {
   try {
-    document.querySelector("#profilesText").value = await call("ExportProviderProfiles");
+    document.querySelector("#profilesText").value = textAreaValue(await call("ExportProviderProfiles"));
     document.querySelector("#profilesOutput").textContent = "Profiles exported.";
   } catch (err) {
     showError(err, "#profilesOutput");
@@ -1623,7 +1823,7 @@ async function exportProfiles() {
 async function importProfiles() {
   try {
     const text = requireField("#profilesText", "Paste provider profiles before importing.");
-    settings = await call("ImportProviderProfiles", text);
+    settings = normalizeSettingsShape(await call("ImportProviderProfiles", text));
     populateProviderProfiles(settings.llm?.profiles || []);
     document.querySelector("#profilesOutput").textContent = "Profiles imported.";
   } catch (err) {
@@ -1635,11 +1835,12 @@ function renderRecentGames(records) {
   const list = document.querySelector("#recentList");
   list.innerHTML = "";
   list.setAttribute("role", "list");
-  if (!records?.length) {
+  const items = asArray(records);
+  if (!items.length) {
     list.textContent = "No recent games.";
     return;
   }
-  for (const record of records) {
+  for (const record of items) {
     const { gameID, savedAt, snapshot } = gameRecordFields(record);
     const row = document.createElement("div");
     row.className = "recent-game";
@@ -1654,12 +1855,14 @@ function renderRecentGames(records) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = "Load";
-    button.setAttribute("aria-label", `Load ${title.textContent} from ${formatSavedAt(savedAt)}, ${outcomeStatus}`);
+    button.disabled = !gameID;
+    button.title = gameID ? "" : "This recent game record is missing an id.";
+    button.setAttribute("aria-label", gameID
+      ? `Load ${title.textContent} from ${formatSavedAt(savedAt)}, ${outcomeStatus}`
+      : `Cannot load ${title.textContent}; missing game id`);
     button.addEventListener("click", () => withBusyControl(button, async () => {
       try {
-        state = await call("LoadRecentGame", gameID);
-        resetBoardEntry();
-        render();
+        applyGameStateResult(await call("LoadRecentGame", gameID));
         document.querySelector("#recentDialog").close();
       } catch (err) {
         showError(err, "#recentOutput");
@@ -1729,16 +1932,14 @@ bindBusyButton("#newGameBtn", async () => {
     let side = document.querySelector("#settingSide")?.value || playerSide;
     if (side === "random") side = Math.random() < 0.5 ? "white" : "black";
     playerSide = side;
-    state = await call("NewGame", {
+    applyGameStateResult(await call("NewGame", {
       side,
       variant: document.querySelector("#settingVariant")?.value || gameVariant,
       seed: Number(document.querySelector("#settingVariantSeed")?.value) || chess960Seed,
       mode: document.querySelector("#settingMode")?.value || "blunderguard",
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
-    });
-    resetBoardEntry();
-    render();
+    }));
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
     showError(err);
@@ -1768,9 +1969,7 @@ bindBusyButton("#stopBtn", async () => {
 document.querySelector("#resignBtn").addEventListener("click", resignGame);
 bindBusyButton("#undoBtn", async () => {
   try {
-    state = await call("Undo", 1);
-    resetBoardEntry();
-    render();
+    applyGameStateResult(await call("Undo", 1));
   } catch (err) {
     showError(err);
   }
@@ -1814,9 +2013,7 @@ bindBusyButton("#runImportBtn", async () => {
     return;
   }
   try {
-    state = type === "fen" ? await call("ImportFEN", text) : await call("ImportPGN", text);
-    resetBoardEntry();
-    render();
+    applyGameStateResult(type === "fen" ? await call("ImportFEN", text) : await call("ImportPGN", text));
     document.querySelector("#importDialog").close();
   } catch (err) {
     showError(err, "#importOutput");
@@ -1910,24 +2107,24 @@ bindBusyButton("#importProfilesBtn", importProfiles);
 async function refreshExport() {
   const type = document.querySelector("#exportType").value;
   if (type === "fen") {
-    document.querySelector("#exportText").value = await call("ExportFEN");
+    document.querySelector("#exportText").value = textAreaValue(await call("ExportFEN"));
     return true;
   }
   if (type === "trace") {
-    document.querySelector("#exportText").value = await call("ExportTrace");
+    document.querySelector("#exportText").value = textAreaValue(await call("ExportTrace"));
     return true;
   }
   if (type === "debug_trace") {
     if (!confirmDebugTraceExport()) return false;
-    document.querySelector("#exportText").value = await call("ExportDebugTrace");
+    document.querySelector("#exportText").value = textAreaValue(await call("ExportDebugTrace"));
     return true;
   }
   if (type === "fine_tune") {
     const workflow = await call("ExportFineTuneDataset");
-    document.querySelector("#exportText").value = workflow.dataset_jsonl || "";
+    document.querySelector("#exportText").value = textAreaValue(workflow?.dataset_jsonl);
     return true;
   }
-  document.querySelector("#exportText").value = await call("ExportPGN");
+  document.querySelector("#exportText").value = textAreaValue(await call("ExportPGN"));
   return true;
 }
 
@@ -1985,6 +2182,9 @@ function shouldIgnoreGlobalShortcut(event) {
 }
 
 async function init() {
+  bindWorkspaceNavigation();
+  setWorkspaceView(document.body.dataset.workspaceView || activeWorkspaceView);
+  bindDialogCloseButtons();
   subscribeDecisionStageEvents();
   try {
     await loadSettings();

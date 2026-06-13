@@ -7,42 +7,49 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='10' fill='%231c2026'/%3E%3Ctext x='32' y='41' text-anchor='middle' font-size='30' font-family='Arial,sans-serif' fill='white'%3EN%3C/text%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body data-workspace-view="play">
     <div id="app">
       <header class="topbar">
         <div class="brand">
           <strong>Noema64</strong>
           <span>A chess engine that remembers what it is trying to do.</span>
         </div>
-        <div class="toolbar" role="toolbar" aria-label="Game controls">
-          <span class="toolbar-group" role="group" aria-label="Game">
-            <button id="newGameBtn" title="New game (N)" aria-label="New game" aria-keyshortcuts="N">N</button>
-            <button id="recentBtn" title="Recent games" aria-label="Recent games">◷</button>
-            <button id="engineBtn" title="Ask engine (Space)" aria-label="Ask engine" aria-keyshortcuts="Space">▶</button>
-            <button id="analyzeBtn" title="Analyze current position (A)" aria-label="Analyze current position" aria-keyshortcuts="A">◇</button>
-            <button id="stopBtn" title="Stop thinking" aria-label="Stop thinking">■</button>
-            <button id="resignBtn" title="Resign (R)" aria-label="Resign" aria-keyshortcuts="R">⚑</button>
+        <nav id="workspaceNav" class="workspace-nav" role="tablist" aria-label="Workspace">
+          <button id="viewPlayBtn" class="active" data-workspace-target="play" role="tab" aria-selected="true" aria-controls="mainWorkspace">Play</button>
+          <button id="viewStudyBtn" data-workspace-target="study" role="tab" aria-selected="false" aria-controls="mainWorkspace">Study</button>
+          <button id="viewLabBtn" data-workspace-target="lab" role="tab" aria-selected="false" aria-controls="mainWorkspace">Lab</button>
+        </nav>
+        <div class="toolbar" role="toolbar" aria-label="Workspace actions">
+          <span class="toolbar-group" data-action-scope="play" role="group" aria-label="Play actions">
+            <button id="newGameBtn" class="primary-command" title="New game (N)" aria-label="New game" aria-keyshortcuts="N">New Game</button>
+            <button id="engineBtn" class="primary-command" title="Ask engine (Space)" aria-label="Ask engine" aria-keyshortcuts="Space">Engine Move</button>
+            <button id="analyzeBtn" title="Analyze current position (A)" aria-label="Analyze current position" aria-keyshortcuts="A">Analyze</button>
+            <button id="stopBtn" title="Stop thinking" aria-label="Stop thinking">Stop</button>
+            <button id="resignBtn" title="Resign (R)" aria-label="Resign" aria-keyshortcuts="R">Resign</button>
           </span>
-          <span class="toolbar-group" role="group" aria-label="Board">
-            <button id="undoBtn" title="Undo (U)" aria-label="Undo" aria-keyshortcuts="U">↶</button>
-            <button id="flipBtn" title="Flip board (F)" aria-label="Flip board" aria-keyshortcuts="F">⇅</button>
+          <span class="toolbar-group" data-action-scope="play" role="group" aria-label="Board actions">
+            <button id="undoBtn" title="Undo (U)" aria-label="Undo" aria-keyshortcuts="U">Undo</button>
+            <button id="flipBtn" title="Flip board (F)" aria-label="Flip board" aria-keyshortcuts="F">Flip</button>
           </span>
-          <span class="toolbar-group" role="group" aria-label="Study and lab">
-            <button id="reviewBtn" title="Post-game review" aria-label="Post-game review">◎</button>
-            <button id="studyBtn" title="Study tools" aria-label="Study tools">※</button>
-            <button id="experimentsBtn" title="Experiments" aria-label="Experiments">Σ</button>
-            <button id="labBtn" title="Roadmap lab" aria-label="Roadmap lab">⌬</button>
-            <button id="promptEditorBtn" title="Prompt editor" aria-label="Prompt editor">✎</button>
+          <span class="toolbar-group" data-action-scope="study" role="group" aria-label="Study actions">
+            <button id="reviewBtn" class="primary-command" title="Post-game review" aria-label="Post-game review">Review</button>
+            <button id="studyBtn" class="primary-command" title="Study tools" aria-label="Study tools">Study Tools</button>
+            <button id="recentBtn" title="Recent games" aria-label="Recent games">Recent Games</button>
           </span>
-          <span class="toolbar-group" role="group" aria-label="Files and settings">
-            <button id="importBtn" title="Import PGN or FEN" aria-label="Import PGN or FEN">⇧</button>
-            <button id="exportBtn" title="Export PGN" aria-label="Export PGN">⇩</button>
-            <button id="settingsBtn" title="Settings (,)" aria-label="Settings" aria-keyshortcuts=",">⚙</button>
+          <span class="toolbar-group" data-action-scope="lab" role="group" aria-label="Lab actions">
+            <button id="experimentsBtn" class="primary-command" title="Experiments" aria-label="Experiments">Provider Tests</button>
+            <button id="labBtn" class="primary-command" title="Roadmap lab" aria-label="Roadmap lab">Developer Lab</button>
+            <button id="promptEditorBtn" title="Prompt editor" aria-label="Prompt editor">Prompts</button>
+          </span>
+          <span class="toolbar-group toolbar-group-global" data-action-scope="global" role="group" aria-label="Files and settings">
+            <button id="importBtn" title="Import PGN or FEN" aria-label="Import PGN or FEN">Import</button>
+            <button id="exportBtn" title="Export PGN" aria-label="Export PGN">Export</button>
+            <button id="settingsBtn" title="Settings (,)" aria-label="Settings" aria-keyshortcuts=",">Settings</button>
           </span>
         </div>
       </header>
 
-      <main class="workspace">
+      <main id="mainWorkspace" class="workspace" role="tabpanel" aria-labelledby="viewPlayBtn">
         <section class="board-area" aria-label="Chess board workspace">
           <div class="status-row">
             <span id="statusText" role="status" aria-live="polite">Loading game...</span>
@@ -68,8 +75,8 @@
             <button id="summaryTab" data-tab="summary" class="active" role="tab" aria-selected="true" aria-controls="tabContent" tabindex="0">Summary</button>
             <button id="diffTab" data-tab="diff" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">Diff</button>
             <button id="verifierTab" data-tab="verifier" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">Verifier</button>
-            <button id="promptTab" data-tab="prompt" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">Prompt</button>
-            <button id="rawTab" data-tab="raw" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">JSON</button>
+            <button id="promptTab" data-tab="prompt" data-lab-only="true" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">Prompt</button>
+            <button id="rawTab" data-tab="raw" data-lab-only="true" role="tab" aria-selected="false" aria-controls="tabContent" tabindex="-1">JSON</button>
           </div>
           <div id="tabContent" class="tab-content" role="tabpanel" aria-live="polite"></div>
           <h2>Candidate Moves</h2>
