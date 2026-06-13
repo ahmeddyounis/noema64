@@ -726,6 +726,12 @@ function resetBoardEntry() {
   document.querySelector("#moveInput").value = "";
 }
 
+function focusMoveInput(select = false) {
+  const input = document.querySelector("#moveInput");
+  if (!focusVisibleElement(input)) return;
+  if (select) input.select?.();
+}
+
 function parseJSONField(selector, label) {
   const field = document.querySelector(selector);
   try {
@@ -1442,7 +1448,7 @@ async function makeMove(move) {
   const normalizedMove = String(move || "").trim();
   if (!normalizedMove) {
     showError("Enter a UCI move before playing.");
-    document.querySelector("#moveInput").focus();
+    focusMoveInput();
     return;
   }
   return withBusyControl("#moveBtn", async () => {
@@ -1453,9 +1459,11 @@ async function makeMove(move) {
       if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
         await askEngine();
       }
+      focusMoveInput();
     } catch (err) {
       showError(err);
       document.querySelector("#thinkingStage").textContent = "Move failed";
+      focusMoveInput(true);
     }
   });
 }
