@@ -201,7 +201,7 @@ func (a *Application) ImportProviderProfiles(text string) (storage.Settings, err
 	if err != nil {
 		return storage.Settings{}, appErr("ERR_IMPORT_PROFILES", err, true)
 	}
-	settings := a.settings
+	settings := cloneSettings(a.settings)
 	settings.LLM.Profiles = profiles
 	preserveRedactedProfileKeys(&settings, a.settings)
 	settings = storage.NormalizeSettings(settings)
@@ -226,7 +226,7 @@ func (a *Application) SaveProviderAPIKeyToKeychain(profileID string, apiKey stri
 	if err := security.StoreKeychainSecret(keyRef, apiKey); err != nil {
 		return storage.Settings{}, appErr("ERR_KEYCHAIN", err, true)
 	}
-	settings := a.settings
+	settings := cloneSettings(a.settings)
 	settings.LLM.APIKey = ""
 	settings.LLM.APIKeyRef = keyRef
 	for i := range settings.LLM.Profiles {

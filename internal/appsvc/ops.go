@@ -84,7 +84,7 @@ func (a *Application) EnablePolicyPriorModel(modelPath string) (storage.Settings
 	if _, err := finetune.LoadPolicyPriorModel(modelPath); err != nil {
 		return storage.Settings{}, appErr("ERR_POLICY_PRIOR", err, true)
 	}
-	settings := a.settings
+	settings := cloneSettings(a.settings)
 	settings.LLM.Provider = "policy_prior"
 	settings.LLM.Model = modelPath
 	settings.LLM.Endpoint = ""
@@ -130,11 +130,12 @@ func resolvedSettingsPath(path string) string {
 }
 
 func upsertProviderProfile(profiles []storage.ProviderProfile, profile storage.ProviderProfile) []storage.ProviderProfile {
-	for i := range profiles {
-		if profiles[i].ID == profile.ID {
-			profiles[i] = profile
-			return profiles
+	out := append([]storage.ProviderProfile(nil), profiles...)
+	for i := range out {
+		if out[i].ID == profile.ID {
+			out[i] = profile
+			return out
 		}
 	}
-	return append(profiles, profile)
+	return append(out, profile)
 }

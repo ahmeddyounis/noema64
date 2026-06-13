@@ -387,6 +387,61 @@ func TestGetSettingsRedactsProviderProfileKeys(t *testing.T) {
 	}
 }
 
+func TestGetSettingsDoesNotExposeMutableCustomPersonalities(t *testing.T) {
+	app, _ := newTestApplication(t)
+	app.settings.Engine.CustomPersonalities = []strategy.PersonalityProfile{{
+		ID:              "sharp",
+		Name:            "Sharp",
+		RiskTolerance:   0.8,
+		StrategicBiases: []string{"initiative"},
+		PromptModifiers: []string{"Prefer active moves."},
+	}}
+
+	settings, err := app.GetSettings()
+	if err != nil {
+		t.Fatalf("get settings: %v", err)
+	}
+	settings.Engine.CustomPersonalities[0].Name = "Mutated"
+	settings.Engine.CustomPersonalities[0].StrategicBiases[0] = "mutated"
+	settings.Engine.CustomPersonalities[0].PromptModifiers[0] = "mutated"
+
+	profile := app.settings.Engine.CustomPersonalities[0]
+	if profile.Name != "Sharp" || profile.StrategicBiases[0] != "initiative" || profile.PromptModifiers[0] != "Prefer active moves." {
+		t.Fatalf("GetSettings exposed mutable custom personality backing arrays: %+v", profile)
+	}
+}
+
+func TestFailedCustomPersonalitySaveDoesNotMutateRuntimeSettings(t *testing.T) {
+	app, _ := newTestApplication(t)
+	app.settings.Engine.CustomPersonalities = []strategy.PersonalityProfile{{
+		ID:              "sharp",
+		Name:            "Sharp",
+		RiskTolerance:   0.8,
+		StrategicBiases: []string{"initiative"},
+		PromptModifiers: []string{"Prefer active moves."},
+	}}
+	blocker := filepath.Join(t.TempDir(), "not-a-dir")
+	if err := os.WriteFile(blocker, []byte("block"), 0o600); err != nil {
+		t.Fatalf("write blocker: %v", err)
+	}
+	app.settingsPath = filepath.Join(blocker, "config.yaml")
+
+	_, err := app.SaveCustomPersonalityProfile(CustomPersonalityProfile{
+		ID:              "sharp",
+		Name:            "Changed",
+		RiskTolerance:   0.3,
+		StrategicBiases: []string{"changed"},
+		PromptModifiers: []string{"Changed modifier."},
+	}, false)
+	if err == nil {
+		t.Fatal("expected save through blocked settings path to fail")
+	}
+	profile := app.settings.Engine.CustomPersonalities[0]
+	if profile.Name != "Sharp" || profile.RiskTolerance != 0.8 || profile.StrategicBiases[0] != "initiative" || profile.PromptModifiers[0] != "Prefer active moves." {
+		t.Fatalf("failed custom personality save mutated runtime settings: %+v", profile)
+	}
+}
+
 func TestRequestEngineMoveHonorsTraceEnabled(t *testing.T) {
 	app, traceDir := newTestApplication(t)
 	app.settings.Engine.TraceEnabled = false

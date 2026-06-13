@@ -44,6 +44,26 @@ type MoveComparison struct {
 	Selected      any    `json:"selected,omitempty"`
 }
 
+func cloneSettings(settings storage.Settings) storage.Settings {
+	settings.LLM.Profiles = append([]storage.ProviderProfile(nil), settings.LLM.Profiles...)
+	settings.Engine.CustomPersonalities = clonePersonalityProfiles(settings.Engine.CustomPersonalities)
+	return settings
+}
+
+func clonePersonalityProfiles(profiles []strategy.PersonalityProfile) []strategy.PersonalityProfile {
+	out := make([]strategy.PersonalityProfile, 0, len(profiles))
+	for _, profile := range profiles {
+		out = append(out, clonePersonalityProfile(profile))
+	}
+	return out
+}
+
+func clonePersonalityProfile(profile strategy.PersonalityProfile) strategy.PersonalityProfile {
+	profile.StrategicBiases = append([]string(nil), profile.StrategicBiases...)
+	profile.PromptModifiers = append([]string(nil), profile.PromptModifiers...)
+	return profile
+}
+
 func NewApplication(settingsPath string) *Application {
 	settings, err := storage.LoadSettings(settingsPath)
 	var settingsLoadErr error
@@ -338,11 +358,10 @@ func (a *Application) ImportPGN(pgn string) (*engine.GameState, error) {
 }
 
 func (a *Application) GetSettings() (storage.Settings, error) {
-	settings := a.settings
+	settings := cloneSettings(a.settings)
 	if settings.LLM.APIKey != "" {
 		settings.LLM.APIKey = "[REDACTED]"
 	}
-	settings.LLM.Profiles = append([]storage.ProviderProfile(nil), settings.LLM.Profiles...)
 	for i := range settings.LLM.Profiles {
 		if settings.LLM.Profiles[i].APIKey != "" {
 			settings.LLM.Profiles[i].APIKey = "[REDACTED]"
@@ -355,6 +374,7 @@ func (a *Application) GetSettings() (storage.Settings, error) {
 }
 
 func (a *Application) SaveSettings(settings storage.Settings) error {
+	settings = cloneSettings(settings)
 	if settings.LLM.APIKey == "[REDACTED]" {
 		settings.LLM.APIKey = a.settings.LLM.APIKey
 	}
@@ -416,7 +436,7 @@ func selectedCustomPersonality(settings storage.Settings) *strategy.PersonalityP
 	}
 	for _, profile := range settings.Engine.CustomPersonalities {
 		if string(profile.ID) == id {
-			copy := profile
+			copy := clonePersonalityProfile(profile)
 			return &copy
 		}
 	}

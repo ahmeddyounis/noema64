@@ -432,7 +432,7 @@ func (a *Application) SaveCustomPersonalityProfile(profile CustomPersonalityProf
 	if err != nil {
 		return storage.Settings{}, err
 	}
-	settings := a.settings
+	settings := cloneSettings(a.settings)
 	strategyProfile := strategy.PersonalityProfile{
 		ID:              strategy.Personality(normalized.ID),
 		Name:            normalized.Name,
@@ -464,7 +464,7 @@ func (a *Application) SaveCustomPersonalityProfile(profile CustomPersonalityProf
 
 func (a *Application) SelectCustomPersonalityProfile(id string) (storage.Settings, error) {
 	id = strings.TrimSpace(id)
-	settings := a.settings
+	settings := cloneSettings(a.settings)
 	settings.Engine.CustomPersonalityID = id
 	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
 		return storage.Settings{}, appErr("ERR_SETTINGS_INVALID", err, true)
@@ -479,8 +479,8 @@ func (a *Application) DeleteCustomPersonalityProfile(id string) (storage.Setting
 	if id == "" {
 		return storage.Settings{}, &AppError{Code: "ERR_CUSTOM_PERSONALITY", Message: "Custom personality ID is required", Recoverable: true}
 	}
-	settings := a.settings
-	filtered := settings.Engine.CustomPersonalities[:0]
+	settings := cloneSettings(a.settings)
+	filtered := make([]strategy.PersonalityProfile, 0, len(settings.Engine.CustomPersonalities))
 	for _, profile := range settings.Engine.CustomPersonalities {
 		if string(profile.ID) != id {
 			filtered = append(filtered, profile)
