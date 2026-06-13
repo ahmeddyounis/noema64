@@ -1639,22 +1639,27 @@ async function analyzeCurrentPosition() {
 }
 
 async function whyNotMove() {
-  const move = document.querySelector("#moveInput").value.trim();
+  const moveInput = document.querySelector("#moveInput");
+  const move = moveInput.value.trim();
   if (!move) {
     activateTraceTab(document.querySelector("#summaryTab"));
-    showError("Enter a move to compare.", "#tabContent");
+    markFieldInvalid(moveInput);
+    showError("Enter a move to compare.");
+    document.querySelector("#tabContent").textContent = "Enter a move to compare.";
     document.querySelector("#tabContent").classList.remove("empty-copy");
-    document.querySelector("#moveInput").focus();
+    moveInput.focus();
     return;
   }
   return withThinkingControl("#whyBtn", async () => {
     try {
+      clearFieldInvalid(moveInput);
       const comparison = await call("WhyNotMove", move);
       activateTraceTab(document.querySelector("#summaryTab"));
       document.querySelector("#tabContent").textContent = whyNotText(comparison);
       document.querySelector("#tabContent").classList.remove("empty-copy");
       showSuccess("Move comparison ready.");
     } catch (err) {
+      markFieldInvalid(moveInput);
       showError(err);
       focusMoveInput(true);
     }
