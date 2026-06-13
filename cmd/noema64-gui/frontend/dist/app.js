@@ -1935,7 +1935,10 @@ async function saveProviderKeyToKeychain() {
     await loadSettings();
     showSuccess("API key saved to keychain reference.", "#settingsOutput");
   } catch (err) {
+    markFieldInvalid(keyField);
     showError(err, "#settingsOutput");
+    keyField.focus();
+    keyField.select?.();
   }
 }
 

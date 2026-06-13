@@ -407,6 +407,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "showError(\"Enter an API key before saving it to the keychain.\", \"#settingsOutput\")",
     "markFieldInvalid(keyField)",
     "keyField.focus()",
+    "keyField.select?.()",
     "showError(\"Acknowledge provider endpoint data sharing before saving.\", \"#settingsOutput\")",
     "markFieldInvalid(cloudAck)",
     "cloudAck.focus()",
