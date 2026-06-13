@@ -513,6 +513,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Analysis complete. No game state is loaded.",
     "promptPack = normalizePromptPack(await call(\"PromptTemplatePack\"))",
     "textAreaValue(await call(\"ExportProviderProfiles\"))",
+    "clearFieldInvalid(profilesText)",
     "finishExport(workflow?.dataset_jsonl, \"Fine-tune export ready.\")",
     "clearFieldInvalid(memoryField)",
     "parseJSONField",

@@ -2537,7 +2537,9 @@ function restoreSettingsAfterProfiles() {
 
 async function exportProfiles() {
   try {
-    document.querySelector("#profilesText").value = textAreaValue(await call("ExportProviderProfiles"));
+    const profilesText = document.querySelector("#profilesText");
+    profilesText.value = textAreaValue(await call("ExportProviderProfiles"));
+    clearFieldInvalid(profilesText);
     document.querySelector("#profilesOutput").textContent = "Profiles exported.";
     showSuccess("Provider profiles exported.");
   } catch (err) {
