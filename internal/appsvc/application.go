@@ -11,6 +11,7 @@ import (
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/experiments"
 	"github.com/ahmedyounis/noema64/internal/providers"
+	"github.com/ahmedyounis/noema64/internal/security"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"github.com/ahmedyounis/noema64/internal/verifier"
@@ -65,7 +66,8 @@ func NewApplication(settingsPath string) *Application {
 func (a *Application) engineOptions() engine.Options {
 	var provider providers.Provider = providers.MockProvider{}
 	if a.settings.LLM.Provider == "openai_compatible" && a.settings.LLM.Endpoint != "" {
-		provider = providers.OpenAICompatible{BaseURL: a.settings.LLM.Endpoint, APIKey: a.settings.LLM.APIKey, Model: a.settings.LLM.Model, Retries: a.settings.LLM.Retries}
+		apiKey, _ := security.ResolveAPIKey(a.settings.LLM.APIKey, a.settings.LLM.APIKeyRef)
+		provider = providers.OpenAICompatible{BaseURL: a.settings.LLM.Endpoint, APIKey: apiKey, Model: a.settings.LLM.Model, Retries: a.settings.LLM.Retries}
 	}
 	var verify verifier.Verifier = verifier.StaticVerifier{Enabled: a.settings.Verifier.Enabled}
 	if a.settings.Verifier.Enabled && a.settings.Verifier.Path != "" {

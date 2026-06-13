@@ -292,6 +292,28 @@ func TestEngineOptionsHonorsProviderRetries(t *testing.T) {
 	}
 }
 
+func TestEngineOptionsResolvesAPIKeyRef(t *testing.T) {
+	t.Setenv("NOEMA64_KEYCHAIN_PROVIDER_CLOUD", "resolved-secret")
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.LLM.Model = "llama3.1"
+	settings.LLM.APIKey = ""
+	settings.LLM.APIKeyRef = "provider/cloud"
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save key ref settings: %v", err)
+	}
+	provider, ok := app.engineOptions().Provider.(providers.OpenAICompatible)
+	if !ok {
+		t.Fatalf("provider = %T, want OpenAICompatible", app.engineOptions().Provider)
+	}
+	if provider.APIKey != "resolved-secret" {
+		t.Fatalf("provider api key = %q, want resolved keychain secret", provider.APIKey)
+	}
+}
+
 func TestEngineOptionsWrapsTablebaseVerifier(t *testing.T) {
 	app, _ := newTestApplication(t)
 	settings := app.settings

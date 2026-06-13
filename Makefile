@@ -2,7 +2,7 @@ GO ?= go
 NPM ?= npm
 WAILS ?= wails
 
-.PHONY: test test-race frontend-smoke uci-smoke bench-random trace-validate perft lint license-check gui-dev build-uci build-cli build-bench build-gui fmt
+.PHONY: test test-race frontend-smoke uci-smoke bench-random trace-validate perft lint license-check release-check gui-dev build-uci build-cli build-bench build-gui fmt
 
 fmt:
 	$(GO)fmt -w ./cmd ./internal
@@ -37,6 +37,9 @@ trace-validate:
 license-check:
 	$(GO) mod download
 	$(GO) list -m -json all | $(GO) run ./cmd/noema64-licensecheck
+
+release-check: build-cli build-uci build-bench
+	$(GO) run ./cmd/noema64-releasecheck ./bin/noema64 ./bin/noema64-uci ./bin/noema64-bench
 
 gui-dev:
 	cd cmd/noema64-gui && $(WAILS) dev

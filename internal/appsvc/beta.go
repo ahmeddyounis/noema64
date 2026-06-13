@@ -11,6 +11,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/experiments"
 	"github.com/ahmedyounis/noema64/internal/providers"
+	"github.com/ahmedyounis/noema64/internal/security"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"gopkg.in/yaml.v3"
@@ -212,6 +213,33 @@ func (a *Application) ImportProviderProfiles(text string) (storage.Settings, err
 	return a.GetSettings()
 }
 
+func (a *Application) SaveProviderAPIKeyToKeychain(profileID string, apiKey string) (storage.Settings, error) {
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		profileID = strings.TrimSpace(a.settings.LLM.ProfileID)
+	}
+	if profileID == "" || profileID == "custom" {
+		profileID = "active"
+	}
+	keyRef := "provider/" + profileID
+	if err := security.StoreKeychainSecret(keyRef, apiKey); err != nil {
+		return storage.Settings{}, appErr("ERR_KEYCHAIN", err, true)
+	}
+	settings := a.settings
+	settings.LLM.APIKey = ""
+	settings.LLM.APIKeyRef = keyRef
+	for i := range settings.LLM.Profiles {
+		if settings.LLM.Profiles[i].ID == profileID {
+			settings.LLM.Profiles[i].APIKey = ""
+			settings.LLM.Profiles[i].APIKeyRef = keyRef
+		}
+	}
+	if err := a.SaveSettings(settings); err != nil {
+		return storage.Settings{}, err
+	}
+	return a.GetSettings()
+}
+
 func (a *Application) PromptTemplatePack() (PromptTemplatePack, error) {
 	source := "default"
 	templates := strategy.DefaultPromptTemplates()
@@ -381,9 +409,13 @@ func providerFromProfile(profile storage.ProviderProfile) (providers.Provider, s
 		if strings.TrimSpace(profile.Endpoint) == "" {
 			return providers.OpenAICompatible{Model: profile.Model, Retries: profile.Retries}, "config_missing", fmt.Errorf("provider endpoint is required")
 		}
+		apiKey, err := security.ResolveAPIKey(profile.APIKey, profile.APIKeyRef)
+		if err != nil {
+			return providers.OpenAICompatible{BaseURL: profile.Endpoint, Model: profile.Model, Retries: profile.Retries}, "keychain_unavailable", err
+		}
 		return providers.OpenAICompatible{
 			BaseURL: profile.Endpoint,
-			APIKey:  profile.APIKey,
+			APIKey:  apiKey,
 			Model:   profile.Model,
 			Retries: profile.Retries,
 		}, "configured", nil

@@ -136,6 +136,7 @@
           <label>LLM timeout ms <input id="settingTimeout" type="number" min="100" step="100" /></label>
           <label>Retries <input id="settingRetries" type="number" min="0" max="5" step="1" /></label>
           <label>API key <input id="settingKey" type="password" autocomplete="off" /></label>
+          <label>API key ref <input id="settingKeyRef" placeholder="provider/cloud" /></label>
           <label><input id="settingVerifier" type="checkbox" /> Verifier enabled</label>
           <label>Verifier path <input id="settingVerifierPath" placeholder="stockfish" /></label>
           <label>Verifier movetime ms <input id="settingVerifierMoveTime" type="number" min="10" step="10" /></label>
@@ -152,6 +153,7 @@
             <button id="benchBtn" value="none" type="button">Benchmark 100</button>
             <button id="modeBenchBtn" value="none" type="button">Mode Benchmark</button>
             <button id="profilesBtn" value="none" type="button">Profiles</button>
+            <button id="keychainBtn" value="none" type="button">Keychain</button>
             <button id="saveSettingsBtn" value="none" type="button">Save</button>
           </menu>
           <pre id="settingsOutput"></pre>

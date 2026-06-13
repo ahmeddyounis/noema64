@@ -72,6 +72,7 @@ test("settings surface covers MVP and profile controls", () => {
     "settingTimeout",
     "settingRetries",
     "settingKey",
+    "settingKeyRef",
     "settingVerifier",
     "settingTablebase",
     "settingTablebasePath",
@@ -83,6 +84,7 @@ test("settings surface covers MVP and profile controls", () => {
     "benchBtn",
     "modeBenchBtn",
     "profilesBtn",
+    "keychainBtn",
   ]) {
     expectMarkupID(id);
   }
@@ -117,6 +119,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "SavePromptTemplatePack",
     "ExportProviderProfiles",
     "ImportProviderProfiles",
+    "SaveProviderAPIKeyToKeychain",
     "renderBenchmarkSummary",
     "renderPositionSuiteSummary",
     "renderProviderComparison",
@@ -145,6 +148,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "verifier_score",
     "strategy_metrics",
     "alert_level",
+    "api_key_ref",
   ]) {
     expectScriptToken(token);
   }

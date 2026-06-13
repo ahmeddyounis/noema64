@@ -40,6 +40,7 @@ type LLMSettings struct {
 	Endpoint    string            `json:"endpoint" yaml:"endpoint"`
 	Model       string            `json:"model" yaml:"model"`
 	APIKey      string            `json:"api_key,omitempty" yaml:"api_key,omitempty"`
+	APIKeyRef   string            `json:"api_key_ref,omitempty" yaml:"api_key_ref,omitempty"`
 	Temperature float64           `json:"temperature" yaml:"temperature"`
 	MaxTokens   int               `json:"max_tokens" yaml:"max_tokens"`
 	TimeoutMS   int               `json:"timeout_ms" yaml:"timeout_ms"`
@@ -56,6 +57,7 @@ type ProviderProfile struct {
 	Endpoint    string  `json:"endpoint,omitempty" yaml:"base_url,omitempty"`
 	Model       string  `json:"model,omitempty" yaml:"model,omitempty"`
 	APIKey      string  `json:"api_key,omitempty" yaml:"api_key,omitempty"`
+	APIKeyRef   string  `json:"api_key_ref,omitempty" yaml:"api_key_ref,omitempty"`
 	Temperature float64 `json:"temperature,omitempty" yaml:"temperature,omitempty"`
 	MaxTokens   int     `json:"max_tokens,omitempty" yaml:"max_tokens,omitempty"`
 	TimeoutMS   int     `json:"timeout_ms,omitempty" yaml:"timeout_ms,omitempty"`

@@ -26,6 +26,31 @@ func TestSettingsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSettingsRoundTripAPIKeyRefs(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	settings := DefaultSettings()
+	settings.LLM.APIKeyRef = "provider/active"
+	settings.LLM.Profiles = []ProviderProfile{{
+		ID:        "cloud",
+		Provider:  "openai_compatible",
+		Endpoint:  "https://api.example.test/v1",
+		Model:     "model",
+		APIKeyRef: "provider/cloud",
+		MaxTokens: 1000,
+		TimeoutMS: 1000,
+	}}
+	if err := SaveSettings(path, settings); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	loaded, err := LoadSettings(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.LLM.APIKeyRef != "provider/active" || loaded.LLM.Profiles[0].APIKeyRef != "provider/cloud" {
+		t.Fatalf("api key refs did not round trip: %+v", loaded.LLM)
+	}
+}
+
 func TestSaveSettingsForcesPrivateFilePermissions(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(path, []byte("schema_version: \"1.0\"\n"), 0o644); err != nil {

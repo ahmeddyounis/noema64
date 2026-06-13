@@ -37,3 +37,5 @@ jobs:
         run: make bench-random
       - name: Build CLI and UCI binaries
         run: make build-cli build-uci build-bench
+      - name: Release artifact checks
+        run: make release-check

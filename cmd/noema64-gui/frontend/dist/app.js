@@ -466,6 +466,7 @@ async function loadSettings() {
   document.querySelector("#settingTimeout").value = settings.llm.timeout_ms || 12000;
   document.querySelector("#settingRetries").value = settings.llm.retries ?? 1;
   document.querySelector("#settingKey").value = settings.llm.api_key || "";
+  document.querySelector("#settingKeyRef").value = settings.llm.api_key_ref || "";
   document.querySelector("#settingCloudAck").checked = !!settings.privacy.cloud_provider_warning_acknowledged;
   document.querySelector("#settingVerifier").checked = !!settings.verifier.enabled;
   document.querySelector("#settingVerifierPath").value = settings.verifier.path || "";
@@ -520,6 +521,7 @@ function applySelectedProviderProfile() {
   document.querySelector("#settingMaxTokens").value = profile.max_tokens || settings?.llm?.max_tokens || 1600;
   document.querySelector("#settingTimeout").value = profile.timeout_ms || settings?.llm?.timeout_ms || 12000;
   document.querySelector("#settingRetries").value = profile.retries ?? settings?.llm?.retries ?? 1;
+  document.querySelector("#settingKeyRef").value = profile.api_key_ref || "";
   applyingProviderProfile = false;
   syncProviderDisclosure();
 }
@@ -550,6 +552,7 @@ async function saveSettings() {
     settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
     settings.llm.retries = Number(document.querySelector("#settingRetries").value) || 0;
     settings.llm.api_key = document.querySelector("#settingKey").value;
+    settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
     settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
     if (settings.llm.provider === "openai_compatible" && !settings.privacy.cloud_provider_warning_acknowledged) {
       document.querySelector("#settingsOutput").textContent = "Acknowledge cloud provider data sharing before saving.";
@@ -568,6 +571,21 @@ async function saveSettings() {
     settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
     await call("SaveSettings", settings);
     document.querySelector("#settingsOutput").textContent = "Settings saved.";
+  } catch (err) {
+    showError(err, "#settingsOutput");
+  }
+}
+
+async function saveProviderKeyToKeychain() {
+  const apiKey = document.querySelector("#settingKey").value.trim();
+  if (!apiKey || apiKey === "[REDACTED]") {
+    document.querySelector("#settingsOutput").textContent = "Enter an API key before saving it to the keychain.";
+    return;
+  }
+  try {
+    settings = await call("SaveProviderAPIKeyToKeychain", document.querySelector("#settingProfile").value, apiKey);
+    await loadSettings();
+    document.querySelector("#settingsOutput").textContent = "API key saved to keychain reference.";
   } catch (err) {
     showError(err, "#settingsOutput");
   }
@@ -874,7 +892,7 @@ document.querySelector("#settingProvider").addEventListener("change", () => {
   markProviderProfileCustom();
   syncProviderDisclosure();
 });
-["#settingEndpoint", "#settingModel", "#settingTemperature", "#settingMaxTokens", "#settingTimeout", "#settingRetries", "#settingKey"].forEach((selector) => {
+["#settingEndpoint", "#settingModel", "#settingTemperature", "#settingMaxTokens", "#settingTimeout", "#settingRetries", "#settingKey", "#settingKeyRef"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", markProviderProfileCustom);
 });
 document.querySelector("#recentBtn").addEventListener("click", openRecentGames);
@@ -938,6 +956,7 @@ document.querySelector("#promotionDialog").addEventListener("close", () => {
 });
 document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
 document.querySelector("#profilesBtn").addEventListener("click", openProfilesEditor);
+document.querySelector("#keychainBtn").addEventListener("click", saveProviderKeyToKeychain);
 document.querySelector("#healthBtn").addEventListener("click", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);

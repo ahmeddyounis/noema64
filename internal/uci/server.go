@@ -13,6 +13,7 @@ import (
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/providers"
+	"github.com/ahmedyounis/noema64/internal/security"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 	"github.com/ahmedyounis/noema64/internal/verifier"
@@ -559,7 +560,8 @@ func sanitizeInfo(s string) string {
 func engineOptions(settings storage.Settings) engine.Options {
 	provider := providers.Provider(providers.MockProvider{})
 	if settings.LLM.Provider == "openai_compatible" && settings.LLM.Endpoint != "" {
-		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: settings.LLM.APIKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
+		apiKey, _ := security.ResolveAPIKey(settings.LLM.APIKey, settings.LLM.APIKeyRef)
+		provider = providers.OpenAICompatible{BaseURL: settings.LLM.Endpoint, APIKey: apiKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
 	}
 	v := verifier.Verifier(verifier.StaticVerifier{Enabled: settings.Verifier.Enabled})
 	if settings.Verifier.Enabled && settings.Verifier.Path != "" {
