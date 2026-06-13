@@ -140,4 +140,12 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	if !record.Trace.VerifierTrace.Used || record.Trace.VerifierTrace.Name != "static_safety" {
 		t.Fatalf("missing verifier trace disclosure: %+v", record.Trace.VerifierTrace)
 	}
+
+	exported, err := NewTraceFileStore(path).ReadGame(context.Background(), "")
+	if err != nil {
+		t.Fatalf("read trace file: %v", err)
+	}
+	if strings.Contains(exported, "abc123") || !strings.Contains(exported, `"event_type":"move_decision"`) {
+		t.Fatalf("exported trace not redacted or incomplete: %s", exported)
+	}
 }

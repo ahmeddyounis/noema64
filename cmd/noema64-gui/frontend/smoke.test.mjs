@@ -22,6 +22,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
   assert.match(indexHTML, /data-tab="prompt"/);
+  assert.match(indexHTML, /Trace JSONL/);
 });
 
 test("primary toolbar and dialogs expose expected controls", () => {
@@ -88,6 +89,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Resign",
     "Undo",
     "ExportPGN",
+    "ExportTrace",
     "ImportPGN",
     "RunRandomBenchmark",
     "RunModeBenchmark",

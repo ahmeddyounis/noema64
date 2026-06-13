@@ -6,7 +6,7 @@ It exposes:
 
 - Interactive board with drag/drop and click source/destination moves.
 - Legal move highlighting from backend data.
-- New game, time control, recent games, engine move, analysis-only decision, stop, resign, undo, flip, PGN/FEN export, and settings controls.
+- New game, time control, recent games, engine move, analysis-only decision, stop, resign, undo, flip, PGN/FEN/JSONL trace export, and settings controls.
 - Settings for mode, personality, provider, API endpoint/key, temperature, max tokens, timeout, retries, cloud-provider acknowledgement, verifier path/timing, external tablebase probe, trace logging, raw logging flags, and log output directory.
 - Relaunch restore for the latest saved game, clock, and strategy memory from `logging.output_dir/games`.
 - Strategy memory panel.

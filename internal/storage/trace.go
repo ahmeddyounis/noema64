@@ -3,8 +3,10 @@ package storage
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -63,6 +65,27 @@ func (s *TraceStore) AppendDecision(ctx context.Context, trace *decision.MoveDec
 	defer f.Close()
 	_, err = f.Write(b)
 	return err
+}
+
+func (s *TraceStore) ReadGame(ctx context.Context, gameID string) (string, error) {
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+	}
+	path := s.filePath
+	if path == "" {
+		gameID = strings.TrimSpace(gameID)
+		if gameID == "" {
+			return "", fmt.Errorf("game id is required")
+		}
+		path = filepath.Join(s.dir, gameID+".jsonl")
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return security.RedactSecrets(string(b)), nil
 }
 
 func decisionTraceRecord(trace *decision.MoveDecision) map[string]any {

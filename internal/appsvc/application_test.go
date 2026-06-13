@@ -122,6 +122,22 @@ func TestAnalyzeCurrentPositionDoesNotMutateCurrentGame(t *testing.T) {
 	}
 }
 
+func TestExportTraceReturnsCurrentGameJSONL(t *testing.T) {
+	app, _ := newTestApplication(t)
+	if _, err := app.RequestEngineMove(); err != nil {
+		t.Fatalf("engine move: %v", err)
+	}
+	trace, err := app.ExportTrace()
+	if err != nil {
+		t.Fatalf("export trace: %v", err)
+	}
+	for _, want := range []string{`"event_type":"move_decision"`, `"schema_version":"1.0"`, `"selected_move"`} {
+		if !strings.Contains(trace, want) {
+			t.Fatalf("trace missing %q:\n%s", want, trace)
+		}
+	}
+}
+
 func TestNewApplicationRecoversFromCorruptSettings(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(configPath, []byte("llm: [not valid yaml\n"), 0o600); err != nil {

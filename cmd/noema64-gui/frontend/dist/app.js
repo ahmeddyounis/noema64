@@ -747,7 +747,15 @@ document.querySelector("#modeBenchBtn").addEventListener("click", async () => {
 });
 async function refreshExport() {
   const type = document.querySelector("#exportType").value;
-  document.querySelector("#exportText").value = type === "fen" ? await call("ExportFEN") : await call("ExportPGN");
+  if (type === "fen") {
+    document.querySelector("#exportText").value = await call("ExportFEN");
+    return;
+  }
+  if (type === "trace") {
+    document.querySelector("#exportText").value = await call("ExportTrace");
+    return;
+  }
+  document.querySelector("#exportText").value = await call("ExportPGN");
 }
 
 document.querySelector("#refreshExportBtn").addEventListener("click", async () => {

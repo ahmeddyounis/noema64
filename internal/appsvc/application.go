@@ -222,6 +222,15 @@ func (a *Application) ExportFEN() (string, error) {
 	return fen, appErr("ERR_EXPORT_FEN", err, true)
 }
 
+func (a *Application) ExportTrace() (string, error) {
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return "", appErr("ERR_GAME_STATE", err, true)
+	}
+	trace, err := a.traces.ReadGame(context.Background(), state.Snapshot.GameID)
+	return trace, appErr("ERR_EXPORT_TRACE", err, true)
+}
+
 func (a *Application) ImportFEN(fen string) (*engine.GameState, error) {
 	fen = strings.TrimSpace(fen)
 	if fen == "" {

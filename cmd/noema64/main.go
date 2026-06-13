@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen")
+	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen, trace")
 	move := flag.String("move", "", "UCI move for -cmd move")
 	fen := flag.String("fen", "", "FEN to load before running the command")
 	pgn := flag.String("pgn", "", "PGN to load before running the command")
@@ -55,6 +55,10 @@ func main() {
 		fen, err := app.ExportFEN()
 		exitOnAppErr(err)
 		fmt.Println(fen)
+	case "trace":
+		trace, err := app.ExportTrace()
+		exitOnAppErr(err)
+		fmt.Print(trace)
 	default:
 		fmt.Fprintln(os.Stderr, "unknown command:", *cmd)
 		os.Exit(2)
