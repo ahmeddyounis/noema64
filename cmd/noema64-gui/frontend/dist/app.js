@@ -2177,13 +2177,18 @@ async function refreshMultiAgent() {
 }
 
 async function saveStudyMemory() {
+  const memoryField = document.querySelector("#studyMemoryText");
   try {
     const memory = parseJSONField("#studyMemoryText", "Strategy memory");
     applyGameStateResult(await call("UpdateStrategyMemory", memory));
+    clearFieldInvalid(memoryField);
     await refreshStudy();
     showSuccess("Strategy memory saved.");
   } catch (err) {
+    markFieldInvalid(memoryField);
     showError(err, "#studyOutput");
+    memoryField?.focus();
+    memoryField?.select?.();
   }
 }
 

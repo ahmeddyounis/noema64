@@ -528,6 +528,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "clearFieldInvalid(customBoardDefinition)",
     "finishExport(workflow?.dataset_jsonl, \"Fine-tune export ready.\")",
     "clearFieldInvalid(memoryField)",
+    "markFieldInvalid(memoryField)",
+    "memoryField?.focus()",
     "parseJSONField",
     "markFieldInvalid",
     "clearFieldInvalid",
