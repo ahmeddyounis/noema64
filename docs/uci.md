@@ -33,6 +33,7 @@ Additional Noema64 options:
 - `LLMModel`
 - `Temperature`
 - `MaxCandidates`
+- `LLMRetries`
 - `VerifierEnabled`
 - `VerifierPath`
 - `VerifierMoveTime`

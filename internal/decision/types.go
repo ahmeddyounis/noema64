@@ -10,20 +10,21 @@ import (
 )
 
 type Request struct {
-	Game           *chesscore.Game
-	Memory         strategy.StrategyMemory
-	Mode           strategy.EngineMode
-	Personality    strategy.Personality
-	Provider       providers.Provider
-	Verifier       verifier.Verifier
-	Model          string
-	Temperature    float64
-	MaxTokens      int
-	MaxCandidates  int
-	Timeout        time.Duration
-	LogRawPrompts  bool
-	LogRawResponse bool
-	Progress       ProgressFunc `json:"-"`
+	Game            *chesscore.Game
+	Memory          strategy.StrategyMemory
+	Mode            strategy.EngineMode
+	Personality     strategy.Personality
+	Provider        providers.Provider
+	Verifier        verifier.Verifier
+	Model           string
+	Temperature     float64
+	MaxTokens       int
+	ProviderRetries int
+	MaxCandidates   int
+	Timeout         time.Duration
+	LogRawPrompts   bool
+	LogRawResponse  bool
+	Progress        ProgressFunc `json:"-"`
 }
 
 type MoveDecision struct {
@@ -57,6 +58,9 @@ type ProviderTrace struct {
 	Name           string                   `json:"name"`
 	Model          string                   `json:"model"`
 	PromptVersion  string                   `json:"prompt_version"`
+	Temperature    float64                  `json:"temperature"`
+	MaxTokens      int                      `json:"max_tokens"`
+	RetryCount     int                      `json:"retry_count"`
 	ParseStatus    string                   `json:"parse_status"`
 	RawAvailable   bool                     `json:"raw_available"`
 	Error          string                   `json:"error,omitempty"`

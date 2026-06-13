@@ -29,6 +29,9 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 			Name:          "mock",
 			Model:         "mock-balanced",
 			PromptVersion: strategy.PromptVersion,
+			Temperature:   0.2,
+			MaxTokens:     1600,
+			RetryCount:    2,
 			ParseStatus:   "ok",
 			RawAvailable:  false,
 			Error:         "api_key: abc123",
@@ -73,6 +76,9 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		Provider        string              `json:"provider"`
 		Model           string              `json:"model"`
 		PromptVersion   string              `json:"prompt_version"`
+		Temperature     float64             `json:"temperature"`
+		MaxTokens       int                 `json:"max_tokens"`
+		RetryCount      int                 `json:"retry_count"`
 		LLMParseStatus  string              `json:"llm_parse_status"`
 		SelectedMove    string              `json:"selected_move"`
 		AnalysisOnly    bool                `json:"analysis_only"`
@@ -118,6 +124,9 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 	if record.Mode != strategy.ModeBlunderguard || record.Provider != "mock" || record.Model != "mock-balanced" || record.PromptVersion != strategy.PromptVersion {
 		t.Fatalf("missing DATA-005 provider metadata: %+v", record)
+	}
+	if record.Temperature != 0.2 || record.MaxTokens != 1600 || record.RetryCount != 2 {
+		t.Fatalf("missing provider runtime metadata: %+v", record)
 	}
 	if record.LLMParseStatus != "ok" || record.TimingMS["llm"] != 6 || record.TimingMS["verifier"] != 3 || record.TimingMS["search"] != 1 {
 		t.Fatalf("missing top-level LLM/timing fields: %+v", record)

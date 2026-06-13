@@ -145,6 +145,12 @@ func TestUCIOptionRangesMatchHandshake(t *testing.T) {
 	if server.opts.MaxCandidates != 10 {
 		t.Fatalf("max candidates = %d, want 10", server.opts.MaxCandidates)
 	}
+	if err := server.setOption("setoption name LLMRetries value 99"); err != nil {
+		t.Fatalf("set retries: %v", err)
+	}
+	if server.opts.ProviderRetries != 5 || server.providerRetries != 5 {
+		t.Fatalf("provider retries = opts:%d server:%d, want 5", server.opts.ProviderRetries, server.providerRetries)
+	}
 	if err := server.setOption("setoption name VerifierPath value /usr/bin/stockfish"); err != nil {
 		t.Fatalf("set verifier path: %v", err)
 	}

@@ -107,6 +107,7 @@ func (s *Server) handle(ctx context.Context, line string) error {
 		s.write("option name LLMEndpoint type string default")
 		s.write("option name Temperature type spin default 20 min 0 max 200")
 		s.write("option name MaxCandidates type spin default 5 min 1 max 10")
+		s.write("option name LLMRetries type spin default 1 min 0 max 5")
 		s.write("option name VerifierEnabled type check default false")
 		s.write("option name VerifierPath type string default")
 		s.write("option name VerifierMoveTime type spin default 100 min 10 max 5000")
@@ -156,6 +157,13 @@ func (s *Server) setOption(line string) error {
 	case "llmendpoint":
 		s.endpoint = value
 		s.refreshProviderLocked()
+	case "llmretries", "retries":
+		n, err := strconv.Atoi(value)
+		if err == nil && n >= 0 {
+			s.providerRetries = clampInt(n, 0, 5)
+			s.opts.ProviderRetries = s.providerRetries
+			s.refreshProviderLocked()
+		}
 	case "temperature":
 		n, err := strconv.Atoi(value)
 		if err == nil {
@@ -489,14 +497,15 @@ func engineOptions(settings storage.Settings) engine.Options {
 		timeout = 12 * time.Second
 	}
 	return engine.Options{
-		Mode:          settings.Engine.DefaultMode,
-		Personality:   settings.Engine.Personality,
-		Provider:      provider,
-		Verifier:      v,
-		Model:         settings.LLM.Model,
-		Temperature:   settings.LLM.Temperature,
-		MaxTokens:     settings.LLM.MaxTokens,
-		MaxCandidates: settings.Engine.MaxCandidates,
-		MoveTimeout:   timeout,
+		Mode:            settings.Engine.DefaultMode,
+		Personality:     settings.Engine.Personality,
+		Provider:        provider,
+		Verifier:        v,
+		Model:           settings.LLM.Model,
+		Temperature:     settings.LLM.Temperature,
+		MaxTokens:       settings.LLM.MaxTokens,
+		ProviderRetries: settings.LLM.Retries,
+		MaxCandidates:   settings.Engine.MaxCandidates,
+		MoveTimeout:     timeout,
 	}
 }

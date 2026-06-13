@@ -268,6 +268,9 @@ func TestEngineOptionsHonorsProviderRetries(t *testing.T) {
 	if provider.Retries != 3 {
 		t.Fatalf("provider retries = %d, want 3", provider.Retries)
 	}
+	if app.engineOptions().ProviderRetries != 3 {
+		t.Fatalf("engine option provider retries = %d, want 3", app.engineOptions().ProviderRetries)
+	}
 }
 
 func TestEngineOptionsWrapsTablebaseVerifier(t *testing.T) {
