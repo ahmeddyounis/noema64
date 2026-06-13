@@ -2,6 +2,8 @@ package verifier
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/strategy"
@@ -74,10 +76,15 @@ func (v StaticVerifier) VerifyCandidates(ctx context.Context, req Request) (*Res
 		if mateRisk {
 			status = "rejected"
 			reason = "Move allows an immediate mate-in-one reply."
-		}
-		if len(mateInOneMoves) > 0 && !contains(mateInOneMoves, candidate.UCI) {
-			status = "warning"
+		} else if len(mateInOneMoves) > 0 && !contains(mateInOneMoves, candidate.UCI) {
+			status = "rejected"
 			reason = "A mating move is available; this candidate does not play it."
+		} else if piece, square, reply, ok := directHighValueLoss(req.Game, candidate.UCI, "queen"); ok {
+			status = "rejected"
+			reason = fmt.Sprintf("Move allows direct capture of %s on %s by %s.", piece, square, reply)
+		} else if piece, square, reply, ok := directHighValueLoss(req.Game, candidate.UCI, "rook"); ok {
+			status = "warning"
+			reason = fmt.Sprintf("Move allows direct capture of %s on %s by %s.", piece, square, reply)
 		}
 		result.Candidates = append(result.Candidates, CandidateResult{
 			UCI:      candidate.UCI,
@@ -151,6 +158,76 @@ func allowsMateInOne(game *chesscore.Game, moveUCI string) bool {
 		}
 	}
 	return false
+}
+
+func directHighValueLoss(game *chesscore.Game, moveUCI string, target string) (piece string, square string, reply string, ok bool) {
+	if game == nil {
+		return "", "", "", false
+	}
+	movingSide := game.SideToMove()
+	after := game.Clone()
+	if _, err := after.ApplyUCI(moveUCI); err != nil {
+		return "", "", "", false
+	}
+	if after.Outcome().Status != "ongoing" {
+		return "", "", "", false
+	}
+	board := after.Snapshot().Board
+	for _, candidateReply := range after.LegalMoves() {
+		if !candidateReply.Capture {
+			continue
+		}
+		captured := board[candidateReply.To]
+		if pieceSide(captured) != movingSide || pieceKind(captured) != target {
+			continue
+		}
+		return pieceName(captured), candidateReply.To, candidateReply.UCI, true
+	}
+	return "", "", "", false
+}
+
+func pieceSide(piece string) string {
+	if piece == "" {
+		return ""
+	}
+	if strings.Contains("♔♕♖♗♘♙", piece) {
+		return "white"
+	}
+	if strings.Contains("♚♛♜♝♞♟", piece) {
+		return "black"
+	}
+	if piece == strings.ToUpper(piece) {
+		return "white"
+	}
+	return "black"
+}
+
+func pieceKind(piece string) string {
+	switch strings.ToLower(piece) {
+	case "q", "♕", "♛":
+		return "queen"
+	case "r", "♖", "♜":
+		return "rook"
+	case "b", "♗", "♝":
+		return "bishop"
+	case "n", "♘", "♞":
+		return "knight"
+	case "p", "♙", "♟":
+		return "pawn"
+	case "k", "♔", "♚":
+		return "king"
+	default:
+		return "piece"
+	}
+}
+
+func pieceName(piece string) string {
+	side := pieceSide(piece)
+	kind := pieceKind(piece)
+	if side == "" {
+		return kind
+	}
+	return side + " " + kind
 }
 
 func contains(items []string, needle string) bool {

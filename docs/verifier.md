@@ -8,6 +8,8 @@ The MVP verifier stack has three levels:
 
 External UCI verification uses `searchmoves` for each LLM candidate, compares centipawn loss against the best candidate, and rejects candidates that exceed the configured loss threshold. Verifier use is disclosed in every decision trace through the assistance block and verifier trace. Pure mode disables verifier scoring except deterministic legality.
 
+Static safety checks reject moves that allow an immediate mate-in-one reply, reject candidates that skip an available mate-in-one, reject direct queen blunders, and warn on direct rook losses. These checks are intentionally shallow and deterministic; external UCI verification is still the stronger tactical guard when configured.
+
 External tablebase probing is configured with `verifier.tablebase_enabled`, `verifier.tablebase_path`, and `verifier.tablebase_timeout_ms`. The probe is a separate executable that reads JSON on stdin:
 
 ```json
