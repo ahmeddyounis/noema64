@@ -2149,7 +2149,9 @@ async function refreshStudy() {
   try {
     const dashboard = await call("StudyDashboard");
     const current = await call("GetGame");
-    document.querySelector("#studyMemoryText").value = JSON.stringify(current?.strategy_memory || {}, null, 2);
+    const memoryField = document.querySelector("#studyMemoryText");
+    memoryField.value = JSON.stringify(current?.strategy_memory || {}, null, 2);
+    clearFieldInvalid(memoryField);
     document.querySelector("#studyOutput").textContent = renderStudyDashboard(dashboard);
     showSuccess("Study dashboard ready.");
   } catch (err) {
