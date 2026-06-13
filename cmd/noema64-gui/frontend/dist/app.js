@@ -317,6 +317,8 @@ function recordActivity(label, message, tone) {
 
 function renderActivityLog() {
   const log = document.querySelector("#activityLog");
+  const clearButton = document.querySelector("#clearActivityBtn");
+  if (clearButton) clearButton.disabled = activityEvents.length === 0;
   if (!log) return;
   log.innerHTML = "";
   if (!activityEvents.length) {
@@ -358,13 +360,14 @@ function formatActivityTime(value) {
 function openActivityHistory() {
   renderActivityLog();
   document.querySelector("#activityDialog").showModal();
-  focusDialogInitialControl("#clearActivityBtn");
+  focusDialogInitialControl("#clearActivityBtn:not(:disabled)", "#activityDialog button[value='cancel']");
 }
 
 function clearActivityHistory() {
   activityEvents = [];
   renderActivityLog();
   setAppActivity("Ready", "Activity history cleared.", "ready", false);
+  focusDialogInitialControl("#activityDialog button[value='cancel']");
 }
 
 function beginAppOperation(label) {
