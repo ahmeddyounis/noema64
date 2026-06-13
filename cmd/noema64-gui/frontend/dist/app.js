@@ -25,6 +25,7 @@ let settingsScrollBeforeProfiles = 0;
 const busyControls = new Set();
 const busyDisabledState = new WeakMap();
 let activeOperationCount = 0;
+let activeThinkingOperationCount = 0;
 let appActivitySequence = 0;
 let activityEvents = [];
 const maxActivityEvents = 30;
@@ -58,7 +59,7 @@ const primaryActionRequirements = {
   "#resignBtn": "ongoing",
   "#reviewBtn": "game",
   "#settingsBtn": "service",
-  "#stopBtn": "game",
+  "#stopBtn": "thinking",
   "#studyBtn": "game",
   "#undoBtn": "moves",
   "#whyBtn": "game"
@@ -449,6 +450,20 @@ async function withBusyControl(controlOrSelector, action) {
   }
 }
 
+async function withThinkingControl(controlOrSelector, action) {
+  const control = controlFrom(controlOrSelector);
+  const key = busyKey(controlOrSelector, control);
+  if (!control || busyControls.has(key)) return undefined;
+  activeThinkingOperationCount += 1;
+  setPrimaryActionAvailability(state?.snapshot);
+  try {
+    return await withBusyControl(controlOrSelector, action);
+  } finally {
+    activeThinkingOperationCount = Math.max(0, activeThinkingOperationCount - 1);
+    setPrimaryActionAvailability(state?.snapshot);
+  }
+}
+
 function restoreBusyControlFocus(control) {
   if (focusVisibleElement(control, true)) return;
   const dialog = control?.closest?.("dialog[open]");
@@ -733,7 +748,8 @@ function setPrimaryActionAvailability(snapshot) {
       (requirement === "service" && !hasService) ||
       (requirement === "game" && (!hasService || !hasGame)) ||
       (requirement === "ongoing" && (!hasService || !ongoing)) ||
-      (requirement === "moves" && (!hasService || !hasMoves));
+      (requirement === "moves" && (!hasService || !hasMoves)) ||
+      (requirement === "thinking" && (!hasService || activeThinkingOperationCount === 0));
   }
   const moveInput = document.querySelector("#moveInput");
   if (moveInput) moveInput.disabled = !hasService || !ongoing;
@@ -1526,7 +1542,7 @@ async function makeMove(move) {
 }
 
 async function askEngine() {
-  return withBusyControl("#engineBtn", async () => {
+  return withThinkingControl("#engineBtn", async () => {
     try {
       lastStageEvent = null;
       document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
@@ -1540,7 +1556,7 @@ async function askEngine() {
 }
 
 async function analyzeCurrentPosition() {
-  return withBusyControl("#analyzeBtn", async () => {
+  return withThinkingControl("#analyzeBtn", async () => {
     try {
       lastStageEvent = null;
       document.querySelector("#thinkingStage").textContent = "Analyzing current position";
@@ -1576,7 +1592,7 @@ async function whyNotMove() {
     document.querySelector("#moveInput").focus();
     return;
   }
-  return withBusyControl("#whyBtn", async () => {
+  return withThinkingControl("#whyBtn", async () => {
     try {
       const comparison = await call("WhyNotMove", move);
       activateTraceTab(document.querySelector("#summaryTab"));
