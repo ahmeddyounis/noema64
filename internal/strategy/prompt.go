@@ -106,7 +106,7 @@ func LoadPromptTemplates(dir string) (PromptTemplates, error) {
 	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
 		return PromptTemplates{}, fmt.Errorf("prompt manifest is invalid JSON: %w", err)
 	}
-	if err := validatePromptManifest(manifest); err != nil {
+	if err := ValidatePromptManifest(manifest); err != nil {
 		return PromptTemplates{}, err
 	}
 	system, err := os.ReadFile(filepath.Join(dir, "system.md"))
@@ -121,7 +121,7 @@ func LoadPromptTemplates(dir string) (PromptTemplates, error) {
 	if err != nil {
 		return PromptTemplates{}, err
 	}
-	if err := validatePromptSchema(schema); err != nil {
+	if err := ValidatePromptSchema(schema); err != nil {
 		return PromptTemplates{}, err
 	}
 	return PromptTemplates{
@@ -132,7 +132,24 @@ func LoadPromptTemplates(dir string) (PromptTemplates, error) {
 	}, nil
 }
 
-func validatePromptManifest(manifest PromptManifest) error {
+func ValidatePromptTemplates(templates PromptTemplates) error {
+	if err := ValidatePromptManifest(templates.Manifest); err != nil {
+		return err
+	}
+	if strings.TrimSpace(templates.System) == "" {
+		return fmt.Errorf("prompt system template is required")
+	}
+	if strings.TrimSpace(templates.User) == "" {
+		return fmt.Errorf("prompt user template is required")
+	}
+	if err := ValidatePromptSchema([]byte(templates.Schema)); err != nil {
+		return err
+	}
+	_, _, err := BuildPromptWithTemplates(samplePromptRequest(), templates)
+	return err
+}
+
+func ValidatePromptManifest(manifest PromptManifest) error {
 	if manifest.SchemaVersion != PromptTemplateSchemaVersion {
 		return fmt.Errorf("unsupported prompt manifest schema_version %q", manifest.SchemaVersion)
 	}
@@ -148,7 +165,7 @@ func validatePromptManifest(manifest PromptManifest) error {
 	return nil
 }
 
-func validatePromptSchema(schema []byte) error {
+func ValidatePromptSchema(schema []byte) error {
 	var out struct {
 		SchemaVersion string `json:"schema_version"`
 	}
@@ -218,6 +235,20 @@ func LegalMoveCSV(req StrategyRequest) string {
 		parts = append(parts, mv.UCI)
 	}
 	return strings.Join(parts, ",")
+}
+
+func samplePromptRequest() StrategyRequest {
+	return StrategyRequest{
+		GameID:           "sample",
+		FEN:              "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+		PGN:              "*",
+		SideToMove:       "white",
+		MoveNumber:       1,
+		LastOpponentMove: "",
+		PreviousMemory:   NewMemory("sample", "white"),
+		Mode:             ModeBlunderguard,
+		Personality:      PersonalityBalanced,
+	}
 }
 
 func ExampleSchema() DecisionOutput {

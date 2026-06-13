@@ -9,6 +9,7 @@ import (
 
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
+	"github.com/ahmedyounis/noema64/internal/experiments"
 	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
@@ -466,6 +467,153 @@ func TestRunModeBenchmarkCoversCoreModes(t *testing.T) {
 		if result.Summary.GamesCompleted != 1 {
 			t.Fatalf("%s completed = %d, want 1", result.Mode, result.Summary.GamesCompleted)
 		}
+	}
+}
+
+func TestPostGameReviewAndStrategyMetrics(t *testing.T) {
+	app, _ := newTestApplication(t)
+	emptyReview, err := app.PostGameReview()
+	if err != nil {
+		t.Fatalf("empty review: %v", err)
+	}
+	if emptyReview.SchemaVersion != postGameReviewSchemaVersion || emptyReview.GameID == "" || emptyReview.StrategyMetrics.SchemaVersion == "" {
+		t.Fatalf("empty review missing boundary fields: %+v", emptyReview)
+	}
+
+	if _, err := app.RequestEngineMove(); err != nil {
+		t.Fatalf("engine move: %v", err)
+	}
+	metrics, err := app.StrategyMetrics()
+	if err != nil {
+		t.Fatalf("strategy metrics: %v", err)
+	}
+	if metrics.SchemaVersion != strategy.MemoryMetricsSchemaVersion || metrics.Quality <= 0 {
+		t.Fatalf("metrics not populated: %+v", metrics)
+	}
+	review, err := app.PostGameReview()
+	if err != nil {
+		t.Fatalf("post-game review: %v", err)
+	}
+	if review.SelectedMove == "" || review.CandidateCount == 0 || review.Provider == "" || review.Summary == "" {
+		t.Fatalf("review missing decision context: %+v", review)
+	}
+}
+
+func TestProviderDashboardHonorsProfilePrivacy(t *testing.T) {
+	app, _ := newTestApplication(t)
+	dashboard, err := app.ProviderDashboard()
+	if err != nil {
+		t.Fatalf("provider dashboard: %v", err)
+	}
+	if dashboard.SchemaVersion != providerDashboardSchemaVersion || len(dashboard.Profiles) == 0 {
+		t.Fatalf("dashboard missing fields: %+v", dashboard)
+	}
+	var sawMockHealthy bool
+	var sawPrivacyGate bool
+	for _, profile := range dashboard.Profiles {
+		if profile.Provider == "mock" && profile.Healthy {
+			sawMockHealthy = true
+		}
+		if profile.Provider == "openai_compatible" && profile.Status == "privacy_ack_required" {
+			sawPrivacyGate = true
+		}
+	}
+	if !sawMockHealthy || !sawPrivacyGate {
+		t.Fatalf("dashboard did not expose expected profile statuses: %+v", dashboard.Profiles)
+	}
+}
+
+func TestProviderProfileImportExportRedactsAndPreservesKeys(t *testing.T) {
+	app, _ := newTestApplication(t)
+	app.settings.LLM.Profiles = []storage.ProviderProfile{{
+		ID:        "cloud",
+		Provider:  "openai_compatible",
+		Endpoint:  "https://api.example.test/v1",
+		Model:     "model",
+		APIKey:    "secret",
+		MaxTokens: 1000,
+		TimeoutMS: 1000,
+	}}
+	exported, err := app.ExportProviderProfiles()
+	if err != nil {
+		t.Fatalf("export provider profiles: %v", err)
+	}
+	if strings.Contains(exported, "secret") || !strings.Contains(exported, "[REDACTED]") {
+		t.Fatalf("profiles were not redacted:\n%s", exported)
+	}
+	settings, err := app.ImportProviderProfiles(exported)
+	if err != nil {
+		t.Fatalf("import provider profiles: %v", err)
+	}
+	if settings.LLM.Profiles[0].APIKey != "[REDACTED]" {
+		t.Fatalf("returned settings did not redact key: %+v", settings.LLM.Profiles[0])
+	}
+	if app.settings.LLM.Profiles[0].APIKey != "secret" {
+		t.Fatalf("redacted import did not preserve prior key: %+v", app.settings.LLM.Profiles[0])
+	}
+}
+
+func TestPromptTemplatePackValidationAndSave(t *testing.T) {
+	app, _ := newTestApplication(t)
+	pack, err := app.PromptTemplatePack()
+	if err != nil {
+		t.Fatalf("prompt pack: %v", err)
+	}
+	validation, err := app.ValidatePromptTemplatePack(pack)
+	if err != nil {
+		t.Fatalf("validate prompt pack: %v", err)
+	}
+	if !validation.Valid || validation.SchemaVersion != promptTemplateValidationSchemaVersion {
+		t.Fatalf("default prompt pack invalid: %+v", validation)
+	}
+	dir := t.TempDir()
+	validation, err = app.SavePromptTemplatePack(dir, pack)
+	if err != nil {
+		t.Fatalf("save prompt pack: %v", err)
+	}
+	if !validation.Valid {
+		t.Fatalf("saved invalid prompt pack: %+v", validation)
+	}
+	if _, err := strategy.LoadPromptTemplates(dir); err != nil {
+		t.Fatalf("saved prompt pack did not load: %v", err)
+	}
+	pack.User += "\n{{unknown_placeholder}}\n"
+	validation, err = app.ValidatePromptTemplatePack(pack)
+	if err != nil {
+		t.Fatalf("validate invalid prompt pack: %v", err)
+	}
+	if validation.Valid || len(validation.Errors) == 0 {
+		t.Fatalf("invalid prompt pack accepted: %+v", validation)
+	}
+}
+
+func TestPositionSuiteAndProviderComparison(t *testing.T) {
+	app, _ := newTestApplication(t)
+	suite, err := app.RunPositionSuite([]experiments.SuitePosition{{
+		Name: "start",
+		FEN:  "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+	}})
+	if err != nil {
+		t.Fatalf("run position suite: %v", err)
+	}
+	if suite.SchemaVersion != experiments.PositionSuiteSchemaVersion || suite.PositionsAnalyzed != 1 {
+		t.Fatalf("unexpected suite summary: %+v", suite)
+	}
+	comparison, err := app.RunProviderComparison()
+	if err != nil {
+		t.Fatalf("run provider comparison: %v", err)
+	}
+	if comparison.SchemaVersion != providerComparisonSchemaVersion || comparison.ProfilesCompared == 0 {
+		t.Fatalf("unexpected provider comparison summary: %+v", comparison)
+	}
+	var sawPrivacyGate bool
+	for _, result := range comparison.Results {
+		if result.Status == "privacy_ack_required" {
+			sawPrivacyGate = true
+		}
+	}
+	if !sawPrivacyGate {
+		t.Fatalf("provider comparison did not gate cloud profiles: %+v", comparison.Results)
 	}
 }
 

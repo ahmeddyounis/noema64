@@ -106,3 +106,40 @@ func TestRandomModeBenchmarkCoversCoreModes(t *testing.T) {
 		}
 	}
 }
+
+func TestPositionSuiteRunsDeterministicPositions(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	summary, err := (Runner{}).PositionSuite(ctx, []SuitePosition{
+		{Name: "start", FEN: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"},
+		{Name: "endgame", FEN: "8/5pk1/6p1/4P3/5P2/6K1/8/8 w - - 0 42"},
+	})
+	if err != nil {
+		t.Fatalf("position suite: %v", err)
+	}
+	if summary.SchemaVersion != PositionSuiteSchemaVersion {
+		t.Fatalf("schema_version = %q, want %q", summary.SchemaVersion, PositionSuiteSchemaVersion)
+	}
+	if summary.PositionsRequested != 2 || summary.PositionsAnalyzed != 2 || summary.EngineErrors != 0 {
+		t.Fatalf("unexpected position suite summary: %+v", summary)
+	}
+	for _, result := range summary.Results {
+		if result.SelectedMove == "" || result.CandidateCount == 0 || result.Provider == "" {
+			t.Fatalf("incomplete position result: %+v", result)
+		}
+	}
+}
+
+func TestPositionSuiteRecordsPositionErrors(t *testing.T) {
+	summary, err := (Runner{}).PositionSuite(context.Background(), []SuitePosition{{Name: "bad", FEN: "not a fen"}})
+	if err != nil {
+		t.Fatalf("position suite should keep per-position errors: %v", err)
+	}
+	if summary.PositionsAnalyzed != 0 || summary.EngineErrors != 1 {
+		t.Fatalf("unexpected error summary: %+v", summary)
+	}
+	if len(summary.Results) != 1 || summary.Results[0].EngineError == "" {
+		t.Fatalf("missing per-position error: %+v", summary.Results)
+	}
+}
