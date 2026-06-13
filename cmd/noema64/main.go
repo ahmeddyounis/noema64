@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen, trace")
+	cmd := flag.String("cmd", "state", "state, move, engine, analyze, pgn, fen, trace, debug-trace")
 	move := flag.String("move", "", "UCI move for -cmd move")
 	fen := flag.String("fen", "", "FEN to load before running the command")
 	pgn := flag.String("pgn", "", "PGN to load before running the command")
@@ -57,6 +57,10 @@ func main() {
 		fmt.Println(fen)
 	case "trace":
 		trace, err := app.ExportTrace()
+		exitOnAppErr(err)
+		fmt.Print(trace)
+	case "debug-trace":
+		trace, err := app.ExportDebugTrace()
 		exitOnAppErr(err)
 		fmt.Print(trace)
 	default:

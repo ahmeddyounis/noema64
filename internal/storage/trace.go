@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bufio"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -70,6 +71,18 @@ func (s *TraceStore) AppendDecision(ctx context.Context, trace *decision.MoveDec
 }
 
 func (s *TraceStore) ReadGame(ctx context.Context, gameID string) (string, error) {
+	text, err := s.readGame(ctx, gameID)
+	if err != nil {
+		return "", err
+	}
+	return stripRawProviderData(text), nil
+}
+
+func (s *TraceStore) ReadGameDebug(ctx context.Context, gameID string) (string, error) {
+	return s.readGame(ctx, gameID)
+}
+
+func (s *TraceStore) readGame(ctx context.Context, gameID string) (string, error) {
 	select {
 	case <-ctx.Done():
 		return "", ctx.Err()
@@ -88,6 +101,53 @@ func (s *TraceStore) ReadGame(ctx context.Context, gameID string) (string, error
 		return "", err
 	}
 	return security.RedactSecrets(string(b)), nil
+}
+
+func stripRawProviderData(jsonl string) string {
+	var out strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(jsonl))
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			out.WriteByte('\n')
+			continue
+		}
+		var value any
+		if err := json.Unmarshal([]byte(line), &value); err != nil {
+			out.WriteString(line)
+			out.WriteByte('\n')
+			continue
+		}
+		stripRawFields(value)
+		b, err := json.Marshal(value)
+		if err != nil {
+			out.WriteString(line)
+			out.WriteByte('\n')
+			continue
+		}
+		out.Write(b)
+		out.WriteByte('\n')
+	}
+	if err := scanner.Err(); err != nil {
+		return jsonl
+	}
+	return out.String()
+}
+
+func stripRawFields(value any) {
+	switch typed := value.(type) {
+	case map[string]any:
+		delete(typed, "raw_prompt")
+		delete(typed, "raw_response")
+		for _, child := range typed {
+			stripRawFields(child)
+		}
+	case []any:
+		for _, child := range typed {
+			stripRawFields(child)
+		}
+	}
 }
 
 func decisionTraceRecord(trace *decision.MoveDecision) map[string]any {

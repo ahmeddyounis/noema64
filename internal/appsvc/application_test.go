@@ -400,6 +400,20 @@ func TestPrivacySettingsEnableRawProviderTrace(t *testing.T) {
 	if state.LastDecision.Provider.RawPrompt == nil || state.LastDecision.Provider.RawResponse == "" {
 		t.Fatalf("raw provider trace not populated: %+v", state.LastDecision.Provider)
 	}
+	trace, err := app.ExportTrace()
+	if err != nil {
+		t.Fatalf("export trace: %v", err)
+	}
+	if strings.Contains(trace, "raw_prompt") || strings.Contains(trace, "raw_response") {
+		t.Fatalf("normal trace export included raw provider data: %s", trace)
+	}
+	debugTrace, err := app.ExportDebugTrace()
+	if err != nil {
+		t.Fatalf("export debug trace: %v", err)
+	}
+	if !strings.Contains(debugTrace, "raw_prompt") || !strings.Contains(debugTrace, "raw_response") {
+		t.Fatalf("debug trace export missing raw provider data: %s", debugTrace)
+	}
 }
 
 func TestRequestEngineMoveEmitsDecisionStageEvents(t *testing.T) {

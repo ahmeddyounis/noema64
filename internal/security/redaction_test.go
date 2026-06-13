@@ -3,12 +3,12 @@ package security
 import "testing"
 
 func TestRedactSecrets(t *testing.T) {
-	in := `Authorization: Bearer sk-testsecret api_key: abc123`
+	in := `Authorization: Bearer sk-testsecret api_key: abc123 {"raw_response":"{\"api_key\":\"raw-secret\"}"}`
 	out := RedactSecrets(in)
 	if out == in || out == "" {
 		t.Fatalf("redaction did not change input: %q", out)
 	}
-	if outContains(out, "sk-testsecret") || outContains(out, "abc123") {
+	if outContains(out, "sk-testsecret") || outContains(out, "abc123") || outContains(out, "raw-secret") {
 		t.Fatalf("secret leaked: %s", out)
 	}
 }

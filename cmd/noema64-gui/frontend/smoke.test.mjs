@@ -23,6 +23,7 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /aria-label="Strategy memory"/);
   assert.match(indexHTML, /data-tab="prompt"/);
   assert.match(indexHTML, /Trace JSONL/);
+  assert.match(indexHTML, /Debug trace JSONL/);
 });
 
 test("primary toolbar and dialogs expose expected controls", () => {
@@ -93,8 +94,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Undo",
     "ExportPGN",
     "ExportTrace",
-    "confirmRawTraceExport",
-    "raw logging is enabled",
+    "ExportDebugTrace",
+    "confirmDebugTraceExport",
+    "Debug trace export may include raw prompts",
     "ImportPGN",
     "RunRandomBenchmark",
     "RunModeBenchmark",

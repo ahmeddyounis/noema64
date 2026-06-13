@@ -4,6 +4,6 @@ Noema64 is local-first and does not upload telemetry by default.
 
 Mock provider mode is fully offline. Cloud provider mode may send the current FEN, legal moves, move history, strategy memory, selected settings, and optional user notes to the configured provider.
 
-Raw prompt logging is disabled by default. API keys are redacted from traces and logs. If raw prompt or raw response logging is enabled, the GUI asks for confirmation before exporting JSONL traces because those traces may include provider prompts or responses.
+Raw prompt logging is disabled by default. API keys are redacted from traces and logs. Normal JSONL trace export strips raw prompts and raw LLM responses even if they were logged. Full debug trace export keeps raw prompt/response fields and requires explicit GUI confirmation.
 
 GUI game snapshots are local JSON files under the configured log directory. They include board state, move history, strategy memory, and the last decision payload; the snapshot writer redacts secrets before saving.

@@ -50,6 +50,8 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 			ParseStatus:   "ok",
 			RawAvailable:  false,
 			Error:         "api_key: abc123",
+			RawPrompt:     &decision.PromptTrace{System: "system prompt with api_key: raw-secret", User: "user prompt"},
+			RawResponse:   `{"candidate_moves":[{"uci":"g1f3"}],"api_key":"raw-secret"}`,
 		},
 		Timing:        decision.Timing{TotalMS: 10, ProviderMS: 6, VerifierMS: 3, SearchMS: 1},
 		VerifierTrace: &verifier.Result{Enabled: true, Used: true, Name: "static_safety"},
@@ -194,5 +196,18 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 	}
 	if strings.Contains(exported, "abc123") || !strings.Contains(exported, `"event_type":"move_decision"`) {
 		t.Fatalf("exported trace not redacted or incomplete: %s", exported)
+	}
+	if strings.Contains(exported, "raw_prompt") || strings.Contains(exported, "raw_response") || strings.Contains(exported, "raw-secret") {
+		t.Fatalf("normal trace export kept raw provider data: %s", exported)
+	}
+	debugExported, err := NewTraceFileStore(path).ReadGameDebug(context.Background(), "")
+	if err != nil {
+		t.Fatalf("read debug trace file: %v", err)
+	}
+	if !strings.Contains(debugExported, "raw_prompt") || !strings.Contains(debugExported, "raw_response") {
+		t.Fatalf("debug trace export stripped raw provider data: %s", debugExported)
+	}
+	if strings.Contains(debugExported, "raw-secret") {
+		t.Fatalf("debug trace export leaked unredacted secret: %s", debugExported)
 	}
 }

@@ -247,6 +247,15 @@ func (a *Application) ExportTrace() (string, error) {
 	return trace, appErr("ERR_EXPORT_TRACE", err, true)
 }
 
+func (a *Application) ExportDebugTrace() (string, error) {
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return "", appErr("ERR_GAME_STATE", err, true)
+	}
+	trace, err := a.traces.ReadGameDebug(context.Background(), state.Snapshot.GameID)
+	return trace, appErr("ERR_EXPORT_TRACE", err, true)
+}
+
 func (a *Application) WhyNotMove(moveUCI string) (*MoveComparison, error) {
 	moveUCI = strings.TrimSpace(moveUCI)
 	if moveUCI == "" {
