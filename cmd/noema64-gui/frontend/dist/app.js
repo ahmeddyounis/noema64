@@ -1541,6 +1541,7 @@ async function whyNotMove() {
   if (!move) {
     activateTraceTab(document.querySelector("#summaryTab"));
     showError("Enter a move to compare.", "#tabContent");
+    document.querySelector("#tabContent").classList.remove("empty-copy");
     document.querySelector("#moveInput").focus();
     return;
   }
@@ -1549,6 +1550,7 @@ async function whyNotMove() {
       const comparison = await call("WhyNotMove", move);
       activateTraceTab(document.querySelector("#summaryTab"));
       document.querySelector("#tabContent").textContent = whyNotText(comparison);
+      document.querySelector("#tabContent").classList.remove("empty-copy");
       showSuccess("Move comparison ready.");
     } catch (err) {
       showError(err);

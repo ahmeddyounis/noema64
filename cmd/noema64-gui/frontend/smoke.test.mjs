@@ -384,6 +384,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "showSuccess",
     "activateTraceTab(document.querySelector(\"#summaryTab\"))",
     "showError(\"Enter a move to compare.\", \"#tabContent\")",
+    "document.querySelector(\"#tabContent\").classList.remove(\"empty-copy\")",
     "document.querySelector(\"#moveInput\").focus()",
     "showError(\"Enter an API key before saving it to the keychain.\", \"#settingsOutput\")",
     "document.querySelector(\"#settingKey\").focus()",
