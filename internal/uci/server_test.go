@@ -32,7 +32,19 @@ func TestUCISmoke(t *testing.T) {
 		t.Fatalf("run: %v", err)
 	}
 	text := out.String()
-	for _, want := range []string{"id name Noema64", "uciok", "readyok", "bestmove ", "option name TablebaseEnabled", "option name TablebasePath", "option name TablebaseTimeoutMS", "option name LogPath"} {
+	for _, want := range []string{
+		"id name Noema64",
+		"uciok",
+		"readyok",
+		"bestmove ",
+		"option name MoveOverhead",
+		"option name MaxProviderMillis",
+		"option name MaxVerifierMillis",
+		"option name TablebaseEnabled",
+		"option name TablebasePath",
+		"option name TablebaseTimeoutMS",
+		"option name LogPath",
+	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("output missing %q:\n%s", want, text)
 		}
@@ -155,6 +167,30 @@ func TestUCIOptionRangesMatchHandshake(t *testing.T) {
 	if server.opts.ProviderRetries != 5 || server.providerRetries != 5 {
 		t.Fatalf("provider retries = opts:%d server:%d, want 5", server.opts.ProviderRetries, server.providerRetries)
 	}
+	if err := server.setOption("setoption name MoveOverhead value 99999"); err != nil {
+		t.Fatalf("set move overhead: %v", err)
+	}
+	if server.moveOverheadMS != 5000 {
+		t.Fatalf("move overhead = %d, want 5000", server.moveOverheadMS)
+	}
+	if err := server.setOption("setoption name MoveOverhead value -25"); err != nil {
+		t.Fatalf("set move overhead low: %v", err)
+	}
+	if server.moveOverheadMS != 0 {
+		t.Fatalf("move overhead = %d, want 0", server.moveOverheadMS)
+	}
+	if err := server.setOption("setoption name MaxProviderMillis value 999999"); err != nil {
+		t.Fatalf("set max provider millis: %v", err)
+	}
+	if server.maxProviderMS != 120000 || server.opts.MoveTimeout != 120*time.Second {
+		t.Fatalf("max provider millis = %d timeout=%s, want 120000/120s", server.maxProviderMS, server.opts.MoveTimeout)
+	}
+	if err := server.setOption("setoption name MaxProviderMillis value 1"); err != nil {
+		t.Fatalf("set max provider millis low: %v", err)
+	}
+	if server.maxProviderMS != 100 || server.opts.MoveTimeout != 100*time.Millisecond {
+		t.Fatalf("max provider millis = %d timeout=%s, want 100/100ms", server.maxProviderMS, server.opts.MoveTimeout)
+	}
 	if err := server.setOption("setoption name VerifierPath value /usr/bin/stockfish"); err != nil {
 		t.Fatalf("set verifier path: %v", err)
 	}
@@ -177,6 +213,13 @@ func TestUCIOptionRangesMatchHandshake(t *testing.T) {
 	external = server.opts.Verifier.(verifier.ExternalUCI)
 	if external.MoveTimeMS != 10 {
 		t.Fatalf("verifier movetime = %d, want 10", external.MoveTimeMS)
+	}
+	if err := server.setOption("setoption name MaxVerifierMillis value 99999"); err != nil {
+		t.Fatalf("set max verifier millis: %v", err)
+	}
+	external = server.opts.Verifier.(verifier.ExternalUCI)
+	if external.MoveTimeMS != 60000 {
+		t.Fatalf("max verifier millis = %d, want 60000", external.MoveTimeMS)
 	}
 	if err := server.setOption("setoption name VerifierMaxCentipawnLoss value 99999"); err != nil {
 		t.Fatalf("set verifier max loss: %v", err)

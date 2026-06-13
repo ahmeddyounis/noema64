@@ -34,6 +34,8 @@ type Server struct {
 	endpoint         string
 	apiKey           string
 	providerRetries  int
+	moveOverheadMS   int
+	maxProviderMS    int
 	verifierEnabled  bool
 	verifierPath     string
 	verifierMoveTime int
@@ -52,6 +54,10 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 	if traceDir == "" {
 		traceDir = "logs"
 	}
+	maxProviderMS := settings.LLM.TimeoutMS
+	if maxProviderMS <= 0 {
+		maxProviderMS = 12000
+	}
 	return &Server{
 		in:               in,
 		out:              out,
@@ -63,6 +69,8 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		endpoint:         settings.LLM.Endpoint,
 		apiKey:           settings.LLM.APIKey,
 		providerRetries:  settings.LLM.Retries,
+		moveOverheadMS:   100,
+		maxProviderMS:    clampInt(maxProviderMS, 100, 120000),
 		verifierEnabled:  settings.Verifier.Enabled,
 		verifierPath:     settings.Verifier.Path,
 		verifierMoveTime: settings.Verifier.MoveTimeMS,
@@ -108,9 +116,12 @@ func (s *Server) handle(ctx context.Context, line string) error {
 		s.write("option name Temperature type spin default 20 min 0 max 200")
 		s.write("option name MaxCandidates type spin default 5 min 1 max 10")
 		s.write("option name LLMRetries type spin default 1 min 0 max 5")
+		s.write("option name MoveOverhead type spin default 100 min 0 max 5000")
+		s.write("option name MaxProviderMillis type spin default 12000 min 100 max 120000")
 		s.write("option name VerifierEnabled type check default false")
 		s.write("option name VerifierPath type string default")
 		s.write("option name VerifierMoveTime type spin default 100 min 10 max 5000")
+		s.write("option name MaxVerifierMillis type spin default 1000 min 0 max 60000")
 		s.write("option name VerifierMaxCentipawnLoss type spin default 180 min 0 max 2000")
 		s.write("option name TablebaseEnabled type check default false")
 		s.write("option name TablebasePath type string default")
@@ -175,6 +186,17 @@ func (s *Server) setOption(line string) error {
 		if err == nil && n > 0 {
 			s.opts.MaxCandidates = clampInt(n, 1, 10)
 		}
+	case "moveoverhead":
+		n, err := strconv.Atoi(value)
+		if err == nil {
+			s.moveOverheadMS = clampInt(n, 0, 5000)
+		}
+	case "maxprovidermillis":
+		n, err := strconv.Atoi(value)
+		if err == nil {
+			s.maxProviderMS = clampInt(n, 100, 120000)
+			s.opts.MoveTimeout = time.Duration(s.maxProviderMS) * time.Millisecond
+		}
 	case "verifierenabled":
 		s.verifierEnabled = strings.EqualFold(value, "true")
 		s.refreshVerifierLocked(s.verifierEnabled)
@@ -185,6 +207,12 @@ func (s *Server) setOption(line string) error {
 		n, err := strconv.Atoi(value)
 		if err == nil {
 			s.verifierMoveTime = clampInt(n, 10, 5000)
+			s.refreshVerifierLocked(s.verifierEnabled)
+		}
+	case "maxverifiermillis":
+		n, err := strconv.Atoi(value)
+		if err == nil {
+			s.verifierMoveTime = clampInt(n, 0, 60000)
 			s.refreshVerifierLocked(s.verifierEnabled)
 		}
 	case "verifiermaxcentipawnloss":
@@ -298,6 +326,13 @@ func (s *Server) goCommand(ctx context.Context, args []string) error {
 		return nil
 	}
 	budget := parseGoBudget(args)
+	moveOverhead := s.moveOverheadMS
+	if moveOverhead > 0 {
+		budget -= time.Duration(moveOverhead) * time.Millisecond
+		if budget < 50*time.Millisecond {
+			budget = 50 * time.Millisecond
+		}
+	}
 	searchCtx, cancel := context.WithTimeout(ctx, budget)
 	done := make(chan struct{})
 	s.searchCancel = cancel
