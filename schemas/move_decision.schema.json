@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://noema64.local/schemas/move_decision.schema.json",
+  "title": "Noema64 Move Decision Output",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "previous_plan_status",
+    "position_summary",
+    "strategy_update",
+    "candidate_moves",
+    "do_not_play"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "decision-output.v1.2"
+    },
+    "previous_plan_status": {
+      "enum": ["continue", "modify", "abandon", "new"]
+    },
+    "position_summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "strategy_update": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["plan_summary", "phase", "confidence"],
+      "properties": {
+        "plan_summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase": {
+          "type": "string"
+        },
+        "main_targets": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "piece_improvement": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pawn_breaks": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "opponent_plan_guess": {
+          "type": "string"
+        },
+        "commitments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "refutation_triggers": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tactical_warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "last_update_summary": {
+          "type": "string"
+        }
+      }
+    },
+    "candidate_moves": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["purpose", "confidence"],
+        "anyOf": [
+          { "required": ["uci"] },
+          { "required": ["san"] }
+        ],
+        "properties": {
+          "uci": {
+            "type": "string"
+          },
+          "san": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_reply": {
+            "type": "string"
+          },
+          "risk": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "do_not_play": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["uci_or_pattern", "reason"],
+        "properties": {
+          "uci_or_pattern": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "needs_replan_after": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

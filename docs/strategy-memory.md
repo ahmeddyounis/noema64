@@ -14,3 +14,7 @@ Strategy memory is structured public state, not raw private reasoning. It stores
 
 Every engine move produces before/after memory and a compact diff in the decision trace.
 
+Public schema artifacts live under `schemas/`:
+
+- `schemas/strategy_memory.schema.json`
+- `schemas/move_decision.schema.json`
