@@ -2268,26 +2268,48 @@ async function startCustomBoardFromLab() {
 }
 
 async function createBackup() {
+  const backupDir = document.querySelector("#backupDir");
   try {
-    const manifest = await call("CreateBackup", document.querySelector("#backupDir").value.trim());
+    const manifest = await call("CreateBackup", backupDir.value.trim());
     const restoreArchive = document.querySelector("#restoreArchive");
     restoreArchive.value = manifest?.archive_path || "";
+    clearFieldInvalid(backupDir);
     if (restoreArchive.value) clearFieldInvalid(restoreArchive);
     document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
     showSuccess("Backup created.");
   } catch (err) {
+    markFieldInvalid(backupDir);
     showError(err, "#labOutput");
+    backupDir?.focus();
+    backupDir?.select?.();
   }
 }
 
 async function restoreBackup() {
+  const restoreArchive = document.querySelector("#restoreArchive");
+  const restoreTarget = document.querySelector("#restoreTarget");
   try {
     const archive = requireField("#restoreArchive", "Choose a backup archive before restoring.");
-    const manifest = await call("RestoreBackup", archive, document.querySelector("#restoreTarget").value.trim());
+    const target = requireField("#restoreTarget", "Choose a restore target before restoring.");
+    const manifest = await call("RestoreBackup", archive, target);
+    clearFieldInvalid(restoreArchive);
+    clearFieldInvalid(restoreTarget);
     document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
     showSuccess("Backup restored.");
   } catch (err) {
+    const message = appErrorMessage(err);
+    const targetValue = String(restoreTarget?.value || "").trim();
+    if (/restore target|target directory|restore directory/i.test(message) || (targetValue && message.includes(targetValue))) {
+      markFieldInvalid(restoreTarget);
+      showError(err, "#labOutput");
+      restoreTarget?.focus();
+      restoreTarget?.select?.();
+      return;
+    }
+    markFieldInvalid(restoreArchive);
     showError(err, "#labOutput");
+    restoreArchive?.focus();
+    restoreArchive?.select?.();
   }
 }
 
