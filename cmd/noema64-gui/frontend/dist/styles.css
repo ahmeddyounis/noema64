@@ -1187,6 +1187,14 @@ textarea {
     max-height: none;
   }
 
+  .square {
+    font-size: clamp(
+      5px,
+      min(calc(37vh / var(--board-ranks, 8)), calc(52vh / var(--board-files, 8)), 9vw),
+      40px
+    );
+  }
+
   .move-list {
     max-height: 160px;
   }
@@ -1222,11 +1230,20 @@ textarea {
 
   .toolbar-group {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(38px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 64px), 1fr));
     padding: 0;
     border-right: 0;
     border-bottom: 1px solid #d9dee7;
     padding-bottom: 6px;
+  }
+
+  .toolbar-group button {
+    min-height: 42px;
+    height: 100%;
+    padding: 4px 6px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 
   .toolbar-group:last-child {
@@ -1236,6 +1253,10 @@ textarea {
 
   .workflow-panel {
     padding: 10px;
+  }
+
+  .workflow-cards {
+    display: none;
   }
 
   .activity-row {
