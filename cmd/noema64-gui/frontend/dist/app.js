@@ -2260,7 +2260,9 @@ async function startCustomBoardFromLab() {
 async function createBackup() {
   try {
     const manifest = await call("CreateBackup", document.querySelector("#backupDir").value.trim());
-    document.querySelector("#restoreArchive").value = manifest?.archive_path || "";
+    const restoreArchive = document.querySelector("#restoreArchive");
+    restoreArchive.value = manifest?.archive_path || "";
+    if (restoreArchive.value) clearFieldInvalid(restoreArchive);
     document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
     showSuccess("Backup created.");
   } catch (err) {

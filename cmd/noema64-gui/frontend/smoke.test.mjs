@@ -514,6 +514,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "promptPack = normalizePromptPack(await call(\"PromptTemplatePack\"))",
     "textAreaValue(await call(\"ExportProviderProfiles\"))",
     "clearFieldInvalid(profilesText)",
+    "clearFieldInvalid(restoreArchive)",
     "finishExport(workflow?.dataset_jsonl, \"Fine-tune export ready.\")",
     "clearFieldInvalid(memoryField)",
     "parseJSONField",
