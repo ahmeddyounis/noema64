@@ -2188,8 +2188,10 @@ function openExperiments() {
 function openLab() {
   document.querySelector("#labOutput").textContent = "";
   document.querySelector("#tournamentGames").value = document.querySelector("#tournamentGames").value || "1";
-  if (!document.querySelector("#customBoardDefinition").value.trim()) {
-    document.querySelector("#customBoardDefinition").value = JSON.stringify(defaultCustomBoardDefinition(), null, 2);
+  const customBoardDefinition = document.querySelector("#customBoardDefinition");
+  if (!customBoardDefinition.value.trim()) {
+    customBoardDefinition.value = JSON.stringify(defaultCustomBoardDefinition(), null, 2);
+    clearFieldInvalid(customBoardDefinition);
   }
   document.querySelector("#labDialog").showModal();
   focusDialogInitialControl("#backupDir");
