@@ -44,7 +44,7 @@ func TestUCISmoke(t *testing.T) {
 	}
 }
 
-func TestUCIHundredScriptedSessions(t *testing.T) {
+func TestUCITwoHundredScriptedSessions(t *testing.T) {
 	settings := storage.DefaultSettings()
 	settings.Engine.TraceEnabled = false
 	settings.Logging.OutputDir = t.TempDir()
@@ -57,7 +57,7 @@ func TestUCIHundredScriptedSessions(t *testing.T) {
 		"quit",
 		"",
 	}, "\n")
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 200; i++ {
 		var out bytes.Buffer
 		server := NewServer(strings.NewReader(script), &out, &bytes.Buffer{}, settings)
 		if err := server.Run(context.Background()); err != nil {
