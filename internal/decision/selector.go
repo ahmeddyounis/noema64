@@ -168,7 +168,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	scoreStage.finish("completed", fmt.Sprintf("Selected %s.", chosen.UCI))
 
 	updateStage := stages.begin("updating_strategy_memory_after_move", "Merge provider strategy update into persistent memory.")
-	memAfter := strategy.MergeMemory(memBefore, parse.Decision.StrategyUpdate, snapshot.GameID, snapshot.SideToMove, snapshot.Ply+1, decisionID, chosen.UCI)
+	memAfter := strategy.MergeMemory(memBefore, parse.Decision.StrategyUpdate, parse.Decision.PreviousPlanStatus, snapshot.GameID, snapshot.SideToMove, snapshot.Ply+1, decisionID, chosen.UCI)
 	diff := strategy.DiffMemory(memBefore, memAfter)
 	updateStage.finish("completed", "Strategy memory updated.")
 	totalMS := time.Since(start).Milliseconds()
@@ -227,7 +227,7 @@ func fallbackDecision(req Request, decisionID string, mem strategy.StrategyMemor
 		LastUpdateSummary:  "Fallback ladder preserved legal play after " + reason + ".",
 		RefutationTriggers: []string{"Provider remains unavailable or malformed."},
 	}
-	memAfter := strategy.MergeMemory(mem, update, snapshot.GameID, snapshot.SideToMove, snapshot.Ply+1, decisionID, mv.UCI)
+	memAfter := strategy.MergeMemory(mem, update, "modify", snapshot.GameID, snapshot.SideToMove, snapshot.Ply+1, decisionID, mv.UCI)
 	diff := strategy.DiffMemory(mem, memAfter)
 	candidate := strategy.CandidateMove{
 		UCI:           mv.UCI,

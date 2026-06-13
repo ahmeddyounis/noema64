@@ -161,7 +161,7 @@ func LegalMoveCSV(req StrategyRequest) string {
 func ExampleSchema() DecisionOutput {
 	return DecisionOutput{
 		SchemaVersion:      DecisionSchemaVersion,
-		PreviousPlanStatus: "continue|modify|abandon",
+		PreviousPlanStatus: "continue|modify|abandon|new",
 		PositionSummary:    "concise public summary",
 		StrategyUpdate: StrategyUpdate{
 			PlanSummary:        "plan",

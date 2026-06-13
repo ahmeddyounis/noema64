@@ -31,7 +31,7 @@ func NewMemory(gameID, side string) StrategyMemory {
 	}
 }
 
-func MergeMemory(prev StrategyMemory, update StrategyUpdate, gameID, side string, ply int, decisionID, moveUCI string) StrategyMemory {
+func MergeMemory(prev StrategyMemory, update StrategyUpdate, status string, gameID, side string, ply int, decisionID, moveUCI string) StrategyMemory {
 	next := prev
 	next.SchemaVersion = MemorySchemaVersion
 	next.GameID = gameID
@@ -55,7 +55,7 @@ func MergeMemory(prev StrategyMemory, update StrategyUpdate, gameID, side string
 	if update.LastUpdateSummary != "" {
 		next.LastUpdate.Summary = bounded(update.LastUpdateSummary, 500)
 	}
-	next.Plan.Status = planStatus(update)
+	next.Plan.Status = planStatus(status, update)
 	next.Targets.Squares = limitStrings(update.MainTargets, 12, 64)
 	next.PieceImprovement = stringsToPieceImprovements(update.PieceImprovement)
 	next.PawnBreaks = stringsToPawnBreaks(update.PawnBreaks)
@@ -99,8 +99,12 @@ func HashMemory(mem StrategyMemory) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
-func planStatus(update StrategyUpdate) string {
-	switch strings.ToLower(strings.TrimSpace(update.PlanSummary)) {
+func planStatus(status string, update StrategyUpdate) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "continue", "modify", "abandon", "new":
+		return strings.ToLower(strings.TrimSpace(status))
+	}
+	switch strings.TrimSpace(update.PlanSummary) {
 	case "":
 		return "continue"
 	default:
