@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ahmedyounis/noema64/internal/analysis"
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
 	"github.com/ahmedyounis/noema64/internal/experiments"
@@ -521,6 +522,79 @@ func TestPostGameReviewAndStrategyMetrics(t *testing.T) {
 	}
 }
 
+func TestStudyDashboardAndMultiAgentAnalysis(t *testing.T) {
+	app, _ := newTestApplication(t)
+	initial, err := app.StudyDashboard()
+	if err != nil {
+		t.Fatalf("initial study dashboard: %v", err)
+	}
+	if initial.SchemaVersion != studyDashboardSchemaVersion || initial.Memory.SchemaVersion != strategy.CompressedMemorySchemaVersion {
+		t.Fatalf("initial dashboard missing schema fields: %+v", initial)
+	}
+	if initial.MultiAgent.SchemaVersion == "" || initial.Lesson.Title == "" || initial.Puzzle.FEN == "" {
+		t.Fatalf("initial dashboard missing study tools: %+v", initial)
+	}
+
+	if _, err := app.RequestEngineMove(); err != nil {
+		t.Fatalf("engine move: %v", err)
+	}
+	dashboard, err := app.StudyDashboard()
+	if err != nil {
+		t.Fatalf("study dashboard: %v", err)
+	}
+	if dashboard.CandidateDiversity.CandidateCount == 0 || len(dashboard.MultiAgent.Reviews) < 4 || len(dashboard.Heatmap) == 0 || len(dashboard.Timeline) < 2 {
+		t.Fatalf("dashboard missing decision study surfaces: %+v", dashboard)
+	}
+	multi, err := app.MultiAgentAnalysis()
+	if err != nil {
+		t.Fatalf("multi-agent analysis: %v", err)
+	}
+	if multi.Arbiter == "" || !hasAgentRole(multi.Reviews, "tactician") {
+		t.Fatalf("multi-agent review incomplete: %+v", multi)
+	}
+	compressed, err := app.CompressedStrategyMemory(2)
+	if err != nil {
+		t.Fatalf("compressed memory: %v", err)
+	}
+	if compressed.RetainedItems == 0 || compressed.SourceHash == "" {
+		t.Fatalf("compressed memory incomplete: %+v", compressed)
+	}
+	coherence, err := app.PlanCoherence()
+	if err != nil {
+		t.Fatalf("plan coherence: %v", err)
+	}
+	if coherence.SchemaVersion != strategy.PlanCoherenceSchemaVersion {
+		t.Fatalf("bad coherence report: %+v", coherence)
+	}
+}
+
+func TestUpdateStrategyMemoryPersistsEditorChanges(t *testing.T) {
+	app, _ := newTestApplication(t)
+	state, err := app.GetGame()
+	if err != nil {
+		t.Fatalf("get game: %v", err)
+	}
+	mem := state.StrategyMemory
+	mem.Plan.Summary = "Edited plan from study tools."
+	mem.Commitments = []string{"Preserve the edited plan."}
+	updated, err := app.UpdateStrategyMemory(mem)
+	if err != nil {
+		t.Fatalf("update memory: %v", err)
+	}
+	if updated.StrategyMemory.Plan.Summary != mem.Plan.Summary || updated.StrategyMemory.GameID != state.Snapshot.GameID {
+		t.Fatalf("memory update not reflected: %+v", updated.StrategyMemory)
+	}
+
+	restored := NewApplication(filepath.Join(filepath.Dir(app.settingsPath), "config.yaml"))
+	restoredState, err := restored.GetGame()
+	if err != nil {
+		t.Fatalf("restored state: %v", err)
+	}
+	if restoredState.StrategyMemory.Plan.Summary != mem.Plan.Summary {
+		t.Fatalf("memory edit did not persist: %+v", restoredState.StrategyMemory)
+	}
+}
+
 func TestProviderDashboardHonorsProfilePrivacy(t *testing.T) {
 	app, _ := newTestApplication(t)
 	dashboard, err := app.ProviderDashboard()
@@ -771,6 +845,15 @@ func TestApplicationRestoresLatestGameAndRecentRecords(t *testing.T) {
 func hasDecisionStage(stages []decision.StageTrace, name string) bool {
 	for _, stage := range stages {
 		if stage.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasAgentRole(reviews []analysis.AgentReview, role string) bool {
+	for _, review := range reviews {
+		if review.Role == role {
 			return true
 		}
 	}

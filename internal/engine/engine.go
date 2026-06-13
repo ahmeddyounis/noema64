@@ -363,6 +363,32 @@ func (e *Engine) State(ctx context.Context) (*GameState, error) {
 	return e.stateLocked(), nil
 }
 
+func (e *Engine) UpdateStrategyMemory(ctx context.Context, memory strategy.StrategyMemory) (*GameState, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if strings.TrimSpace(memory.SchemaVersion) == "" {
+		memory.SchemaVersion = strategy.MemorySchemaVersion
+	}
+	if memory.SchemaVersion != strategy.MemorySchemaVersion {
+		return nil, fmt.Errorf("strategy memory schema_version %q is unsupported by this release", memory.SchemaVersion)
+	}
+	if strings.TrimSpace(memory.MemoryID) == "" {
+		memory.MemoryID = strategy.NewMemory(e.game.ID(), e.game.SideToMove()).MemoryID
+	}
+	memory.GameID = e.game.ID()
+	if strings.TrimSpace(memory.Side) == "" {
+		memory.Side = e.game.SideToMove()
+	}
+	memory.Ply = e.game.Ply()
+	e.memory = memory
+	return e.stateLocked(), nil
+}
+
 func (e *Engine) SetOptions(opts Options) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
