@@ -220,3 +220,33 @@ func TestTraceStoreWritesVersionedRedactedDecision(t *testing.T) {
 		t.Fatalf("debug trace export leaked unredacted secret: %s", debugExported)
 	}
 }
+
+func TestTraceStoreSanitizesGameIDFileNames(t *testing.T) {
+	dir := t.TempDir()
+	traceDir := filepath.Join(dir, "logs")
+	outsidePath := filepath.Join(dir, "secret.jsonl")
+	if err := os.WriteFile(outsidePath, []byte("outside-only\n"), 0o600); err != nil {
+		t.Fatalf("write outside trace: %v", err)
+	}
+	store := NewTraceStore(traceDir)
+	if text, err := store.ReadGame(context.Background(), "../secret"); err == nil {
+		t.Fatalf("traversal-shaped game id read outside trace dir: %q", text)
+	}
+	trace := &decision.MoveDecision{
+		GameID:       "../secret",
+		SelectedMove: chesscore.LegalMove{UCI: "e2e4"},
+	}
+	if err := store.AppendDecision(context.Background(), trace); err != nil {
+		t.Fatalf("append sanitized trace: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(traceDir, "secret.jsonl")); err != nil {
+		t.Fatalf("sanitized trace was not written inside trace dir: %v", err)
+	}
+	outside, err := os.ReadFile(outsidePath)
+	if err != nil {
+		t.Fatalf("read outside trace: %v", err)
+	}
+	if string(outside) != "outside-only\n" {
+		t.Fatalf("outside trace was modified: %q", outside)
+	}
+}

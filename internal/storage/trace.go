@@ -57,7 +57,7 @@ func (s *TraceStore) AppendDecision(ctx context.Context, trace *decision.MoveDec
 		if err := os.MkdirAll(s.dir, 0o700); err != nil {
 			return err
 		}
-		path = filepath.Join(s.dir, trace.GameID+".jsonl")
+		path = filepath.Join(s.dir, traceFileName(trace.GameID))
 	} else if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func (s *TraceStore) readGame(ctx context.Context, gameID string) (string, error
 		if gameID == "" {
 			return "", fmt.Errorf("game id is required")
 		}
-		path = filepath.Join(s.dir, gameID+".jsonl")
+		path = filepath.Join(s.dir, traceFileName(gameID))
 	}
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -220,4 +220,21 @@ func traceTimingRecord(timing decision.Timing) map[string]int64 {
 		"search":   timing.SearchMS,
 		"other":    timing.OtherMS,
 	}
+}
+
+func traceFileName(gameID string) string {
+	gameID = strings.TrimSpace(gameID)
+	if gameID == "" {
+		return "current.jsonl"
+	}
+	var b strings.Builder
+	for _, r := range gameID {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			b.WriteRune(r)
+		}
+	}
+	if b.Len() == 0 {
+		return "current.jsonl"
+	}
+	return b.String() + ".jsonl"
 }
