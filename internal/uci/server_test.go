@@ -143,6 +143,25 @@ func TestUCITraceEnabledOptionDisablesTraceWrites(t *testing.T) {
 	}
 }
 
+func TestParseGoBudgetUsesSideToMoveClock(t *testing.T) {
+	args := []string{"wtime", "300000", "btime", "3000"}
+	if got := parseGoBudget(args, "white"); got != 10*time.Second {
+		t.Fatalf("white budget = %s, want 10s from white clock", got)
+	}
+	if got := parseGoBudget(args, "black"); got != 200*time.Millisecond {
+		t.Fatalf("black budget = %s, want floor from black clock", got)
+	}
+}
+
+func TestParseGoBudgetFallsBackWhenSideClockMissing(t *testing.T) {
+	if got := parseGoBudget([]string{"btime", "90000"}, "white"); got != 3*time.Second {
+		t.Fatalf("budget = %s, want fallback to available black clock", got)
+	}
+	if got := parseGoBudget([]string{"wtime", "90000"}, "black"); got != 3*time.Second {
+		t.Fatalf("budget = %s, want fallback to available white clock", got)
+	}
+}
+
 func TestUCIOptionRangesMatchHandshake(t *testing.T) {
 	server := NewServer(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, storage.DefaultSettings())
 	if err := server.setOption("setoption name Temperature value 999"); err != nil {

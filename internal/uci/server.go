@@ -350,7 +350,11 @@ func (s *Server) goCommand(ctx context.Context, args []string) error {
 		s.info("search already active")
 		return nil
 	}
-	budget := parseGoBudget(args)
+	sideToMove := "white"
+	if state, err := s.engine.State(ctx); err == nil && state != nil {
+		sideToMove = state.Snapshot.SideToMove
+	}
+	budget := parseGoBudget(args, sideToMove)
 	moveOverhead := s.moveOverheadMS
 	if moveOverhead > 0 {
 		budget -= time.Duration(moveOverhead) * time.Millisecond
@@ -559,7 +563,7 @@ func parseSetOption(line string) (string, string) {
 	return strings.Join(nameParts, " "), strings.Join(valueParts, " ")
 }
 
-func parseGoBudget(args []string) time.Duration {
+func parseGoBudget(args []string, sideToMove string) time.Duration {
 	if idx := indexOf(args, "movetime"); idx >= 0 && idx+1 < len(args) {
 		if ms, err := strconv.Atoi(args[idx+1]); err == nil && ms > 0 {
 			return time.Duration(ms) * time.Millisecond
@@ -571,7 +575,13 @@ func parseGoBudget(args []string) time.Duration {
 	wtime := valueAfter(args, "wtime")
 	btime := valueAfter(args, "btime")
 	remaining := wtime
-	if btime > 0 && (remaining == 0 || btime < remaining) {
+	if strings.EqualFold(sideToMove, "black") {
+		remaining = btime
+	}
+	if remaining <= 0 && wtime > 0 {
+		remaining = wtime
+	}
+	if remaining <= 0 && btime > 0 {
 		remaining = btime
 	}
 	if remaining <= 0 {
