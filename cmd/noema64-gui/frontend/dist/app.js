@@ -2883,30 +2883,47 @@ bindBusyButton("#importProfilesBtn", importProfiles);
 async function refreshExport() {
   const type = document.querySelector("#exportType").value;
   if (type === "fen") {
-    document.querySelector("#exportText").value = textAreaValue(await call("ExportFEN"));
-    showSuccess("FEN export ready.");
+    finishExport(await call("ExportFEN"), "FEN export ready.");
     return true;
   }
   if (type === "trace") {
-    document.querySelector("#exportText").value = textAreaValue(await call("ExportTrace"));
-    showSuccess("Trace export ready.");
+    finishExport(await call("ExportTrace"), "Trace export ready.");
     return true;
   }
   if (type === "debug_trace") {
     if (!confirmDebugTraceExport()) return false;
-    document.querySelector("#exportText").value = textAreaValue(await call("ExportDebugTrace"));
-    showSuccess("Debug trace export ready.");
+    finishExport(await call("ExportDebugTrace"), "Debug trace export ready.");
     return true;
   }
   if (type === "fine_tune") {
     const workflow = await call("ExportFineTuneDataset");
-    document.querySelector("#exportText").value = textAreaValue(workflow?.dataset_jsonl);
-    showSuccess("Fine-tune export ready.");
+    finishExport(workflow?.dataset_jsonl, "Fine-tune export ready.");
     return true;
   }
-  document.querySelector("#exportText").value = textAreaValue(await call("ExportPGN"));
-  showSuccess("PGN export ready.");
+  finishExport(await call("ExportPGN"), "PGN export ready.");
   return true;
+}
+
+function setExportText(value) {
+  document.querySelector("#exportText").value = textAreaValue(value);
+}
+
+function setExportStatus(message) {
+  const output = document.querySelector("#exportOutput");
+  if (!output) return;
+  output.textContent = message;
+  output.title = message;
+}
+
+function finishExport(value, message) {
+  setExportText(value);
+  showSuccess(message, "#exportOutput");
+}
+
+function showExportError(err) {
+  const message = appErrorMessage(err);
+  setExportText(message);
+  showError(message, "#exportOutput");
 }
 
 function confirmDebugTraceExport() {
@@ -2914,7 +2931,8 @@ function confirmDebugTraceExport() {
 }
 
 function showExportCanceled() {
-  document.querySelector("#exportText").value = "Export canceled.";
+  setExportText("Export canceled.");
+  setExportStatus("Export canceled.");
   setAppActivity("Canceled", "Export canceled.", "ready");
 }
 
@@ -2922,7 +2940,7 @@ bindBusyButton("#refreshExportBtn", async () => {
   try {
     if (!await refreshExport()) showExportCanceled();
   } catch (err) {
-    showError(err, "#exportText");
+    showExportError(err);
   }
 });
 document.querySelector("#exportType").addEventListener("change", async () => {
@@ -2930,13 +2948,14 @@ document.querySelector("#exportType").addEventListener("change", async () => {
     try {
       if (!await refreshExport()) showExportCanceled();
     } catch (err) {
-      showError(err, "#exportText");
+      showExportError(err);
     }
   });
 });
 bindBusyButton("#exportBtn", async () => {
   const exportDialog = document.querySelector("#exportDialog");
-  document.querySelector("#exportText").value = "Preparing export...";
+  setExportText("Preparing export...");
+  setExportStatus("Preparing export...");
   if (!exportDialog.open) exportDialog.showModal();
   focusDialogInitialControl("#exportType");
   try {
@@ -2944,7 +2963,7 @@ bindBusyButton("#exportBtn", async () => {
       showExportCanceled();
     }
   } catch (err) {
-    showError(err, "#exportText");
+    showExportError(err);
   }
 });
 

@@ -114,7 +114,8 @@ test("primary toolbar and dialogs expose expected controls", () => {
   assert.match(indexHTML, /aria-label="Close dialog"/);
   assert.match(indexHTML, /id="profilesText" aria-label="Provider profiles JSON"/);
   assert.match(indexHTML, /id="studyMemoryText" aria-label="Strategy memory JSON"/);
-  assert.match(indexHTML, /id="exportText" aria-label="Export output"/);
+  assert.match(indexHTML, /id="exportText" aria-label="Export output" aria-describedby="exportOutput"/);
+  assert.match(indexHTML, /id="exportOutput" role="status" aria-live="polite"/);
   assert.match(indexHTML, /id="importText" aria-label="FEN or PGN input"/);
   assert.match(indexHTML, /role="toolbar" aria-label="Workspace actions"/);
   assert.match(indexHTML, /class="toolbar-group" data-action-scope="play" role="group" aria-label="Play actions"/);
@@ -451,6 +452,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Settings saved.",
     "Export canceled.",
     "showExportCanceled",
+    "finishExport",
+    "setExportStatus",
+    "showExportError",
     "if (!await refreshExport()) showExportCanceled()",
     "bindDialogCloseButtons",
     "dialogReturnFocusTargets",
@@ -506,7 +510,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Analysis complete. No game state is loaded.",
     "promptPack = normalizePromptPack(await call(\"PromptTemplatePack\"))",
     "textAreaValue(await call(\"ExportProviderProfiles\"))",
-    "textAreaValue(workflow?.dataset_jsonl)",
+    "finishExport(workflow?.dataset_jsonl, \"Fine-tune export ready.\")",
     "parseJSONField",
     "markFieldInvalid",
     "clearFieldInvalid",
@@ -584,7 +588,7 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /"openai_compatible", "anthropic", "gemini", "ollama"/);
   assert.match(appJS, /initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/);
   assert.match(appJS, /bindBusyButton\("#runImportBtn"/);
-  assert.match(appJS, /showError\(err, "#exportText"\)/);
+  assert.match(appJS, /showExportError\(err\)/);
   assert.match(appJS, /async function whyNotMove\(\)[\s\S]*call\("WhyNotMove", move\)[\s\S]*catch \(err\) \{\n      showError\(err\);\n      focusMoveInput\(true\);/);
   assert.match(appJS, /target\.closest\("dialog\[open\]"\)/);
   assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);
@@ -607,6 +611,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /\.app-activity\[data-tone="error"\]/);
   assert.match(stylesCSS, /body\[data-app-busy="true"\] \.app-activity\[data-tone="busy"\] #appActivityLabel::after/);
   assert.match(stylesCSS, /\.activity-history-button/);
+  assert.match(stylesCSS, /#exportOutput \{[\s\S]*min-height: 52px;/);
   assert.match(stylesCSS, /\.recent-empty \{[\s\S]*padding: 18px 12px;/);
   assert.match(stylesCSS, /\.activity-log \{[\s\S]*max-height: min\(58vh, 520px\);/);
   assert.match(stylesCSS, /\.activity-entry \{[\s\S]*grid-template-columns: minmax\(86px, auto\) minmax\(0, 1fr\);/);

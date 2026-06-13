@@ -1102,6 +1102,10 @@ textarea {
   min-height: 96px;
 }
 
+#exportOutput {
+  min-height: 52px;
+}
+
 @media (min-width: 1241px) {
   body {
     min-width: 980px;

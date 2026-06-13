@@ -452,7 +452,8 @@
             </label>
             <button id="refreshExportBtn" value="none" type="button">Refresh</button>
           </div>
-          <textarea id="exportText" aria-label="Export output" readonly spellcheck="false"></textarea>
+          <textarea id="exportText" aria-label="Export output" aria-describedby="exportOutput" readonly spellcheck="false"></textarea>
+          <pre id="exportOutput" role="status" aria-live="polite"></pre>
         </form>
       </dialog>
 
