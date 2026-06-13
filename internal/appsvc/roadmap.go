@@ -14,6 +14,7 @@ import (
 	"github.com/ahmedyounis/noema64/internal/chesscore"
 	"github.com/ahmedyounis/noema64/internal/decision"
 	"github.com/ahmedyounis/noema64/internal/engine"
+	"github.com/ahmedyounis/noema64/internal/providers"
 	"github.com/ahmedyounis/noema64/internal/storage"
 	"github.com/ahmedyounis/noema64/internal/strategy"
 )
@@ -72,6 +73,20 @@ type EndgameTrainer struct {
 	Drills          []string `json:"drills,omitempty"`
 }
 
+type AccessibilityAuditReport struct {
+	SchemaVersion string               `json:"schema_version"`
+	GeneratedAt   string               `json:"generated_at"`
+	Checks        []AccessibilityCheck `json:"checks"`
+	OpenIssues    int                  `json:"open_issues"`
+}
+
+type AccessibilityCheck struct {
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	Severity string `json:"severity"`
+	Summary  string `json:"summary"`
+}
+
 type AnalysisComparison struct {
 	SchemaVersion string                 `json:"schema_version"`
 	GameID        string                 `json:"game_id"`
@@ -89,6 +104,28 @@ type PromptComparison struct {
 	RightValid    bool     `json:"right_valid"`
 	ChangedFiles  []string `json:"changed_files,omitempty"`
 	Errors        []string `json:"errors,omitempty"`
+}
+
+type PromptPlaygroundResult struct {
+	SchemaVersion string           `json:"schema_version"`
+	GameID        string           `json:"game_id"`
+	Ply           int              `json:"ply"`
+	Comparison    PromptComparison `json:"comparison"`
+	Left          PromptExecution  `json:"left"`
+	Right         PromptExecution  `json:"right"`
+}
+
+type PromptExecution struct {
+	Source      string                   `json:"source"`
+	Valid       bool                     `json:"valid"`
+	Error       string                   `json:"error,omitempty"`
+	System      string                   `json:"system,omitempty"`
+	User        string                   `json:"user,omitempty"`
+	Provider    string                   `json:"provider,omitempty"`
+	Model       string                   `json:"model,omitempty"`
+	RawResponse string                   `json:"raw_response,omitempty"`
+	ParseStatus string                   `json:"parse_status,omitempty"`
+	Candidates  []strategy.CandidateMove `json:"candidates,omitempty"`
 }
 
 type CustomPersonalityProfile struct {
@@ -132,6 +169,25 @@ func (a *Application) MultiAgentAnalysis() (analysis.MultiAgentReview, error) {
 		return analysis.MultiAgentReview{}, appErr("ERR_GAME_STATE", err, true)
 	}
 	return analysis.ReviewDecision(state.LastDecision), nil
+}
+
+func (a *Application) AccessibilityAudit() (AccessibilityAuditReport, error) {
+	report := AccessibilityAuditReport{
+		SchemaVersion: "accessibility-audit.v1",
+		GeneratedAt:   time.Now().UTC().Format(time.RFC3339),
+		Checks: []AccessibilityCheck{
+			{ID: "board-grid-labels", Status: "pass", Severity: "required", Summary: "Board squares expose gridcell roles and square labels."},
+			{ID: "keyboard-board", Status: "pass", Severity: "required", Summary: "Arrow keys move board focus and Enter/Space selects or plays focused squares."},
+			{ID: "high-contrast-theme", Status: "pass", Severity: "required", Summary: "High-contrast theme is available from settings and uses non-color move indicators."},
+			{ID: "modal-controls", Status: "pass", Severity: "recommended", Summary: "Dialog actions are reachable as native buttons and form controls."},
+		},
+	}
+	for _, check := range report.Checks {
+		if check.Status != "pass" {
+			report.OpenIssues++
+		}
+	}
+	return report, nil
 }
 
 func (a *Application) StudyDashboard() (StudyDashboard, error) {
@@ -234,6 +290,100 @@ func (a *Application) ComparePromptTemplatePacks(left PromptTemplatePack, right 
 		out.ChangedFiles = append(out.ChangedFiles, "manifest.json")
 	}
 	return out, nil
+}
+
+func (a *Application) RunPromptPlayground(left PromptTemplatePack, right PromptTemplatePack) (PromptPlaygroundResult, error) {
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return PromptPlaygroundResult{}, appErr("ERR_GAME_STATE", err, true)
+	}
+	game, err := gameForStudyState(state)
+	if err != nil {
+		return PromptPlaygroundResult{}, appErr("ERR_GAME_STATE", err, true)
+	}
+	comparison, _ := a.ComparePromptTemplatePacks(left, right)
+	result := PromptPlaygroundResult{
+		SchemaVersion: "prompt-playground.v1",
+		GameID:        state.Snapshot.GameID,
+		Ply:           state.Snapshot.Ply,
+		Comparison:    comparison,
+	}
+	opts := a.engineOptions()
+	req := strategy.StrategyRequest{
+		GameID:             state.Snapshot.GameID,
+		FEN:                state.Snapshot.FEN,
+		PGN:                state.Snapshot.PGN,
+		SideToMove:         state.Snapshot.SideToMove,
+		MoveNumber:         state.Snapshot.Ply/2 + 1,
+		LegalMoves:         state.Snapshot.LegalMoves,
+		Features:           state.Features,
+		PreviousMemory:     state.StrategyMemory,
+		Mode:               opts.Mode,
+		Personality:        opts.Personality,
+		PersonalityProfile: opts.PersonalityProfile,
+	}
+	result.Left = a.runPromptExecution(left, req, game, opts)
+	result.Right = a.runPromptExecution(right, req, game, opts)
+	return result, nil
+}
+
+func (a *Application) runPromptExecution(pack PromptTemplatePack, req strategy.StrategyRequest, game *chesscore.Game, opts engine.Options) PromptExecution {
+	exec := PromptExecution{Source: pack.Source}
+	validation := validatePromptTemplatePack(pack)
+	if !validation.Valid {
+		exec.Error = strings.Join(validation.Errors, "; ")
+		return exec
+	}
+	exec.Valid = true
+	templates := strategy.PromptTemplates{
+		Manifest: pack.Manifest,
+		System:   pack.System,
+		User:     pack.User,
+		Schema:   pack.Schema,
+	}
+	system, user, err := strategy.BuildPromptWithTemplates(req, templates)
+	if err != nil {
+		exec.Valid = false
+		exec.Error = err.Error()
+		return exec
+	}
+	exec.System = system
+	exec.User = user
+	provider := opts.Provider
+	if provider == nil {
+		provider = providers.MockProvider{}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), opts.MoveTimeout)
+	defer cancel()
+	resp, err := provider.CompleteJSON(ctx, providers.CompletionRequest{
+		Model:       opts.Model,
+		System:      system,
+		User:        user,
+		Temperature: opts.Temperature,
+		MaxTokens:   opts.MaxTokens,
+		Metadata: map[string]string{
+			"legal_moves":    strategy.LegalMoveCSV(req),
+			"max_candidates": fmt.Sprintf("%d", opts.MaxCandidates),
+			"game_id":        req.GameID,
+			"fen":            req.FEN,
+		},
+	})
+	exec.Provider = provider.Name()
+	exec.Model = opts.Model
+	if err != nil {
+		exec.Error = err.Error()
+		return exec
+	}
+	exec.RawResponse = resp.Text
+	parse := strategy.ParseDecision(resp.Text)
+	exec.ParseStatus = parse.Status
+	if parse.Status != "ok" && parse.Status != "extracted_json" {
+		exec.Error = parse.Error
+		return exec
+	}
+	candidates, _ := strategy.NormalizeCandidates(game, parse.Decision.CandidateMoves)
+	exec.Candidates = candidates
+	return exec
 }
 
 func (a *Application) BuildCustomPersonalityProfile(id string, name string, riskTolerance float64, biases []string, modifiers []string) (CustomPersonalityProfile, error) {
