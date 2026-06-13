@@ -768,7 +768,9 @@ function workflowCommandUnavailable(command) {
 
 function resetBoardEntry() {
   selected = null;
-  document.querySelector("#moveInput").value = "";
+  const moveInput = document.querySelector("#moveInput");
+  moveInput.value = "";
+  clearFieldInvalid(moveInput);
 }
 
 function focusMoveInput(select = false) {
@@ -825,7 +827,9 @@ function clearFieldInvalid(field) {
 }
 
 function statusDescriberForField(field) {
-  return field?.closest?.("dialog")?.querySelector?.("[role='status'][id]")?.id || "";
+  return field?.closest?.("dialog")?.querySelector?.("[role='status'][id]")?.id ||
+    field?.closest?.("section")?.querySelector?.("[role='status'][id]")?.id ||
+    "";
 }
 
 function addDescribedBy(field, id) {
@@ -1565,14 +1569,17 @@ function stageLabel(value) {
 }
 
 async function makeMove(move) {
+  const moveInput = document.querySelector("#moveInput");
   const normalizedMove = String(move || "").trim();
   if (!normalizedMove) {
+    markFieldInvalid(moveInput);
     showError("Enter a UCI move before playing.");
     focusMoveInput();
     return;
   }
   return withBusyControl("#moveBtn", async () => {
     try {
+      clearFieldInvalid(moveInput);
       document.querySelector("#thinkingStage").textContent = "Applying user move";
       applyGameStateResult(await call("MakeUserMove", normalizedMove));
       showSuccess("Move applied.");
@@ -1581,6 +1588,7 @@ async function makeMove(move) {
       }
       focusMoveInput();
     } catch (err) {
+      markFieldInvalid(moveInput);
       showError(err);
       document.querySelector("#thinkingStage").textContent = "Move failed";
       focusMoveInput(true);
