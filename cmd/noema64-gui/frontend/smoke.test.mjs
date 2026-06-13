@@ -539,6 +539,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "requireField",
     "Choose a backup archive before restoring.",
     "Enter a policy model path before enabling the prior.",
+    "markFieldInvalid(policyModelPath)",
+    "policyModelPath?.focus()",
     "Enter an opening book path before importing.",
     "markFieldInvalid(openingBookPath)",
     "openingBookPath?.focus()",

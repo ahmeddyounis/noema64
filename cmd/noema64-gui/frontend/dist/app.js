@@ -2380,14 +2380,19 @@ async function trainPolicyPriorFromLab() {
 }
 
 async function enablePolicyPriorFromLab() {
+  const policyModelPath = document.querySelector("#policyModelPath");
   try {
     const path = requireField("#policyModelPath", "Enter a policy model path before enabling the prior.");
     settings = await call("EnablePolicyPriorModel", path);
+    clearFieldInvalid(policyModelPath);
     await loadSettings();
     document.querySelector("#labOutput").textContent = `Policy prior enabled: ${settings.llm?.model || ""}`;
     showSuccess("Policy prior enabled.");
   } catch (err) {
+    markFieldInvalid(policyModelPath);
     showError(err, "#labOutput");
+    policyModelPath?.focus();
+    policyModelPath?.select?.();
   }
 }
 
