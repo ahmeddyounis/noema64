@@ -501,6 +501,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "normalizeSettingsShape",
     "settings = normalizeSettingsShape(await call(\"GetSettings\"))",
     "settings = normalizeSettingsShape(settings)",
+    "document.querySelector(\"#settingsOutput\").textContent = \"\"",
+    "clearFieldInvalid(document.querySelector(\"#settingKey\"))",
     "renderBoardEmpty(\"Board unavailable\"",
     "renderCandidatesEmpty(\"Candidate moves are unavailable until a game is loaded.\")",
     "return withThinkingControl(\"#engineBtn\"",

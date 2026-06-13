@@ -1708,6 +1708,7 @@ async function resignGame() {
 
 async function loadSettings() {
   settings = normalizeSettingsShape(await call("GetSettings"));
+  document.querySelector("#settingsOutput").textContent = "";
   populateProviderProfiles(settings.llm?.profiles || []);
   populateCustomPersonalities(settings.engine?.custom_personalities || []);
   document.querySelector("#settingMode").value = settings.engine.default_mode;
@@ -1747,6 +1748,8 @@ async function loadSettings() {
   document.querySelector("#settingLogDir").value = settings.logging.output_dir || "logs";
   document.querySelector("#settingRaw").checked = !!settings.privacy.log_raw_prompts;
   document.querySelector("#settingRawResponses").checked = !!settings.privacy.log_raw_llm_responses;
+  clearFieldInvalid(document.querySelector("#settingKey"));
+  clearFieldInvalid(document.querySelector("#settingCloudAck"));
   syncTimeControlInputsFromPreset(false);
   syncProviderDisclosure();
   renderWorkflowPanel();
