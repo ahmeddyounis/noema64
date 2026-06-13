@@ -1,17 +1,29 @@
 GO ?= go
 NPM ?= npm
+WAILS ?= wails
 
-.PHONY: test frontend-smoke uci-smoke bench-random trace-validate build-uci build-cli build-bench build-gui fmt
+.PHONY: test test-race frontend-smoke uci-smoke bench-random trace-validate perft lint license-check gui-dev build-uci build-cli build-bench build-gui fmt
 
 fmt:
 	$(GO)fmt -w ./cmd ./internal
+
+lint:
+	@files="$$( $(GO)fmt -l ./cmd ./internal )"; if [ -n "$$files" ]; then echo "$$files"; exit 1; fi
+	$(GO) vet ./...
+	$(NPM) --prefix cmd/noema64-gui/frontend test
 
 test:
 	$(GO) test ./...
 	$(NPM) --prefix cmd/noema64-gui/frontend test
 
+test-race:
+	$(GO) test -race ./...
+
 frontend-smoke:
 	$(NPM) --prefix cmd/noema64-gui/frontend test
+
+perft:
+	$(GO) test ./internal/chesscore -run Perft
 
 uci-smoke:
 	printf 'uci\nisready\nucinewgame\nposition startpos moves e2e4 e7e5 g1f3\ngo movetime 100\nquit\n' | $(GO) run ./cmd/noema64-uci
@@ -21,6 +33,13 @@ bench-random:
 
 trace-validate:
 	$(GO) test ./internal/storage -run Trace
+
+license-check:
+	$(GO) mod download
+	$(GO) list -m -json all | $(GO) run ./cmd/noema64-licensecheck
+
+gui-dev:
+	cd cmd/noema64-gui && $(WAILS) dev
 
 build-uci:
 	$(GO) build -o bin/noema64-uci ./cmd/noema64-uci
