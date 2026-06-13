@@ -114,12 +114,13 @@ button:hover {
 .board {
   align-self: center;
   justify-self: center;
-  width: min(70vh, 100%);
-  aspect-ratio: 1;
+  width: min(100%, 70vh, calc(70vh * var(--board-files, 8) / var(--board-ranks, 8)));
+  max-height: 100%;
+  aspect-ratio: var(--board-files, 8) / var(--board-ranks, 8);
   position: relative;
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  grid-template-rows: repeat(8, 1fr);
+  grid-template-columns: repeat(var(--board-files, 8), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--board-ranks, 8), minmax(0, 1fr));
   border: 2px solid #2f3742;
   user-select: none;
 }
@@ -130,7 +131,8 @@ button:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: clamp(28px, 5.8vh, 54px);
+  overflow: hidden;
+  font-size: clamp(5px, min(calc(46vh / var(--board-ranks, 8)), calc(70vh / var(--board-files, 8))), 54px);
   line-height: 1;
   touch-action: manipulation;
 }
@@ -223,9 +225,9 @@ body[data-theme="classic"] .dark {
 
 .coord {
   position: absolute;
-  left: 4px;
-  bottom: 3px;
-  font-size: 10px;
+  left: clamp(1px, 0.4vw, 4px);
+  bottom: clamp(1px, 0.3vw, 3px);
+  font-size: clamp(4px, min(calc(12vh / var(--board-ranks, 8)), calc(13vh / var(--board-files, 8))), 10px);
   color: rgba(28, 32, 38, 0.62);
 }
 

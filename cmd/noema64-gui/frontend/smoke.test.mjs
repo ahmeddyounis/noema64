@@ -197,6 +197,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "applySelectedProviderProfile",
     "populateCustomPersonalities",
     "providerRequiresAck",
+    "boardDimensions",
+    "splitUCIMoveSquares",
+    "pieceGlyph",
     "handleBoardKeyboard",
     "renderBoardOverlay",
     "tablebase_enabled",
@@ -218,4 +221,6 @@ test("bundle wires core actions and renders trace metadata", () => {
   ]) {
     expectScriptToken(token);
   }
+  assert.match(appJS, /--board-files/);
+  assert.match(appJS, /--board-ranks/);
 });

@@ -1,5 +1,4 @@
-const files = ["a", "b", "c", "d", "e", "f", "g", "h"];
-const ranks = ["1", "2", "3", "4", "5", "6", "7", "8"];
+const allFiles = Array.from({ length: 26 }, (_, index) => String.fromCharCode(97 + index));
 const pieces = {
   K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘", P: "♙",
   k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟"
@@ -99,9 +98,28 @@ function applyTheme(theme) {
   document.body.dataset.theme = value;
 }
 
+function boardDimensions() {
+  const def = state?.variant?.board_definition || {};
+  const width = clampInt(def.board_width, 1, 26, 8);
+  const height = clampInt(def.board_height, 1, 99, 8);
+  return {
+    width,
+    height,
+    files: allFiles.slice(0, width),
+    ranks: Array.from({ length: height }, (_, index) => String(index + 1))
+  };
+}
+
+function clampInt(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
 function squareOrder() {
-  const fs = flipped ? [...files].reverse() : files;
-  const rs = flipped ? ranks : [...ranks].reverse();
+  const dims = boardDimensions();
+  const fs = flipped ? [...dims.files].reverse() : dims.files;
+  const rs = flipped ? dims.ranks : [...dims.ranks].reverse();
   const out = [];
   for (const r of rs) for (const f of fs) out.push(f + r);
   return out;
@@ -110,13 +128,21 @@ function squareOrder() {
 function renderBoard() {
   const board = document.querySelector("#board");
   board.innerHTML = "";
+  const dims = boardDimensions();
+  const order = squareOrder();
+  if (!order.includes(focusedSquare)) focusedSquare = order[0] || "a1";
+  board.style.setProperty("--board-files", dims.width);
+  board.style.setProperty("--board-ranks", dims.height);
+  board.style.aspectRatio = `${dims.width} / ${dims.height}`;
   const legalTargets = selected
     ? state.snapshot.legal_moves.filter((m) => m.from === selected).map((m) => m.to)
     : [];
   const last = state.snapshot.move_history.at(-1);
-  for (const sq of squareOrder()) {
-    const file = files.indexOf(sq[0]);
-    const rank = ranks.indexOf(sq[1]);
+  const lastSquares = splitUCIMoveSquares(last?.uci);
+  for (const sq of order) {
+    const parsed = parseBoardSquare(sq, dims);
+    const file = dims.files.indexOf(parsed?.file);
+    const rank = dims.ranks.indexOf(parsed?.rank);
     const div = document.createElement("button");
     div.className = `square ${(file + rank) % 2 === 0 ? "dark" : "light"}`;
     div.setAttribute("role", "gridcell");
@@ -126,9 +152,9 @@ function renderBoard() {
     if (selected === sq) div.classList.add("selected");
     if (focusedSquare === sq) div.classList.add("keyboard-focus");
     if (legalTargets.includes(sq)) div.classList.add("target");
-    if (last && (last.uci.startsWith(sq) || last.uci.slice(2, 4) === sq)) div.classList.add("last-move");
+    if (lastSquares && (lastSquares.from === sq || lastSquares.to === sq)) div.classList.add("last-move");
     div.draggable = !!state.snapshot.board[sq] && state.snapshot.outcome?.status === "ongoing";
-    div.textContent = pieces[state.snapshot.board[sq]] || "";
+    div.textContent = pieceGlyph(state.snapshot.board[sq]);
     const coord = document.createElement("span");
     coord.className = "coord";
     coord.textContent = sq;
@@ -153,8 +179,9 @@ function renderBoardOverlay(board) {
   overlay.innerHTML = `<defs><marker id="arrowhead" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="currentColor"></path></marker></defs>`;
   for (const [index, candidate] of candidates.slice(0, 4).entries()) {
     const move = candidate.legal_move || candidate;
-    const from = move.from || candidate.uci?.slice(0, 2);
-    const to = move.to || candidate.uci?.slice(2, 4);
+    const parsed = splitUCIMoveSquares(candidate.uci || move.uci);
+    const from = move.from || parsed?.from;
+    const to = move.to || parsed?.to;
     const start = squareCenter(from);
     const end = squareCenter(to);
     if (!start || !end) continue;
@@ -170,13 +197,14 @@ function renderBoardOverlay(board) {
 }
 
 function squareCenter(square) {
-  if (!square || square.length !== 2) return null;
+  if (!square) return null;
+  const dims = boardDimensions();
   const order = squareOrder();
   const index = order.indexOf(square);
   if (index < 0) return null;
-  const col = index % 8;
-  const row = Math.floor(index / 8);
-  return { x: (col + 0.5) * 12.5, y: (row + 0.5) * 12.5 };
+  const col = index % dims.width;
+  const row = Math.floor(index / dims.width);
+  return { x: (col + 0.5) * (100 / dims.width), y: (row + 0.5) * (100 / dims.height) };
 }
 
 async function squareClicked(sq) {
@@ -261,12 +289,46 @@ function handleBoardKeyboard(event) {
 }
 
 function moveBoardFocus(df, dr) {
-  const current = focusedSquare || "e2";
-  const file = Math.max(0, Math.min(7, files.indexOf(current[0]) + (flipped ? -df : df)));
-  const rank = Math.max(0, Math.min(7, ranks.indexOf(current[1]) + dr));
-  focusedSquare = files[file] + ranks[rank];
+  const dims = boardDimensions();
+  const current = parseBoardSquare(focusedSquare, dims) || { file: dims.files[0], rank: dims.ranks[0] };
+  const file = Math.max(0, Math.min(dims.width - 1, dims.files.indexOf(current.file) + (flipped ? -df : df)));
+  const rank = Math.max(0, Math.min(dims.height - 1, dims.ranks.indexOf(current.rank) + dr));
+  focusedSquare = dims.files[file] + dims.ranks[rank];
   renderBoard();
   document.querySelector(`[data-square="${focusedSquare}"]`)?.focus();
+}
+
+function parseBoardSquare(square, dims = boardDimensions()) {
+  if (!square || typeof square !== "string" || square.length < 2) return null;
+  const file = square[0];
+  const rank = square.slice(1);
+  if (!dims.files.includes(file) || !dims.ranks.includes(rank)) return null;
+  return { file, rank, square };
+}
+
+function splitUCIMoveSquares(uci) {
+  if (!uci || typeof uci !== "string") return null;
+  const dims = boardDimensions();
+  const from = readUCISquare(uci, 0, dims);
+  if (!from) return null;
+  const to = readUCISquare(uci, from.next, dims);
+  if (!to) return null;
+  return { from: from.square, to: to.square };
+}
+
+function readUCISquare(text, start, dims) {
+  const file = text[start];
+  if (!dims.files.includes(file)) return null;
+  let index = start + 1;
+  while (index < text.length && /[0-9]/.test(text[index])) index += 1;
+  const rank = text.slice(start + 1, index);
+  if (!dims.ranks.includes(rank)) return null;
+  return { square: file + rank, next: index };
+}
+
+function pieceGlyph(piece) {
+  if (!piece) return "";
+  return pieces[piece] || piece;
 }
 
 function choosePromotion(moves) {
