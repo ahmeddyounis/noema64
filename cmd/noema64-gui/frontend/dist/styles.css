@@ -607,7 +607,9 @@ body[data-theme="classic"] .dark {
 
 .move-entry input,
 .settings input,
-.settings select {
+.settings select,
+.import-controls select,
+.export-controls select {
   min-height: 34px;
   border: 1px solid #c7ced8;
   border-radius: 6px;
