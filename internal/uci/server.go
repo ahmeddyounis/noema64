@@ -141,6 +141,8 @@ func (s *Server) handle(ctx context.Context, line string) error {
 		return s.position(ctx, fields[1:])
 	case "go":
 		return s.goCommand(ctx, fields[1:])
+	case "ponderhit":
+		s.ponderhit()
 	case "stop":
 		s.stop()
 	case "quit":
@@ -384,6 +386,17 @@ func (s *Server) stop() {
 	}
 }
 
+func (s *Server) ponderhit() {
+	s.mu.Lock()
+	active := s.searchCancel != nil
+	s.mu.Unlock()
+	if active {
+		s.info("ponderhit accepted")
+		return
+	}
+	s.info("ponderhit ignored: no active search")
+}
+
 func (s *Server) clearSearch(done chan struct{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -403,6 +416,41 @@ func (s *Server) emitDecisionInfo(dec *decision.MoveDecision) {
 		assist = "verifier:" + dec.Assistance.VerifierName
 	}
 	s.info(fmt.Sprintf("noema64 mode=%s assistance=%s fallback=%t", mode, assist, dec.FallbackUsed))
+	s.info(fmt.Sprintf(
+		"noema64 provider=%s model=%s prompt=%s decision_schema=%s candidates=%d",
+		dec.Provider.Name,
+		dec.Provider.Model,
+		dec.Provider.PromptVersion,
+		dec.Provider.DecisionSchemaVersion,
+		len(dec.CandidateMoves),
+	))
+	selected := dec.SelectedMove.UCI
+	if dec.SelectedMove.SAN != "" {
+		selected = dec.SelectedMove.SAN + "(" + dec.SelectedMove.UCI + ")"
+	}
+	s.info(fmt.Sprintf(
+		"noema64 selected=%s verifier=%s total_ms=%d provider_ms=%d legal_moves=%d",
+		selected,
+		verifierStatus(dec),
+		dec.Timing.TotalMS,
+		dec.Timing.ProviderMS,
+		dec.LegalMovesCount,
+	))
+}
+
+func verifierStatus(dec *decision.MoveDecision) string {
+	if dec == nil || dec.VerifierTrace == nil {
+		return "not_checked"
+	}
+	for _, candidate := range dec.VerifierTrace.Candidates {
+		if candidate.UCI == dec.SelectedMove.UCI && candidate.Status != "" {
+			return candidate.Status
+		}
+	}
+	if dec.VerifierTrace.Used {
+		return dec.VerifierTrace.Name
+	}
+	return "not_checked"
 }
 
 func (s *Server) write(line string) {

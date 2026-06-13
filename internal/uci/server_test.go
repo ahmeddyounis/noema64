@@ -44,6 +44,8 @@ func TestUCISmoke(t *testing.T) {
 		"option name TablebasePath",
 		"option name TablebaseTimeoutMS",
 		"option name LogPath",
+		"info string noema64 provider=",
+		"info string noema64 selected=",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("output missing %q:\n%s", want, text)
@@ -369,6 +371,51 @@ func TestUCIStopAfterCancelledSearchReturnsLegalFallback(t *testing.T) {
 		if !validUCILine(line) {
 			t.Fatalf("non-UCI stdout line: %q\n%s", line, text)
 		}
+	}
+}
+
+func TestUCIPonderhitDuringActiveSearch(t *testing.T) {
+	input := strings.Join([]string{
+		"uci",
+		"position startpos",
+		"go ponder movetime 1000",
+		"ponderhit",
+		"stop",
+		"quit",
+		"",
+	}, "\n")
+	var out bytes.Buffer
+	settings := storage.DefaultSettings()
+	settings.Logging.OutputDir = t.TempDir()
+	server := NewServer(strings.NewReader(input), &out, &bytes.Buffer{}, settings)
+	server.opts.Provider = providers.MockProvider{Behavior: "slow"}
+	server.engine.SetOptions(server.opts)
+
+	if err := server.Run(context.Background()); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	text := out.String()
+	if !strings.Contains(text, "info string ponderhit accepted") {
+		t.Fatalf("missing ponderhit acknowledgement:\n%s", text)
+	}
+	if !strings.Contains(text, "bestmove ") {
+		t.Fatalf("missing bestmove after ponderhit:\n%s", text)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
+		if !validUCILine(line) {
+			t.Fatalf("non-UCI stdout line: %q\n%s", line, text)
+		}
+	}
+}
+
+func TestUCIPonderhitWithoutActiveSearch(t *testing.T) {
+	var out bytes.Buffer
+	server := NewServer(strings.NewReader(""), &out, &bytes.Buffer{}, storage.DefaultSettings())
+	if err := server.handle(context.Background(), "ponderhit"); err != nil {
+		t.Fatalf("ponderhit: %v", err)
+	}
+	if !strings.Contains(out.String(), "info string ponderhit ignored: no active search") {
+		t.Fatalf("unexpected ponderhit output:\n%s", out.String())
 	}
 }
 
