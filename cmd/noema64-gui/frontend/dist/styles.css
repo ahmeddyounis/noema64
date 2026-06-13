@@ -116,6 +116,7 @@ button:hover {
   justify-self: center;
   width: min(70vh, 100%);
   aspect-ratio: 1;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   grid-template-rows: repeat(8, 1fr);
@@ -125,12 +126,37 @@ button:hover {
 
 .square {
   position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: clamp(28px, 5.8vh, 54px);
   line-height: 1;
   touch-action: manipulation;
+}
+
+.square:focus-visible,
+.keyboard-focus {
+  outline: 4px solid #111827;
+  outline-offset: -6px;
+}
+
+.board-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.candidate-arrow {
+  stroke: rgba(21, 92, 149, 0.84);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  marker-end: url(#arrowhead);
+}
+
+.candidate-arrow.alt {
+  stroke: rgba(145, 79, 31, 0.72);
 }
 
 .light {

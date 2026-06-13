@@ -7,6 +7,7 @@ const pieces = {
 
 let state = null;
 let selected = null;
+let focusedSquare = "e2";
 let flipped = false;
 let activeTab = "summary";
 let settings = null;
@@ -121,7 +122,9 @@ function renderBoard() {
     div.setAttribute("role", "gridcell");
     div.setAttribute("aria-label", `${sq} ${state.snapshot.board[sq] || "empty"}`);
     div.dataset.square = sq;
+    div.tabIndex = sq === focusedSquare ? 0 : -1;
     if (selected === sq) div.classList.add("selected");
+    if (focusedSquare === sq) div.classList.add("keyboard-focus");
     if (legalTargets.includes(sq)) div.classList.add("target");
     if (last && (last.uci.startsWith(sq) || last.uci.slice(2, 4) === sq)) div.classList.add("last-move");
     div.draggable = !!state.snapshot.board[sq] && state.snapshot.outcome?.status === "ongoing";
@@ -131,11 +134,49 @@ function renderBoard() {
     coord.textContent = sq;
     div.appendChild(coord);
     div.addEventListener("click", () => squareClicked(sq));
+    div.addEventListener("focus", () => { focusedSquare = sq; });
     div.addEventListener("dragstart", (event) => dragStarted(event, sq));
     div.addEventListener("dragover", (event) => dragOver(event, sq));
     div.addEventListener("drop", (event) => dropOnSquare(event, sq));
     board.appendChild(div);
   }
+  renderBoardOverlay(board);
+}
+
+function renderBoardOverlay(board) {
+  const candidates = state?.last_decision?.candidate_moves || [];
+  if (!candidates.length) return;
+  const overlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  overlay.setAttribute("class", "board-overlay");
+  overlay.setAttribute("viewBox", "0 0 100 100");
+  overlay.setAttribute("aria-hidden", "true");
+  overlay.innerHTML = `<defs><marker id="arrowhead" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="currentColor"></path></marker></defs>`;
+  for (const [index, candidate] of candidates.slice(0, 4).entries()) {
+    const move = candidate.legal_move || candidate;
+    const from = move.from || candidate.uci?.slice(0, 2);
+    const to = move.to || candidate.uci?.slice(2, 4);
+    const start = squareCenter(from);
+    const end = squareCenter(to);
+    if (!start || !end) continue;
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", start.x);
+    line.setAttribute("y1", start.y);
+    line.setAttribute("x2", end.x);
+    line.setAttribute("y2", end.y);
+    line.setAttribute("class", `candidate-arrow${index ? " alt" : ""}`);
+    overlay.appendChild(line);
+  }
+  board.appendChild(overlay);
+}
+
+function squareCenter(square) {
+  if (!square || square.length !== 2) return null;
+  const order = squareOrder();
+  const index = order.indexOf(square);
+  if (index < 0) return null;
+  const col = index % 8;
+  const row = Math.floor(index / 8);
+  return { x: (col + 0.5) * 12.5, y: (row + 0.5) * 12.5 };
 }
 
 async function squareClicked(sq) {
@@ -190,6 +231,42 @@ async function dropOnSquare(event, sq) {
   const from = event.dataTransfer.getData("text/plain") || selected;
   if (!from) return;
   await playFromTo(from, sq);
+}
+
+function handleBoardKeyboard(event) {
+  const active = document.activeElement;
+  if (!active?.closest?.("#board")) return false;
+  const delta = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, 1],
+    ArrowDown: [0, -1]
+  }[event.key];
+  if (delta) {
+    event.preventDefault();
+    moveBoardFocus(delta[0], flipped ? -delta[1] : delta[1]);
+    return true;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    squareClicked(focusedSquare);
+    return true;
+  }
+  if (event.key === "Escape") {
+    selected = null;
+    renderBoard();
+    return true;
+  }
+  return false;
+}
+
+function moveBoardFocus(df, dr) {
+  const current = focusedSquare || "e2";
+  const file = Math.max(0, Math.min(7, files.indexOf(current[0]) + (flipped ? -df : df)));
+  const rank = Math.max(0, Math.min(7, ranks.indexOf(current[1]) + dr));
+  focusedSquare = files[file] + ranks[rank];
+  renderBoard();
+  document.querySelector(`[data-square="${focusedSquare}"]`)?.focus();
 }
 
 function choosePromotion(moves) {
@@ -457,8 +534,10 @@ async function resignGame() {
 async function loadSettings() {
   settings = await call("GetSettings");
   populateProviderProfiles(settings.llm?.profiles || []);
+  populateCustomPersonalities(settings.engine?.custom_personalities || []);
   document.querySelector("#settingMode").value = settings.engine.default_mode;
   document.querySelector("#settingPersonality").value = settings.engine.personality;
+  document.querySelector("#settingCustomPersonality").value = settings.engine.custom_personality_id || "";
   document.querySelector("#settingSide").value = playerSide;
   document.querySelector("#settingVariant").value = gameVariant;
   document.querySelector("#settingVariantSeed").value = chess960Seed;
@@ -511,6 +590,22 @@ function populateProviderProfiles(profiles) {
   }
 }
 
+function populateCustomPersonalities(profiles) {
+  const select = document.querySelector("#settingCustomPersonality");
+  select.innerHTML = "";
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "None";
+  select.appendChild(none);
+  for (const profile of profiles || []) {
+    if (!profile?.id) continue;
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = profile.name ? `${profile.name} (${profile.id})` : profile.id;
+    select.appendChild(option);
+  }
+}
+
 function providerProfileValue(profileID) {
   const id = profileID || "custom";
   const exists = [...document.querySelector("#settingProfile").options].some((option) => option.value === id);
@@ -553,6 +648,7 @@ async function saveSettings() {
     const timeControl = timeControlForNewGame();
     settings.engine.default_mode = document.querySelector("#settingMode").value;
     settings.engine.personality = document.querySelector("#settingPersonality").value;
+    settings.engine.custom_personality_id = document.querySelector("#settingCustomPersonality").value;
     settings.engine.max_candidates = Number(document.querySelector("#settingMaxCandidates").value) || settings.engine.max_candidates;
     settings.gui.theme = document.querySelector("#settingTheme").value || "system";
     settings.gui.time_control = document.querySelector("#settingTimeControl").value;
@@ -569,7 +665,7 @@ async function saveSettings() {
     settings.llm.api_key = document.querySelector("#settingKey").value;
     settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
     settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
-    if (settings.llm.provider === "openai_compatible" && !settings.privacy.cloud_provider_warning_acknowledged) {
+    if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
       document.querySelector("#settingsOutput").textContent = "Acknowledge cloud provider data sharing before saving.";
       return;
     }
@@ -609,8 +705,12 @@ async function saveProviderKeyToKeychain() {
 
 function syncProviderDisclosure() {
   const warning = document.querySelector("#cloudProviderWarning");
-  const isCloud = document.querySelector("#settingProvider").value === "openai_compatible";
+  const isCloud = providerRequiresAck(document.querySelector("#settingProvider").value);
   warning.classList.toggle("hidden", !isCloud);
+}
+
+function providerRequiresAck(provider) {
+  return ["openai_compatible", "anthropic", "gemini"].includes(provider);
 }
 
 function syncTimeControlInputsFromPreset(overwrite) {
@@ -701,6 +801,27 @@ function renderProviderDashboard(dashboard) {
   return [
     `Provider dashboard · active ${dashboard.active_profile || "custom"} · ${dashboard.active_provider || "unknown"} · ${dashboard.active_model || "model"}`,
     ...rows
+  ].join("\n");
+}
+
+function renderPromptPlayground(result) {
+  if (!result) return "No prompt playground result.";
+  const renderSide = (label, side) => {
+    const candidates = (side?.candidates || []).map((c) => `${c.san || c.uci} · ${c.purpose || ""}`).join("\n");
+    return [
+      label,
+      `${side?.provider || "provider"} · ${side?.model || "model"} · valid ${!!side?.valid} · parse ${side?.parse_status || "none"}`,
+      side?.error ? `Error: ${side.error}` : "",
+      candidates || "No legal candidates parsed."
+    ].filter(Boolean).join("\n");
+  };
+  return [
+    `Prompt playground · ${result.game_id || "unknown"} · ply ${result.ply || 0}`,
+    `Changed: ${(result.comparison?.changed_files || []).join(", ") || "none"}`,
+    "",
+    renderSide("LEFT", result.left),
+    "",
+    renderSide("RIGHT", result.right)
   ].join("\n");
 }
 
@@ -937,18 +1058,70 @@ async function comparePromptPlayground() {
   try {
     const base = await call("PromptTemplatePack");
     const variant = { ...base, source: "playground", user: `${base.user || ""}\n\nPrefer concise contrast between the top two candidates.\n` };
-    document.querySelector("#labOutput").textContent = JSON.stringify(await call("ComparePromptTemplatePacks", base, variant), null, 2);
+    document.querySelector("#labOutput").textContent = renderPromptPlayground(await call("RunPromptPlayground", base, variant));
   } catch (err) {
     showError(err, "#labOutput");
+  }
+}
+
+async function runPromptPlaygroundFromEditor() {
+  try {
+    const base = await call("PromptTemplatePack");
+    const edited = promptPackFromInputs();
+    document.querySelector("#promptOutput").textContent = renderPromptPlayground(await call("RunPromptPlayground", base, edited));
+  } catch (err) {
+    showError(err, "#promptOutput");
   }
 }
 
 async function buildPersonalityFromLab() {
   try {
     const profile = await call("BuildCustomPersonalityProfile", "lab-balanced", "Lab Balanced", 0.55, ["development", "king safety"], ["Prefer clear plans with tactical checks."]);
-    document.querySelector("#labOutput").textContent = JSON.stringify(profile, null, 2);
+    settings = await call("SaveCustomPersonalityProfile", profile, true);
+    await loadSettings();
+    document.querySelector("#labOutput").textContent = JSON.stringify({ saved: profile, selected: settings.engine?.custom_personality_id }, null, 2);
   } catch (err) {
     showError(err, "#labOutput");
+  }
+}
+
+async function trainPolicyPriorFromLab() {
+  try {
+    const workflow = await call("ExportFineTuneDataset");
+    const path = document.querySelector("#policyModelPath").value.trim() || "logs/policy-prior-model.json";
+    const result = await call("TrainLocalPolicyPrior", workflow.dataset_jsonl || "", path);
+    document.querySelector("#policyModelPath").value = result.model_path || path;
+    document.querySelector("#labOutput").textContent = JSON.stringify(result, null, 2);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function enablePolicyPriorFromLab() {
+  try {
+    settings = await call("EnablePolicyPriorModel", document.querySelector("#policyModelPath").value.trim());
+    await loadSettings();
+    document.querySelector("#labOutput").textContent = `Policy prior enabled: ${settings.llm?.model || ""}`;
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function importOpeningBookFromLab() {
+  try {
+    const book = await call("ImportOpeningBook", document.querySelector("#openingBookPath").value.trim());
+    const suggestions = await call("OpeningBook");
+    document.querySelector("#labOutput").textContent = JSON.stringify({ imported: book, current_suggestions: suggestions }, null, 2);
+  } catch (err) {
+    showError(err, "#labOutput");
+  }
+}
+
+async function runAccessibilityAudit() {
+  try {
+    document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("AccessibilityAudit"), null, 2);
+  } catch (err) {
+    showError(err, "#settingsOutput");
   }
 }
 
@@ -1209,6 +1382,7 @@ document.querySelector("#modeBenchBtn").addEventListener("click", async () => {
     showError(err, "#settingsOutput");
   }
 });
+document.querySelector("#accessibilityAuditBtn").addEventListener("click", runAccessibilityAudit);
 document.querySelector("#refreshReviewBtn").addEventListener("click", refreshReview);
 document.querySelector("#refreshStudyBtn").addEventListener("click", refreshStudy);
 document.querySelector("#multiAgentBtn").addEventListener("click", refreshMultiAgent);
@@ -1217,6 +1391,9 @@ document.querySelector("#newChess960Btn").addEventListener("click", newChess960G
 document.querySelector("#createBackupBtn").addEventListener("click", createBackup);
 document.querySelector("#restoreBackupBtn").addEventListener("click", restoreBackup);
 document.querySelector("#fineTuneBtn").addEventListener("click", exportFineTuneWorkflow);
+document.querySelector("#trainPolicyPriorBtn").addEventListener("click", trainPolicyPriorFromLab);
+document.querySelector("#enablePolicyPriorBtn").addEventListener("click", enablePolicyPriorFromLab);
+document.querySelector("#importBookBtn").addEventListener("click", importOpeningBookFromLab);
 document.querySelector("#labTournamentBtn").addEventListener("click", runTournamentFromLab);
 document.querySelector("#modeCompareBtn").addEventListener("click", compareAnalysisModes);
 document.querySelector("#promptCompareBtn").addEventListener("click", comparePromptPlayground);
@@ -1253,6 +1430,7 @@ document.querySelector("#experimentModeBtn").addEventListener("click", () => run
 ));
 document.querySelector("#reloadPromptBtn").addEventListener("click", loadPromptEditor);
 document.querySelector("#validatePromptBtn").addEventListener("click", validatePromptEditor);
+document.querySelector("#runPromptPlaygroundBtn").addEventListener("click", runPromptPlaygroundFromEditor);
 document.querySelector("#savePromptBtn").addEventListener("click", savePromptEditor);
 document.querySelector("#exportProfilesBtn").addEventListener("click", exportProfiles);
 document.querySelector("#importProfilesBtn").addEventListener("click", importProfiles);
@@ -1308,6 +1486,7 @@ document.querySelector("#exportBtn").addEventListener("click", async () => {
 });
 
 window.addEventListener("keydown", (event) => {
+  if (handleBoardKeyboard(event)) return;
   if (event.target.matches("input, textarea, select")) return;
   if (event.key === "n" || event.key === "N") document.querySelector("#newGameBtn").click();
   if (event.key === "a" || event.key === "A") document.querySelector("#analyzeBtn").click();

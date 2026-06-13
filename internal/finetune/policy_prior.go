@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -115,6 +116,9 @@ func SavePolicyPriorModel(path string, model PolicyPriorModel) error {
 	}
 	b, err := json.MarshalIndent(model, "", "  ")
 	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	return os.WriteFile(path, append(b, '\n'), 0o600)
