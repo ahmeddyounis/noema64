@@ -3,6 +3,7 @@ package chesscore
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	chess "github.com/corentings/chess/v2"
@@ -131,6 +132,9 @@ func (g *Game) PGN() string {
 		if result := resultToken(g.Outcome()); result != "" {
 			return result
 		}
+	}
+	if len(g.history) == len(g.appliedUCI) && len(g.history) > 0 && len(g.g.Moves()) != len(g.history) {
+		return pgnFromHistory(g.initialFEN, g.history, g.Outcome())
 	}
 	return g.g.String()
 }
@@ -281,6 +285,46 @@ func moveHistoryFromChessGame(game *chess.Game, appliedUCI []string) []MoveRecor
 		})
 	}
 	return history
+}
+
+func pgnFromHistory(initialFEN string, history []MoveRecord, outcome Outcome) string {
+	moveNumber := 1
+	side := "w"
+	if fields := strings.Fields(initialFEN); len(fields) >= 6 {
+		side = fields[1]
+		if n, err := strconv.Atoi(fields[5]); err == nil && n > 0 {
+			moveNumber = n
+		}
+	}
+
+	parts := make([]string, 0, len(history)+1)
+	for i, rec := range history {
+		san := strings.TrimSpace(rec.SAN)
+		if san == "" {
+			san = rec.UCI
+		}
+		if comment := sanitizePGNComment(rec.Comment); comment != "" {
+			san += " {" + comment + "}"
+		}
+		if side == "w" {
+			parts = append(parts, fmt.Sprintf("%d. %s", moveNumber, san))
+			side = "b"
+			continue
+		}
+		if i == 0 {
+			parts = append(parts, fmt.Sprintf("%d... %s", moveNumber, san))
+		} else {
+			parts = append(parts, san)
+		}
+		moveNumber++
+		side = "w"
+	}
+	if result := resultToken(outcome); result != "" {
+		parts = append(parts, result)
+	} else {
+		parts = append(parts, "*")
+	}
+	return strings.Join(parts, " ")
 }
 
 func (g *Game) BoardMap() map[string]string {

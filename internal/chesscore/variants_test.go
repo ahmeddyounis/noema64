@@ -1,6 +1,9 @@
 package chesscore
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestChess960StartGeneratesValidBackRank(t *testing.T) {
 	for _, seed := range []int64{0, 1, 42, 959, 960, -1} {
@@ -58,6 +61,9 @@ func TestChess960ExternalCastlingIsLegalAndPlayable(t *testing.T) {
 	}
 	if game.IsLegalUCI("g1h1") {
 		t.Fatalf("castling remained legal after king castled: %+v", game.LegalMoves())
+	}
+	if pgn := game.PGN(); !strings.Contains(pgn, "1. O-O") {
+		t.Fatalf("Chess960 castling PGN missing castle: %s", pgn)
 	}
 }
 
