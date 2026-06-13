@@ -47,9 +47,117 @@
             <button id="settingsBtn" title="Settings (,)" aria-label="Settings" aria-keyshortcuts=",">Settings</button>
           </span>
         </div>
+        <div class="activity-row">
+          <div id="appActivity" class="app-activity" role="status" aria-live="polite" data-tone="ready">
+            <span id="appActivityLabel">Ready</span>
+            <span id="appActivityMessage">Noema64 is ready.</span>
+          </div>
+          <button id="activityHistoryBtn" class="activity-history-button" type="button" title="Activity history" aria-label="Activity history">History</button>
+        </div>
       </header>
 
       <main id="mainWorkspace" class="workspace" role="tabpanel" aria-labelledby="viewPlayBtn">
+        <section id="workflowPanel" class="workflow-panel" aria-label="Workspace overview">
+          <div class="workflow-summary">
+            <span id="workflowEyebrow" class="workflow-eyebrow">Play</span>
+            <strong id="workflowTitle">Current Game</strong>
+            <span id="workflowDetail">Loading game...</span>
+          </div>
+          <div class="workflow-cards">
+            <article class="workflow-card" data-workspace-card="play">
+              <div class="workflow-card-copy">
+                <strong>Current Game</strong>
+                <span id="playFlowMeta">Loading position</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="engine" data-requires="game" class="primary-command">Engine Move</button>
+                <button type="button" data-command="analyze" data-requires="game">Analyze</button>
+              </div>
+            </article>
+            <article class="workflow-card" data-workspace-card="play">
+              <div class="workflow-card-copy">
+                <strong>Position Setup</strong>
+                <span id="setupFlowMeta">Default setup</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="newGame" class="primary-command">New Game</button>
+                <button type="button" data-command="import">Import</button>
+              </div>
+            </article>
+            <article class="workflow-card" data-workspace-card="play">
+              <div class="workflow-card-copy">
+                <strong>Game Record</strong>
+                <span id="recordFlowMeta">No moves recorded</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="recent">Recent</button>
+                <button type="button" data-command="export" data-requires="game">Export</button>
+              </div>
+            </article>
+
+            <article class="workflow-card" data-workspace-card="study">
+              <div class="workflow-card-copy">
+                <strong>Review</strong>
+                <span id="reviewFlowMeta">No decision recorded</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="review" data-requires="game" class="primary-command">Review</button>
+                <button type="button" data-command="export" data-requires="game">Export</button>
+              </div>
+            </article>
+            <article class="workflow-card" data-workspace-card="study">
+              <div class="workflow-card-copy">
+                <strong>Study Board</strong>
+                <span id="studyFlowMeta">No game loaded</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="study" data-requires="game" class="primary-command">Study Tools</button>
+                <button type="button" data-command="recent">Recent</button>
+              </div>
+            </article>
+            <article class="workflow-card" data-workspace-card="study">
+              <div class="workflow-card-copy">
+                <strong>Strategy Memory</strong>
+                <span id="memoryFlowMeta">No strategy recorded</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="analyze" data-requires="game">Analyze</button>
+                <button type="button" data-command="settings">Settings</button>
+              </div>
+            </article>
+
+            <article class="workflow-card" data-workspace-card="lab">
+              <div class="workflow-card-copy">
+                <strong>Provider Health</strong>
+                <span id="providerFlowMeta">Mock provider</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="experiments" class="primary-command">Provider Tests</button>
+                <button type="button" data-command="settings">Settings</button>
+              </div>
+            </article>
+            <article class="workflow-card" data-workspace-card="lab">
+              <div class="workflow-card-copy">
+                <strong>Prompt Workbench</strong>
+                <span id="promptFlowMeta">Default prompt pack</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="prompts" class="primary-command">Prompts</button>
+                <button type="button" data-command="lab">Developer Lab</button>
+              </div>
+            </article>
+            <article class="workflow-card" data-workspace-card="lab">
+              <div class="workflow-card-copy">
+                <strong>Local Assets</strong>
+                <span id="assetFlowMeta">Logs and backups</span>
+              </div>
+              <div class="workflow-card-actions">
+                <button type="button" data-command="lab" class="primary-command">Developer Lab</button>
+                <button type="button" data-command="export" data-requires="game">Export</button>
+              </div>
+            </article>
+          </div>
+        </section>
         <section class="board-area" aria-label="Chess board workspace">
           <div class="status-row">
             <span id="statusText" role="status" aria-live="polite">Loading game...</span>
@@ -376,6 +484,19 @@
           </header>
           <div id="recentList" class="recent-list" role="list"></div>
           <pre id="recentOutput" role="status" aria-live="polite"></pre>
+        </form>
+      </dialog>
+
+      <dialog id="activityDialog" aria-labelledby="activityTitle">
+        <form method="dialog" class="activity-dialog">
+          <header>
+            <h2 id="activityTitle">Activity</h2>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
+          </header>
+          <menu class="dialog-actions">
+            <button id="clearActivityBtn" value="none" type="button">Clear</button>
+          </menu>
+          <div id="activityLog" class="activity-log" role="list" aria-live="polite"></div>
         </form>
       </dialog>
 

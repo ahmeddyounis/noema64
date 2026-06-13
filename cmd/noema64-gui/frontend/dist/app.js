@@ -21,7 +21,70 @@ let applyingProviderProfile = false;
 let lastStageEvent = null;
 let promptPack = null;
 const busyControls = new Set();
+const busyDisabledState = new WeakMap();
+let activeOperationCount = 0;
+let appActivitySequence = 0;
+let activityEvents = [];
+const maxActivityEvents = 30;
 const workspaceViews = ["play", "study", "lab"];
+const workflowCommandTargets = {
+  analyze: "#analyzeBtn",
+  engine: "#engineBtn",
+  export: "#exportBtn",
+  experiments: "#experimentsBtn",
+  import: "#importBtn",
+  lab: "#labBtn",
+  newGame: "#newGameBtn",
+  prompts: "#promptEditorBtn",
+  recent: "#recentBtn",
+  review: "#reviewBtn",
+  settings: "#settingsBtn",
+  study: "#studyBtn"
+};
+const operationLabels = {
+  "#accessibilityAuditBtn": "Accessibility audit",
+  "#analyzeBtn": "Analysis",
+  "#benchBtn": "Benchmark",
+  "#createBackupBtn": "Backup",
+  "#customBoardBtn": "Custom board",
+  "#enablePolicyPriorBtn": "Policy prior",
+  "#engineBtn": "Engine move",
+  "#exportBtn": "Export",
+  "#exportProfilesBtn": "Provider profile export",
+  "#fineTuneBtn": "Fine-tune export",
+  "#healthBtn": "Provider health",
+  "#importBookBtn": "Opening book import",
+  "#importProfilesBtn": "Provider profile import",
+  "#keychainBtn": "Keychain save",
+  "#labTournamentBtn": "Tournament",
+  "#modeBenchBtn": "Mode benchmark",
+  "#modeCompareBtn": "Mode comparison",
+  "#multiAgentBtn": "Agent review",
+  "#newChess960Btn": "Chess960 game",
+  "#newGameBtn": "New game",
+  "#personalityBuilderBtn": "Personality profile",
+  "#positionSuiteBtn": "Position suite",
+  "#profilesBtn": "Provider profiles",
+  "#promptCompareBtn": "Prompt comparison",
+  "#promptEditorBtn": "Prompt editor",
+  "#providerComparisonBtn": "Provider comparison",
+  "#providerDashboardBtn": "Provider dashboard",
+  "#refreshExportBtn": "Export refresh",
+  "#refreshReviewBtn": "Review refresh",
+  "#refreshStudyBtn": "Study refresh",
+  "#reloadPromptBtn": "Prompt reload",
+  "#restoreBackupBtn": "Restore backup",
+  "#reviewBtn": "Review",
+  "#runImportBtn": "Import",
+  "#runPromptPlaygroundBtn": "Prompt playground",
+  "#saveMemoryBtn": "Strategy memory save",
+  "#savePromptBtn": "Prompt save",
+  "#saveSettingsBtn": "Settings save",
+  "#settingsBtn": "Settings",
+  "#studyBtn": "Study tools",
+  "#trainPolicyPriorBtn": "Policy training",
+  "#validatePromptBtn": "Prompt validation"
+};
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -166,6 +229,115 @@ function showError(err, selector = "#statusText") {
     target.textContent = message;
   }
   target.title = message;
+  setAppActivity("Needs attention", message, "error");
+}
+
+function showSuccess(message, selector = null) {
+  if (selector) {
+    const target = document.querySelector(selector);
+    if (target) {
+      if ("value" in target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT")) {
+        target.value = message;
+      } else {
+        target.textContent = message;
+      }
+      target.title = message;
+    }
+  }
+  setAppActivity("Done", message, "success");
+}
+
+function setAppActivity(label, message, tone = "ready", record = true) {
+  const activity = document.querySelector("#appActivity");
+  if (!activity) return appActivitySequence;
+  appActivitySequence += 1;
+  activity.dataset.tone = tone;
+  setText("#appActivityLabel", label);
+  setText("#appActivityMessage", message);
+  if (record) recordActivity(label, message, tone);
+  return appActivitySequence;
+}
+
+function recordActivity(label, message, tone) {
+  activityEvents.unshift({
+    label: asText(label, "Status"),
+    message: asText(message),
+    tone: asText(tone, "ready"),
+    at: new Date().toISOString()
+  });
+  activityEvents = activityEvents.slice(0, maxActivityEvents);
+  if (document.querySelector("#activityDialog")?.open) renderActivityLog();
+}
+
+function renderActivityLog() {
+  const log = document.querySelector("#activityLog");
+  if (!log) return;
+  log.innerHTML = "";
+  if (!activityEvents.length) {
+    const empty = document.createElement("div");
+    empty.className = "activity-empty";
+    empty.setAttribute("role", "listitem");
+    empty.textContent = "No recent activity.";
+    log.appendChild(empty);
+    return;
+  }
+  for (const event of activityEvents) {
+    const row = document.createElement("article");
+    row.className = "activity-entry";
+    row.dataset.tone = event.tone;
+    row.setAttribute("role", "listitem");
+    const time = document.createElement("time");
+    time.setAttribute("datetime", event.at);
+    time.textContent = formatActivityTime(event.at);
+    const body = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = event.label;
+    const message = document.createElement("span");
+    message.textContent = event.message || "No details.";
+    body.append(title, message);
+    row.append(time, body);
+    log.appendChild(row);
+  }
+}
+
+function formatActivityTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function openActivityHistory() {
+  renderActivityLog();
+  document.querySelector("#activityDialog").showModal();
+}
+
+function clearActivityHistory() {
+  activityEvents = [];
+  renderActivityLog();
+  setAppActivity("Ready", "Activity history cleared.", "ready", false);
+}
+
+function beginAppOperation(label) {
+  activeOperationCount += 1;
+  document.body.dataset.appBusy = "true";
+  return setAppActivity("Working", `${label}...`, "busy");
+}
+
+function finishAppOperation(marker) {
+  activeOperationCount = Math.max(0, activeOperationCount - 1);
+  if (activeOperationCount === 0) {
+    delete document.body.dataset.appBusy;
+  }
+  if (marker === appActivitySequence) {
+    setAppActivity("Ready", "Noema64 is ready.", "ready");
+  }
+}
+
+function activityLabelFor(controlOrSelector, control) {
+  if (typeof controlOrSelector === "string" && operationLabels[controlOrSelector]) return operationLabels[controlOrSelector];
+  const element = control || controlFrom(controlOrSelector);
+  const text = element?.getAttribute?.("aria-label") || element?.textContent || element?.title || "Action";
+  return humanizeToken(text.replace(/\s+/g, " ").trim());
 }
 
 async function call(name, ...args) {
@@ -190,24 +362,33 @@ function setControlBusy(controlOrSelector, busy) {
   const key = busyKey(controlOrSelector, control);
   if (busy) {
     busyControls.add(key);
+    if (!busyDisabledState.has(control)) {
+      busyDisabledState.set(control, control.disabled);
+    }
     control.disabled = true;
     control.setAttribute("aria-busy", "true");
   } else {
     busyControls.delete(key);
-    control.disabled = false;
+    const wasDisabled = busyDisabledState.get(control) || false;
+    busyDisabledState.delete(control);
+    control.disabled = wasDisabled;
     control.removeAttribute("aria-busy");
   }
+  renderWorkflowPanel();
 }
 
 async function withBusyControl(controlOrSelector, action) {
   const control = controlFrom(controlOrSelector);
   const key = busyKey(controlOrSelector, control);
   if (!control || busyControls.has(key)) return undefined;
+  const label = activityLabelFor(controlOrSelector, control);
+  const marker = beginAppOperation(label);
   setControlBusy(controlOrSelector, true);
   try {
     return await action();
   } finally {
     setControlBusy(controlOrSelector, false);
+    finishAppOperation(marker);
   }
 }
 
@@ -244,6 +425,7 @@ function setWorkspaceView(view, focus = false) {
   if (next !== "lab" && ["prompt", "raw"].includes(activeTab)) {
     activateTraceTab(document.querySelector("#summaryTab"));
   }
+  renderWorkflowPanel();
 }
 
 function moveWorkspaceViewFocus(current, delta) {
@@ -276,6 +458,149 @@ function bindWorkspaceNavigation() {
       }
     });
   });
+}
+
+function bindWorkflowCommands() {
+  document.querySelectorAll("#workflowPanel [data-command]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      runWorkflowCommand(button.dataset.command);
+    });
+  });
+}
+
+function runWorkflowCommand(command) {
+  const target = document.querySelector(workflowCommandTargets[command]);
+  if (!target || target.disabled) return;
+  target.click();
+}
+
+function setText(selector, text) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+  target.textContent = text;
+  target.title = text;
+}
+
+function renderWorkflowPanel() {
+  const panel = document.querySelector("#workflowPanel");
+  if (!panel) return;
+  const view = workspaceViews.includes(activeWorkspaceView) ? activeWorkspaceView : "play";
+  const snapshot = state?.snapshot || null;
+  const decision = state?.last_decision || null;
+  setText("#workflowEyebrow", workflowLabel(view));
+  setText("#workflowTitle", workflowTitleText(view, snapshot, decision));
+  setText("#workflowDetail", workflowDetailText(view, snapshot, decision));
+  setText("#playFlowMeta", gameFlowMeta(snapshot));
+  setText("#setupFlowMeta", setupFlowMeta());
+  setText("#recordFlowMeta", recordFlowMeta(snapshot));
+  setText("#reviewFlowMeta", decisionFlowMeta(decision));
+  setText("#studyFlowMeta", studyFlowMeta(snapshot, decision));
+  setText("#memoryFlowMeta", memoryFlowMeta());
+  setText("#providerFlowMeta", providerFlowMeta());
+  setText("#promptFlowMeta", promptFlowMeta());
+  setText("#assetFlowMeta", assetFlowMeta(snapshot));
+  setWorkflowActionAvailability(snapshot, decision);
+}
+
+function workflowLabel(view) {
+  return view === "study" ? "Study" : view === "lab" ? "Lab" : "Play";
+}
+
+function workflowTitleText(view, snapshot, decision) {
+  if (view === "study") return decision ? "Review Ready" : "Study Workspace";
+  if (view === "lab") return "Developer Lab";
+  if (!snapshot) return "Current Game";
+  const outcome = snapshot.outcome?.status || "unknown";
+  if (outcome !== "ongoing") return "Game Complete";
+  return `${humanizeToken(snapshot.side_to_move || "unknown")} to move`;
+}
+
+function workflowDetailText(view, snapshot, decision) {
+  if (view === "lab") return providerFlowMeta();
+  if (view === "study") return decisionFlowMeta(decision);
+  if (!snapshot) return "No game loaded";
+  const fen = compactFen(snapshot.fen);
+  return fen ? `${recordFlowMeta(snapshot)} · ${fen}` : gameFlowMeta(snapshot);
+}
+
+function gameFlowMeta(snapshot) {
+  if (!snapshot) return "No game loaded";
+  return statusSummary(snapshot, state?.variant?.variant || "standard");
+}
+
+function setupFlowMeta() {
+  const mode = document.querySelector("#settingMode")?.value || settings?.engine?.default_mode || "blunderguard";
+  const personality = document.querySelector("#settingPersonality")?.value || settings?.engine?.personality || "balanced";
+  return `${humanizeToken(mode)} · ${humanizeToken(personality)} · ${timeControlMeta()}`;
+}
+
+function timeControlMeta() {
+  const preset = document.querySelector("#settingTimeControl")?.value || settings?.gui?.time_control || "untimed";
+  if (preset !== "custom") return humanizeToken(preset);
+  const tc = timeControlForNewGame();
+  return `${Math.round((tc.initial_ms || 0) / 60000)}+${Math.round((tc.increment_ms || 0) / 1000)}`;
+}
+
+function recordFlowMeta(snapshot) {
+  if (!snapshot) return "No moves recorded";
+  const plies = asArray(snapshot.move_history).length;
+  return `${plies} ${plies === 1 ? "ply" : "plies"} · ${snapshot.outcome?.status || "unknown"}`;
+}
+
+function decisionFlowMeta(decision) {
+  if (!decision) return "No decision recorded";
+  const move = decision.selected_move?.san || decision.selected_move?.uci || "Decision recorded";
+  const mode = decision.mode || settings?.engine?.default_mode || "mode";
+  const fallback = decision.fallback_used ? "fallback" : "selected";
+  return `${move} · ${humanizeToken(mode)} · ${fallback}`;
+}
+
+function studyFlowMeta(snapshot, decision) {
+  if (!snapshot) return "No game loaded";
+  return decision ? decisionFlowMeta(decision) : gameFlowMeta(snapshot);
+}
+
+function memoryFlowMeta() {
+  const memory = state?.strategy_memory || {};
+  const metrics = state?.strategy_metrics || {};
+  const status = memory.plan?.status || "No plan";
+  return `${humanizeToken(status)} · confidence ${formatMetric(memory.plan?.confidence)} · quality ${formatMetric(metrics.quality)}`;
+}
+
+function providerFlowMeta() {
+  const provider = document.querySelector("#settingProvider")?.value || settings?.llm?.provider || "mock";
+  const profile = document.querySelector("#settingProfile")?.value || settings?.llm?.profile_id || "custom";
+  const model = document.querySelector("#settingModel")?.value || settings?.llm?.model || "mock-balanced";
+  return `${humanizeToken(provider)} · ${profile || "custom"} · ${model}`;
+}
+
+function promptFlowMeta() {
+  return promptPack?.source || "Default prompt pack";
+}
+
+function assetFlowMeta(snapshot) {
+  const outputDir = document.querySelector("#settingLogDir")?.value || settings?.logging?.output_dir || "logs";
+  return `${outputDir} · ${snapshot ? recordFlowMeta(snapshot) : "No game loaded"}`;
+}
+
+function setWorkflowActionAvailability(snapshot, decision) {
+  document.querySelectorAll("#workflowPanel [data-requires]").forEach((button) => {
+    const requirement = button.dataset.requires;
+    const busy = workflowCommandBusy(button.dataset.command);
+    button.disabled = busy || (requirement === "game" && !snapshot) || (requirement === "decision" && !decision);
+    button.toggleAttribute("aria-busy", busy);
+  });
+  document.querySelectorAll("#workflowPanel [data-command]:not([data-requires])").forEach((button) => {
+    const busy = workflowCommandBusy(button.dataset.command);
+    button.disabled = busy;
+    button.toggleAttribute("aria-busy", busy);
+  });
+}
+
+function workflowCommandBusy(command) {
+  const target = workflowCommandTargets[command];
+  return !!target && busyControls.has(target);
 }
 
 function resetBoardEntry() {
@@ -322,6 +647,7 @@ function render() {
   renderMoves();
   renderStrategy();
   renderDecision();
+  renderWorkflowPanel();
 }
 
 function normalizeRenderableState() {
@@ -340,6 +666,7 @@ function renderUnavailableState(message) {
   const status = document.querySelector("#statusText");
   status.textContent = message || "Game service unavailable.";
   status.title = status.textContent;
+  setAppActivity("Unavailable", status.textContent, "error");
   document.querySelector("#clockText").textContent = "Untimed";
   document.querySelector("#modeText").textContent = settings?.engine?.default_mode || "offline";
   document.querySelector("#thinkingStage").textContent = "Unavailable";
@@ -352,9 +679,10 @@ function renderUnavailableState(message) {
   document.querySelector("#confidence").textContent = "0.00";
   renderStrategyRows([
     ["Status", "Unavailable"],
-    ["Plan", "Connect the desktop game service to load strategy memory."]
+    ["Plan", "Desktop game service unavailable."]
   ]);
-  renderMoveListEmpty("No moves loaded.");
+  renderMoveListEmpty("No moves recorded.");
+  renderWorkflowPanel();
 }
 
 function renderBoardEmpty(title, detail) {
@@ -773,7 +1101,7 @@ function renderMoves() {
   list.innerHTML = "";
   list.classList.remove("move-list-empty");
   if (!state.snapshot.move_history.length) {
-    renderMoveListEmpty("No moves yet.");
+    renderMoveListEmpty("No moves recorded.");
     return;
   }
   for (const move of asArray(state.snapshot.move_history)) {
@@ -865,7 +1193,7 @@ function renderDecision() {
   const box = document.querySelector("#candidates");
   box.innerHTML = "";
   if (!candidates.length) {
-    box.textContent = "Candidate moves will appear here while the engine is thinking.";
+    box.textContent = dec ? "No candidate moves recorded." : "No candidates recorded.";
     box.classList.add("empty-copy");
     return;
   }
@@ -901,7 +1229,7 @@ function formatScore(value) {
 }
 
 function tabText(dec) {
-  if (!dec) return "No strategy yet. Noema64 will create a plan after its first decision.";
+  if (!dec) return "No decision recorded.";
   switch (activeTab) {
     case "diff": return JSON.stringify(dec.strategy_diff, null, 2);
     case "verifier": return JSON.stringify(dec.verifier_trace, null, 2);
@@ -989,6 +1317,7 @@ async function makeMove(move) {
     try {
       document.querySelector("#thinkingStage").textContent = "Applying user move";
       applyGameStateResult(await call("MakeUserMove", normalizedMove));
+      showSuccess("Move applied.");
       if (autoReply && state?.snapshot?.outcome?.status === "ongoing" && state.snapshot.side_to_move !== playerSide) {
         await askEngine();
       }
@@ -1005,6 +1334,7 @@ async function askEngine() {
       lastStageEvent = null;
       document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
       applyGameStateResult(await call("RequestEngineMove"));
+      showSuccess("Engine move applied.");
     } catch (err) {
       showError(err);
       document.querySelector("#thinkingStage").textContent = "Engine stopped";
@@ -1031,6 +1361,8 @@ async function analyzeCurrentPosition() {
         status.title = status.textContent;
       }
       renderDecision();
+      renderWorkflowPanel();
+      showSuccess("Analysis complete.");
     } catch (err) {
       showError(err);
       document.querySelector("#thinkingStage").textContent = "Analysis failed";
@@ -1074,7 +1406,9 @@ function subscribeDecisionStageEvents() {
   if (!window.runtime?.EventsOn) return;
   window.runtime.EventsOn("decision.stage", (event) => {
     lastStageEvent = event;
-    document.querySelector("#thinkingStage").textContent = stageStatusText(event, "Thinking");
+    const text = stageStatusText(event, "Thinking");
+    document.querySelector("#thinkingStage").textContent = text;
+    setAppActivity("Thinking", text, "busy");
   });
 }
 
@@ -1134,6 +1468,7 @@ async function loadSettings() {
   document.querySelector("#settingRawResponses").checked = !!settings.privacy.log_raw_llm_responses;
   syncTimeControlInputsFromPreset(false);
   syncProviderDisclosure();
+  renderWorkflowPanel();
 }
 
 function populateProviderProfiles(profiles) {
@@ -1193,6 +1528,7 @@ function applySelectedProviderProfile() {
   document.querySelector("#settingKeyRef").value = profile.api_key_ref || "";
   applyingProviderProfile = false;
   syncProviderDisclosure();
+  renderWorkflowPanel();
 }
 
 function markProviderProfileCustom() {
@@ -1231,6 +1567,7 @@ async function saveSettings() {
       settings.privacy.cloud_provider_warning_acknowledged = document.querySelector("#settingCloudAck").checked;
       if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
         document.querySelector("#settingsOutput").textContent = "Acknowledge provider endpoint data sharing before saving.";
+        setAppActivity("Needs attention", "Acknowledge provider endpoint data sharing before saving.", "error");
         return;
       }
       settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
@@ -1246,7 +1583,8 @@ async function saveSettings() {
       settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
       await call("SaveSettings", settings);
       applyTheme(settings.gui.theme);
-      document.querySelector("#settingsOutput").textContent = "Settings saved.";
+      showSuccess("Settings saved.", "#settingsOutput");
+      renderWorkflowPanel();
     } catch (err) {
       showError(err, "#settingsOutput");
     }
@@ -1262,7 +1600,7 @@ async function saveProviderKeyToKeychain() {
   try {
     settings = await call("SaveProviderAPIKeyToKeychain", document.querySelector("#settingProfile").value, apiKey);
     await loadSettings();
-    document.querySelector("#settingsOutput").textContent = "API key saved to keychain reference.";
+    showSuccess("API key saved to keychain reference.", "#settingsOutput");
   } catch (err) {
     showError(err, "#settingsOutput");
   }
@@ -1502,6 +1840,7 @@ async function openReview() {
 async function refreshReview() {
   try {
     document.querySelector("#reviewOutput").textContent = renderReview(await call("PostGameReview"));
+    showSuccess("Review ready.");
   } catch (err) {
     showError(err, "#reviewOutput");
   }
@@ -1519,6 +1858,7 @@ async function refreshStudy() {
     const current = await call("GetGame");
     document.querySelector("#studyMemoryText").value = JSON.stringify(current?.strategy_memory || {}, null, 2);
     document.querySelector("#studyOutput").textContent = renderStudyDashboard(dashboard);
+    showSuccess("Study dashboard ready.");
   } catch (err) {
     showError(err, "#studyOutput");
   }
@@ -1527,6 +1867,7 @@ async function refreshStudy() {
 async function refreshMultiAgent() {
   try {
     document.querySelector("#studyOutput").textContent = JSON.stringify(await call("MultiAgentAnalysis"), null, 2);
+    showSuccess("Agent review ready.");
   } catch (err) {
     showError(err, "#studyOutput");
   }
@@ -1537,6 +1878,7 @@ async function saveStudyMemory() {
     const memory = parseJSONField("#studyMemoryText", "Strategy memory");
     applyGameStateResult(await call("UpdateStrategyMemory", memory));
     await refreshStudy();
+    showSuccess("Strategy memory saved.");
   } catch (err) {
     showError(err, "#studyOutput");
   }
@@ -1589,6 +1931,7 @@ async function newChess960Game() {
       time_control: timeControlForNewGame()
     }));
     document.querySelector("#labOutput").textContent = JSON.stringify(state?.variant || {}, null, 2);
+    showSuccess("Chess960 game ready.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1610,6 +1953,7 @@ async function startCustomBoardFromLab() {
       time_control: timeControlForNewGame()
     }));
     document.querySelector("#labOutput").textContent = JSON.stringify(state?.variant || {}, null, 2);
+    showSuccess("Custom board ready.");
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
     showError(err, "#labOutput");
@@ -1621,6 +1965,7 @@ async function createBackup() {
     const manifest = await call("CreateBackup", document.querySelector("#backupDir").value.trim());
     document.querySelector("#restoreArchive").value = manifest?.archive_path || "";
     document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
+    showSuccess("Backup created.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1631,6 +1976,7 @@ async function restoreBackup() {
     const archive = requireField("#restoreArchive", "Choose a backup archive before restoring.");
     const manifest = await call("RestoreBackup", archive, document.querySelector("#restoreTarget").value.trim());
     document.querySelector("#labOutput").textContent = renderBackupManifest(manifest);
+    showSuccess("Backup restored.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1639,6 +1985,7 @@ async function restoreBackup() {
 async function exportFineTuneWorkflow() {
   try {
     document.querySelector("#labOutput").textContent = renderFineTuneWorkflow(await call("ExportFineTuneDataset"));
+    showSuccess("Fine-tune dataset ready.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1649,6 +1996,7 @@ async function runTournamentFromLab() {
     const games = Number(document.querySelector("#tournamentGames").value) || 1;
     document.querySelector("#labOutput").textContent = "Running tournament...";
     document.querySelector("#labOutput").textContent = renderTournament(await call("RunTournament", games, 64));
+    showSuccess("Tournament complete.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1667,6 +2015,7 @@ async function compareAnalysisModes() {
       "HYBRID",
       `${comparison?.hybrid?.selected_move?.san || comparison?.hybrid?.selected_move?.uci || "none"} · ${comparison?.hybrid?.explanation || ""}`
     ].join("\n");
+    showSuccess("Mode comparison ready.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1677,6 +2026,7 @@ async function comparePromptPlayground() {
     const base = normalizePromptPack(await call("PromptTemplatePack"));
     const variant = { ...base, source: "playground", user: `${base.user || ""}\n\nPrefer concise contrast between the top two candidates.\n` };
     document.querySelector("#labOutput").textContent = renderPromptPlayground(await call("RunPromptPlayground", base, variant));
+    showSuccess("Prompt comparison ready.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1687,6 +2037,7 @@ async function runPromptPlaygroundFromEditor() {
     const base = normalizePromptPack(await call("PromptTemplatePack"));
     const edited = promptPackFromInputs();
     document.querySelector("#promptOutput").textContent = renderPromptPlayground(await call("RunPromptPlayground", base, edited));
+    showSuccess("Prompt playground ready.");
   } catch (err) {
     showError(err, "#promptOutput");
   }
@@ -1698,6 +2049,7 @@ async function buildPersonalityFromLab() {
     settings = await call("SaveCustomPersonalityProfile", profile, true);
     await loadSettings();
     document.querySelector("#labOutput").textContent = JSON.stringify({ saved: profile, selected: settings.engine?.custom_personality_id }, null, 2);
+    showSuccess("Personality profile saved.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1710,6 +2062,7 @@ async function trainPolicyPriorFromLab() {
     const result = await call("TrainLocalPolicyPrior", workflow?.dataset_jsonl || "", path);
     document.querySelector("#policyModelPath").value = result?.model_path || path;
     document.querySelector("#labOutput").textContent = JSON.stringify(result, null, 2);
+    showSuccess("Policy prior trained.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1721,6 +2074,7 @@ async function enablePolicyPriorFromLab() {
     settings = await call("EnablePolicyPriorModel", path);
     await loadSettings();
     document.querySelector("#labOutput").textContent = `Policy prior enabled: ${settings.llm?.model || ""}`;
+    showSuccess("Policy prior enabled.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1732,6 +2086,7 @@ async function importOpeningBookFromLab() {
     const book = await call("ImportOpeningBook", path);
     const suggestions = await call("OpeningBook");
     document.querySelector("#labOutput").textContent = JSON.stringify({ imported: book, current_suggestions: suggestions }, null, 2);
+    showSuccess("Opening book imported.");
   } catch (err) {
     showError(err, "#labOutput");
   }
@@ -1740,6 +2095,7 @@ async function importOpeningBookFromLab() {
 async function runAccessibilityAudit() {
   try {
     document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("AccessibilityAudit"), null, 2);
+    showSuccess("Accessibility audit complete.");
   } catch (err) {
     showError(err, "#settingsOutput");
   }
@@ -1749,6 +2105,7 @@ async function runExperiment(action, label, renderResult) {
   try {
     document.querySelector("#experimentsOutput").textContent = `${label}...`;
     document.querySelector("#experimentsOutput").textContent = renderResult(await action());
+    showSuccess(`${label} complete.`);
   } catch (err) {
     showError(err, "#experimentsOutput");
   }
@@ -1763,6 +2120,8 @@ async function loadPromptEditor() {
     document.querySelector("#promptUser").value = promptPack.user || "";
     document.querySelector("#promptSchema").value = promptPack.schema || "";
     document.querySelector("#promptOutput").textContent = "";
+    renderWorkflowPanel();
+    showSuccess("Prompt pack loaded.");
   } catch (err) {
     showError(err, "#promptOutput");
   }
@@ -1789,6 +2148,7 @@ async function validatePromptEditor() {
   try {
     const validation = await call("ValidatePromptTemplatePack", promptPackFromInputs());
     document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
+    showSuccess("Prompt pack validated.");
     return validation;
   } catch (err) {
     showError(err, "#promptOutput");
@@ -1801,6 +2161,7 @@ async function savePromptEditor() {
     const dir = requireField("#promptSaveDir", "Enter a save directory before saving the prompt pack.");
     const validation = await call("SavePromptTemplatePack", dir, promptPackFromInputs());
     document.querySelector("#promptOutput").textContent = JSON.stringify(validation, null, 2);
+    showSuccess("Prompt pack saved.");
   } catch (err) {
     showError(err, "#promptOutput");
   }
@@ -1815,6 +2176,7 @@ async function exportProfiles() {
   try {
     document.querySelector("#profilesText").value = textAreaValue(await call("ExportProviderProfiles"));
     document.querySelector("#profilesOutput").textContent = "Profiles exported.";
+    showSuccess("Provider profiles exported.");
   } catch (err) {
     showError(err, "#profilesOutput");
   }
@@ -1826,6 +2188,8 @@ async function importProfiles() {
     settings = normalizeSettingsShape(await call("ImportProviderProfiles", text));
     populateProviderProfiles(settings.llm?.profiles || []);
     document.querySelector("#profilesOutput").textContent = "Profiles imported.";
+    renderWorkflowPanel();
+    showSuccess("Provider profiles imported.");
   } catch (err) {
     showError(err, "#profilesOutput");
   }
@@ -1864,6 +2228,7 @@ function renderRecentGames(records) {
       try {
         applyGameStateResult(await call("LoadRecentGame", gameID));
         document.querySelector("#recentDialog").close();
+        showSuccess("Recent game loaded.");
       } catch (err) {
         showError(err, "#recentOutput");
       }
@@ -1927,6 +2292,12 @@ document.querySelectorAll(".tabs button").forEach((btn) => {
   });
 });
 
+document.querySelector("#activityHistoryBtn").addEventListener("click", openActivityHistory);
+document.querySelector("#clearActivityBtn").addEventListener("click", (event) => {
+  event.preventDefault();
+  clearActivityHistory();
+});
+
 bindBusyButton("#newGameBtn", async () => {
   try {
     let side = document.querySelector("#settingSide")?.value || playerSide;
@@ -1940,20 +2311,31 @@ bindBusyButton("#newGameBtn", async () => {
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     }));
+    showSuccess("New game ready.");
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
     showError(err);
   }
 });
-document.querySelector("#settingTimeControl").addEventListener("change", () => syncTimeControlInputsFromPreset(true));
+document.querySelector("#settingTimeControl").addEventListener("change", () => {
+  syncTimeControlInputsFromPreset(true);
+  renderWorkflowPanel();
+});
 document.querySelector("#settingTheme").addEventListener("change", () => applyTheme(document.querySelector("#settingTheme").value));
 document.querySelector("#settingProfile").addEventListener("change", applySelectedProviderProfile);
 document.querySelector("#settingProvider").addEventListener("change", () => {
   markProviderProfileCustom();
   syncProviderDisclosure();
+  renderWorkflowPanel();
 });
 ["#settingEndpoint", "#settingModel", "#settingTemperature", "#settingMaxTokens", "#settingTimeout", "#settingRetries", "#settingKey", "#settingKeyRef"].forEach((selector) => {
-  document.querySelector(selector).addEventListener("input", markProviderProfileCustom);
+  document.querySelector(selector).addEventListener("input", () => {
+    markProviderProfileCustom();
+    renderWorkflowPanel();
+  });
+});
+["#settingMode", "#settingPersonality", "#settingLogDir", "#settingClockInitial", "#settingClockIncrement"].forEach((selector) => {
+  document.querySelector(selector).addEventListener("input", renderWorkflowPanel);
 });
 bindBusyButton("#recentBtn", openRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
@@ -1962,6 +2344,7 @@ bindBusyButton("#stopBtn", async () => {
   try {
     await call("StopEngine");
     document.querySelector("#thinkingStage").textContent = "Stop requested";
+    showSuccess("Stop requested.");
   } catch (err) {
     showError(err);
   }
@@ -1970,6 +2353,7 @@ document.querySelector("#resignBtn").addEventListener("click", resignGame);
 bindBusyButton("#undoBtn", async () => {
   try {
     applyGameStateResult(await call("Undo", 1));
+    showSuccess("Move undone.");
   } catch (err) {
     showError(err);
   }
@@ -2015,6 +2399,7 @@ bindBusyButton("#runImportBtn", async () => {
   try {
     applyGameStateResult(type === "fen" ? await call("ImportFEN", text) : await call("ImportPGN", text));
     document.querySelector("#importDialog").close();
+    showSuccess("Position imported.");
   } catch (err) {
     showError(err, "#importOutput");
   }
@@ -2108,23 +2493,28 @@ async function refreshExport() {
   const type = document.querySelector("#exportType").value;
   if (type === "fen") {
     document.querySelector("#exportText").value = textAreaValue(await call("ExportFEN"));
+    showSuccess("FEN export ready.");
     return true;
   }
   if (type === "trace") {
     document.querySelector("#exportText").value = textAreaValue(await call("ExportTrace"));
+    showSuccess("Trace export ready.");
     return true;
   }
   if (type === "debug_trace") {
     if (!confirmDebugTraceExport()) return false;
     document.querySelector("#exportText").value = textAreaValue(await call("ExportDebugTrace"));
+    showSuccess("Debug trace export ready.");
     return true;
   }
   if (type === "fine_tune") {
     const workflow = await call("ExportFineTuneDataset");
     document.querySelector("#exportText").value = textAreaValue(workflow?.dataset_jsonl);
+    showSuccess("Fine-tune export ready.");
     return true;
   }
   document.querySelector("#exportText").value = textAreaValue(await call("ExportPGN"));
+  showSuccess("PGN export ready.");
   return true;
 }
 
@@ -2155,6 +2545,7 @@ bindBusyButton("#exportBtn", async () => {
   try {
     if (!await refreshExport()) {
       document.querySelector("#exportText").value = "Export canceled.";
+      setAppActivity("Canceled", "Export canceled.", "ready");
     }
   } catch (err) {
     showError(err, "#exportText");
@@ -2183,6 +2574,7 @@ function shouldIgnoreGlobalShortcut(event) {
 
 async function init() {
   bindWorkspaceNavigation();
+  bindWorkflowCommands();
   setWorkspaceView(document.body.dataset.workspaceView || activeWorkspaceView);
   bindDialogCloseButtons();
   subscribeDecisionStageEvents();

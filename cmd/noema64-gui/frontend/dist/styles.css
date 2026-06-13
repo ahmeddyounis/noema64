@@ -83,7 +83,8 @@ button[aria-busy="true"]::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  button[aria-busy="true"]::after {
+  button[aria-busy="true"]::after,
+  body[data-app-busy="true"] .app-activity[data-tone="busy"] #appActivityLabel::after {
     animation: none;
   }
 }
@@ -107,7 +108,8 @@ textarea:focus-visible {
   grid-template-columns: minmax(240px, auto) minmax(0, 1fr);
   grid-template-areas:
     "brand nav"
-    "toolbar toolbar";
+    "toolbar toolbar"
+    "activity activity";
   align-items: center;
   gap: 10px 16px;
   border-bottom: 1px solid #d9dee7;
@@ -201,6 +203,79 @@ textarea:focus-visible {
   border-right: 0;
 }
 
+.activity-row {
+  grid-area: activity;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.app-activity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fbfcfe;
+  color: #4e5d70;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.activity-history-button {
+  white-space: nowrap;
+}
+
+.app-activity span {
+  min-width: 0;
+}
+
+#appActivityLabel {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+#appActivityMessage {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-activity[data-tone="busy"] {
+  border-color: #b7c9e4;
+  background: #f6f9ff;
+  color: #174f9e;
+}
+
+.app-activity[data-tone="success"] {
+  border-color: #b9d9c5;
+  background: #f4fbf6;
+  color: #22543d;
+}
+
+.app-activity[data-tone="error"] {
+  border-color: #e3b6b6;
+  background: #fff7f7;
+  color: #8a2c2c;
+}
+
+body[data-app-busy="true"] .app-activity[data-tone="busy"] #appActivityLabel::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 7px;
+  border: 2px solid #9ab8df;
+  border-top-color: #1e5fbf;
+  border-radius: 50%;
+  animation: busy-spin 0.8s linear infinite;
+}
+
 body[data-workspace-view="play"] [data-action-scope="study"],
 body[data-workspace-view="play"] [data-action-scope="lab"],
 body[data-workspace-view="study"] [data-action-scope="play"],
@@ -217,6 +292,109 @@ body:not([data-workspace-view="lab"]) [data-lab-only="true"] {
   gap: 12px;
   min-height: 0;
   padding: 12px;
+}
+
+.workflow-panel {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.58fr) minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.workflow-summary {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+  min-width: 0;
+}
+
+.workflow-eyebrow {
+  color: #607083;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.workflow-summary strong {
+  font-size: 18px;
+}
+
+.workflow-summary span:last-child {
+  color: #59697c;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.workflow-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.workflow-card {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  min-width: 0;
+  min-height: 104px;
+  padding: 10px;
+  border: 1px solid #e1e6ee;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.workflow-card-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workflow-card-copy strong {
+  font-size: 14px;
+}
+
+.workflow-card-copy span {
+  color: #59697c;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.workflow-card-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.workflow-card-actions button {
+  min-width: 0;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.workflow-card-actions .primary-command {
+  border-color: #b7c9e4;
+  background: #f6f9ff;
+  color: #174f9e;
+  font-weight: 650;
+}
+
+body[data-workspace-view="play"] [data-workspace-card="study"],
+body[data-workspace-view="play"] [data-workspace-card="lab"],
+body[data-workspace-view="study"] [data-workspace-card="play"],
+body[data-workspace-view="study"] [data-workspace-card="lab"],
+body[data-workspace-view="lab"] [data-workspace-card="play"],
+body[data-workspace-view="lab"] [data-workspace-card="study"] {
+  display: none;
 }
 
 .board-area,
@@ -586,6 +764,7 @@ dialog > form {
 }
 
 #experimentsDialog,
+#activityDialog,
 #labDialog,
 #promptDialog,
 #profilesDialog,
@@ -767,6 +946,59 @@ dialog header button {
   overflow: auto;
 }
 
+.activity-log {
+  display: grid;
+  gap: 0;
+  max-height: min(58vh, 520px);
+  overflow: auto;
+  border-top: 1px solid #e1e6ee;
+}
+
+.activity-empty {
+  padding: 18px 12px;
+  color: #607083;
+}
+
+.activity-entry {
+  display: grid;
+  grid-template-columns: minmax(86px, auto) minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e1e6ee;
+}
+
+.activity-entry time {
+  color: #607083;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.activity-entry strong {
+  display: block;
+  font-size: 13px;
+}
+
+.activity-entry span {
+  display: block;
+  min-width: 0;
+  color: #4e5d70;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.activity-entry[data-tone="busy"] strong {
+  color: #174f9e;
+}
+
+.activity-entry[data-tone="success"] strong {
+  color: #22543d;
+}
+
+.activity-entry[data-tone="error"] strong {
+  color: #8a2c2c;
+}
+
 .recent-game {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -859,7 +1091,8 @@ textarea {
     grid-template-areas:
       "brand"
       "nav"
-      "toolbar";
+      "toolbar"
+      "activity";
     align-items: start;
     gap: 8px;
     padding: 10px 12px;
@@ -916,6 +1149,10 @@ textarea {
     height: auto;
   }
 
+  .workflow-panel {
+    grid-template-columns: 1fr;
+  }
+
   .board-area {
     min-height: 620px;
   }
@@ -925,6 +1162,14 @@ textarea {
   .workspace {
     gap: 10px;
     padding: 10px;
+  }
+
+  .workflow-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-card {
+    min-height: 0;
   }
 
   .board-area {
@@ -982,6 +1227,36 @@ textarea {
   .toolbar-group:last-child {
     border-bottom: 0;
     padding-bottom: 0;
+  }
+
+  .workflow-panel {
+    padding: 10px;
+  }
+
+  .activity-row {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-history-button {
+    width: 100%;
+  }
+
+  .app-activity {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  #appActivityMessage {
+    white-space: normal;
+  }
+
+  .workflow-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workflow-card-actions button {
+    width: 100%;
   }
 
   dialog {

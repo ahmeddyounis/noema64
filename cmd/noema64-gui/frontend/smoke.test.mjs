@@ -16,7 +16,7 @@ function expectScriptToken(token) {
 }
 
 test("main GUI screen exposes critical panels", () => {
-  for (const id of ["workspaceNav", "viewPlayBtn", "viewStudyBtn", "viewLabBtn", "mainWorkspace", "board", "statusText", "clockText", "modeText", "moveInput", "moveList", "tabContent", "candidates", "strategyMemory"]) {
+  for (const id of ["workspaceNav", "viewPlayBtn", "viewStudyBtn", "viewLabBtn", "appActivity", "appActivityLabel", "appActivityMessage", "activityHistoryBtn", "activityDialog", "activityTitle", "clearActivityBtn", "activityLog", "mainWorkspace", "workflowPanel", "workflowEyebrow", "workflowTitle", "workflowDetail", "playFlowMeta", "setupFlowMeta", "recordFlowMeta", "reviewFlowMeta", "studyFlowMeta", "memoryFlowMeta", "providerFlowMeta", "promptFlowMeta", "assetFlowMeta", "board", "statusText", "clockText", "modeText", "moveInput", "moveList", "tabContent", "candidates", "strategyMemory"]) {
     expectMarkupID(id);
   }
   assert.match(indexHTML, /body data-workspace-view="play"/);
@@ -24,7 +24,23 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, /id="viewPlayBtn"[\s\S]*data-workspace-target="play"[\s\S]*aria-selected="true"/);
   assert.match(indexHTML, /id="viewStudyBtn"[\s\S]*data-workspace-target="study"/);
   assert.match(indexHTML, /id="viewLabBtn"[\s\S]*data-workspace-target="lab"/);
+  assert.match(indexHTML, /id="appActivity" class="app-activity" role="status" aria-live="polite" data-tone="ready"/);
+  assert.match(indexHTML, /id="appActivityLabel">Ready</);
+  assert.match(indexHTML, /id="appActivityMessage">Noema64 is ready\.</);
+  assert.match(indexHTML, /id="activityHistoryBtn" class="activity-history-button" type="button" title="Activity history" aria-label="Activity history"/);
+  assert.match(indexHTML, /dialog id="activityDialog" aria-labelledby="activityTitle"/);
+  assert.match(indexHTML, /id="activityLog" class="activity-log" role="list" aria-live="polite"/);
   assert.match(indexHTML, /id="mainWorkspace" class="workspace" role="tabpanel" aria-labelledby="viewPlayBtn"/);
+  assert.match(indexHTML, /id="workflowPanel" class="workflow-panel" aria-label="Workspace overview"/);
+  assert.match(indexHTML, /data-workspace-card="play"/);
+  assert.match(indexHTML, /data-workspace-card="study"/);
+  assert.match(indexHTML, /data-workspace-card="lab"/);
+  assert.match(indexHTML, /data-command="engine" data-requires="game"/);
+  assert.match(indexHTML, /data-command="newGame"/);
+  assert.match(indexHTML, /data-command="experiments"/);
+  assert.match(indexHTML, /data-command="prompts"/);
+  assert.match(indexHTML, />Position Setup</);
+  assert.match(indexHTML, />Provider Health</);
   assert.match(indexHTML, /aria-label="Chess board workspace"/);
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
@@ -292,16 +308,62 @@ test("bundle wires core actions and renders trace metadata", () => {
     "moveTraceTabFocus",
     "tabIndex = selectedTab ? 0 : -1",
     "busyControls",
+    "busyDisabledState",
+    "busyDisabledState.set(control, control.disabled)",
+    "const wasDisabled = busyDisabledState.get(control) || false",
+    "control.disabled = wasDisabled",
     "setControlBusy",
     "withBusyControl",
     "bindBusyButton",
     "workspaceViews",
+    "activeOperationCount",
+    "appActivitySequence",
+    "activityEvents",
+    "maxActivityEvents",
+    "operationLabels",
+    "setAppActivity",
+    "recordActivity",
+    "renderActivityLog",
+    "formatActivityTime",
+    "openActivityHistory",
+    "clearActivityHistory",
+    "No recent activity.",
+    "Activity history cleared.",
+    "beginAppOperation",
+    "finishAppOperation",
+    "activityLabelFor",
+    "showSuccess",
+    "setAppActivity(\"Needs attention\"",
+    "setAppActivity(\"Thinking\"",
+    "document.body.dataset.appBusy = \"true\"",
+    "delete document.body.dataset.appBusy",
     "setWorkspaceView",
     "bindWorkspaceNavigation",
     "moveWorkspaceViewFocus",
     "document.body.dataset.workspaceView",
     "data-workspace-target",
     "next !== \"lab\" && [\"prompt\", \"raw\"].includes(activeTab)",
+    "workflowCommandTargets",
+    "bindWorkflowCommands",
+    "runWorkflowCommand",
+    "renderWorkflowPanel",
+    "workflowTitleText",
+    "workflowDetailText",
+    "setWorkflowActionAvailability",
+    "workflowCommandBusy",
+    "button.dataset.requires",
+    "button.toggleAttribute(\"aria-busy\", busy)",
+    "target.click()",
+    "bindWorkflowCommands();",
+    "document.querySelector(\"#activityHistoryBtn\").addEventListener(\"click\", openActivityHistory)",
+    "document.querySelector(\"#clearActivityBtn\").addEventListener(\"click\"",
+    "No decision recorded.",
+    "No candidates recorded.",
+    "No moves recorded.",
+    "Engine move applied.",
+    "Position imported.",
+    "Settings saved.",
+    "Export canceled.",
     "bindDialogCloseButtons",
     "dialog button[value='cancel']",
     "dialog.close(\"cancel\")",
@@ -388,6 +450,21 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(stylesCSS, /\.toolbar-group/);
   assert.match(stylesCSS, /#app \{[\s\S]*grid-template-rows: auto minmax\(0, 1fr\);/);
+  assert.match(stylesCSS, /\.topbar \{[\s\S]*"activity activity";/);
+  assert.match(stylesCSS, /\.activity-row \{[\s\S]*grid-area: activity;/);
+  assert.match(stylesCSS, /\.app-activity\[data-tone="busy"\]/);
+  assert.match(stylesCSS, /\.app-activity\[data-tone="success"\]/);
+  assert.match(stylesCSS, /\.app-activity\[data-tone="error"\]/);
+  assert.match(stylesCSS, /body\[data-app-busy="true"\] \.app-activity\[data-tone="busy"\] #appActivityLabel::after/);
+  assert.match(stylesCSS, /\.activity-history-button/);
+  assert.match(stylesCSS, /\.activity-log \{[\s\S]*max-height: min\(58vh, 520px\);/);
+  assert.match(stylesCSS, /\.activity-entry \{[\s\S]*grid-template-columns: minmax\(86px, auto\) minmax\(0, 1fr\);/);
+  assert.match(stylesCSS, /\.activity-entry\[data-tone="error"\] strong/);
+  assert.match(stylesCSS, /\.workflow-panel \{[\s\S]*grid-column: 1 \/ -1;/);
+  assert.match(stylesCSS, /\.workflow-cards \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
+  assert.match(stylesCSS, /\.workflow-card \{[\s\S]*grid-template-rows: minmax\(0, 1fr\) auto;/);
+  assert.match(stylesCSS, /\.workflow-card-actions/);
+  assert.match(stylesCSS, /body\[data-workspace-view="study"\] \[data-workspace-card="play"\]/);
   assert.match(stylesCSS, /\.workspace-nav/);
   assert.match(stylesCSS, /\.workspace-nav button\[aria-selected="true"\]/);
   assert.match(stylesCSS, /body\[data-workspace-view="play"\] \[data-action-scope="study"\]/);
@@ -412,6 +489,10 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /@media \(max-width: 1240px\)/);
   assert.match(stylesCSS, /@media \(max-width: 760px\)/);
   assert.match(stylesCSS, /@media \(max-width: 520px\)/);
+  assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.workflow-cards \{[\s\S]*grid-template-columns: 1fr;/);
+  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.workflow-card-actions \{[\s\S]*grid-template-columns: 1fr 1fr;/);
+  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.activity-row \{[\s\S]*grid-template-columns: 1fr;/);
+  assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.app-activity \{[\s\S]*grid-template-columns: 1fr;/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.board-area \{[\s\S]*grid-template-rows: auto auto auto minmax\(96px, auto\);[\s\S]*min-height: 0;/);
   assert.match(stylesCSS, /\.board \{[\s\S]*width: min\(100%, calc\(100vw - 44px\)\);[\s\S]*max-height: none;/);
   assert.match(stylesCSS, /\.move-list \{[\s\S]*max-height: 160px;/);
