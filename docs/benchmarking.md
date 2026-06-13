@@ -22,3 +22,11 @@ JSON is the default output format. Use CSV for spreadsheet import or CI artifact
 go run ./cmd/noema64-bench -games 100 -format csv > benchmark.csv
 go run ./cmd/noema64-bench -modes -games 20 -format csv > mode-benchmark.csv
 ```
+
+Use `-out` to keep reproducible run artifacts while still printing the requested format to stdout:
+
+```sh
+go run ./cmd/noema64-bench -games 100 -seed 64 -out runs/pure_vs_random_001
+```
+
+The output directory contains `config.yaml`, `summary.json`, and `summary.csv`.
