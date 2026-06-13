@@ -428,6 +428,7 @@ async function withBusyControl(controlOrSelector, action) {
   const control = controlFrom(controlOrSelector);
   const key = busyKey(controlOrSelector, control);
   if (!control || busyControls.has(key)) return undefined;
+  const hadFocus = document.activeElement === control;
   const label = activityLabelFor(controlOrSelector, control);
   const marker = beginAppOperation(label);
   setControlBusy(controlOrSelector, true);
@@ -436,6 +437,9 @@ async function withBusyControl(controlOrSelector, action) {
   } finally {
     setControlBusy(controlOrSelector, false);
     finishAppOperation(marker);
+    if (hadFocus && document.activeElement === document.body) {
+      focusVisibleElement(control, true);
+    }
   }
 }
 

@@ -454,6 +454,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusDialogInitialControl(\"#recentList button:not(:disabled)\", \"#recentDialog button[value='cancel']\")",
     "focusDialogInitialControl(\"#promotionGrid button\")",
     "dialog:not([open])",
+    "const hadFocus = document.activeElement === control",
+    "hadFocus && document.activeElement === document.body",
     "[0, 80, 250, 750, 1250].forEach",
     "element.focus({ preventScroll: true })",
     "dialog button[value='cancel']",
