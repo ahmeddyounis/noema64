@@ -468,7 +468,23 @@ function formatMetric(value) {
 
 function formatStrategyAlerts(alerts) {
   if (!alerts?.length) return "None";
-  return alerts.map((alert) => `${alert.severity || "info"}: ${alert.message || alert.code}`).join("; ");
+  return alerts.map(formatStrategyAlert).filter(Boolean).join("; ") || "None";
+}
+
+function formatStrategyAlert(alert) {
+  if (typeof alert === "string") return alert;
+  if (!alert || typeof alert !== "object") return "";
+  const severity = alert.severity || "info";
+  const message = alert.message || humanizeToken(alert.code) || "Strategy alert";
+  return `${severity}: ${message}`;
+}
+
+function humanizeToken(value) {
+  return String(value || "")
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function renderDecision() {
@@ -487,7 +503,7 @@ function renderDecision() {
     const move = document.createElement("strong");
     move.textContent = c.san || c.uci;
     const detail = document.createElement("span");
-    detail.append(document.createTextNode(c.purpose || ""));
+    detail.append(document.createTextNode(candidatePurpose(c)));
     detail.append(document.createElement("br"));
     const meta = document.createElement("small");
     meta.textContent = `confidence ${formatScore(c.confidence)} · plan ${formatScore(c.plan_alignment_score)} · personality ${formatScore(c.personality_score)} · search ${formatScore(c.search_score)} · verifier ${c.verifier_score?.status || "not_checked"}`;
@@ -519,8 +535,20 @@ function tabText(dec) {
     case "prompt": return promptInspectorText(dec);
     case "raw": return JSON.stringify(dec, null, 2);
     default:
-      return `${dec.selected_move?.san || dec.selected_move?.uci}: ${dec.explanation}\n\n${dec.position_summary}\n\nFallback used: ${dec.fallback_used}\n\n${stageSummary(dec)}`;
+      return decisionSummaryText(dec);
   }
+}
+
+function decisionSummaryText(dec) {
+  const move = dec.selected_move?.san || dec.selected_move?.uci || "Selected move";
+  const explanation = dec.explanation || candidatePurpose((dec.candidate_moves || [])[0], "Explanation unavailable.");
+  const position = dec.position_summary || "Position summary unavailable.";
+  const fallback = dec.fallback_used ? `Yes${dec.fallback_reason ? `, ${dec.fallback_reason}` : ""}` : "No";
+  return `${move}: ${explanation}\n\n${position}\n\nFallback used: ${fallback}\n\n${stageSummary(dec)}`;
+}
+
+function candidatePurpose(candidate, fallback = "No candidate rationale recorded.") {
+  return candidate?.purpose || candidate?.rationale || candidate?.explanation || candidate?.expected_reply || fallback;
 }
 
 function promptInspectorText(dec) {
