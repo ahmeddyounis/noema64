@@ -362,6 +362,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "recordActivity",
     "renderActivityLog",
     "formatActivityTime",
+    "const formattedTime = formatActivityTime(event.at)",
+    "row.setAttribute(\"aria-label\", `${formattedTime} ${event.label}: ${messageText}`)",
     "openActivityHistory",
     "clearActivityHistory",
     "No recent activity.",
