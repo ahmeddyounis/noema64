@@ -94,6 +94,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
     "importDialog",
     "exportDialog",
     "recentDialog",
+    "refreshRecentBtn",
     "promotionDialog",
     "promotionGrid",
   ]) {
@@ -130,6 +131,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
   assert.match(indexHTML, /id="settingClockInitial" type="number" min="0"/);
   assert.match(indexHTML, /dialog id="settingsDialog" aria-labelledby="settingsTitle"/);
   assert.match(indexHTML, /dialog id="promotionDialog" aria-labelledby="promotionTitle"/);
+  assert.match(indexHTML, /id="refreshRecentBtn" value="none" type="button">Refresh/);
   assert.match(indexHTML, /id="recentList" class="recent-list" role="list" aria-label="Recent games" aria-live="polite"/);
   assert.match(indexHTML, /aria-keyshortcuts="N"/);
   assert.match(indexHTML, /aria-keyshortcuts="Space"/);
@@ -355,6 +357,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "primaryActionRequirements",
     "\"#newGameBtn\": \"service\"",
     "\"#settingsBtn\": \"service\"",
+    "\"#refreshRecentBtn\": \"service\"",
     "\"#engineBtn\": \"ongoing\"",
     "\"#stopBtn\": \"thinking\"",
     "\"#undoBtn\": \"moves\"",
@@ -377,6 +380,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "activityEvents",
     "maxActivityEvents",
     "operationLabels",
+    "\"#refreshRecentBtn\": \"Recent games refresh\"",
     "setAppActivity",
     "recordActivity",
     "renderActivityLog",
@@ -488,7 +492,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "focusDialogInitialControl(\"#refreshReviewBtn\")",
     "focusDialogInitialControl(loaded ? \"#studyMemoryText\" : \"#refreshStudyBtn\")",
     "focusDialogInitialControl(\"#providerDashboardBtn\")",
-    "focusDialogInitialControl(\"#recentList button:not(:disabled)\", \"#recentDialog button[value='cancel']\")",
+    "focusDialogInitialControl(\"#recentList button:not(:disabled)\", \"#refreshRecentBtn\")",
+    "focusDialogInitialControl(\"#refreshRecentBtn\")",
     "focusDialogInitialControl(\"#promotionGrid button\")",
     "dialog:not([open])",
     "const hadFocus = document.activeElement === control",
@@ -593,10 +598,11 @@ test("bundle wires core actions and renders trace metadata", () => {
     "importText.focus()",
     "importText.select?.()",
     "moveInput.value = \"\"",
+    "async function refreshRecentGames()",
+    "bindBusyButton(\"#refreshRecentBtn\", refreshRecentGames)",
     "renderRecentGamesEmpty",
     "Loading recent games...",
     "Recent games could not be loaded.",
-    "focusDialogInitialControl(\"#recentDialog button[value='cancel']\")",
     "Load ${title.textContent} from ${formatSavedAt(savedAt)}, ${outcomeStatus}",
     "row.setAttribute(\"role\", \"listitem\")",
     "Preparing export...",

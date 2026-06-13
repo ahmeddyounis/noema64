@@ -56,6 +56,7 @@ const primaryActionRequirements = {
   "#newGameBtn": "service",
   "#promptEditorBtn": "service",
   "#recentBtn": "service",
+  "#refreshRecentBtn": "service",
   "#resignBtn": "ongoing",
   "#reviewBtn": "game",
   "#settingsBtn": "service",
@@ -93,6 +94,7 @@ const operationLabels = {
   "#providerComparisonBtn": "Provider comparison",
   "#providerDashboardBtn": "Provider dashboard",
   "#refreshExportBtn": "Export refresh",
+  "#refreshRecentBtn": "Recent games refresh",
   "#refreshReviewBtn": "Review refresh",
   "#refreshStudyBtn": "Study refresh",
   "#reloadPromptBtn": "Prompt reload",
@@ -2741,19 +2743,26 @@ function renderRecentGamesEmpty(message) {
   list.appendChild(empty);
 }
 
-async function openRecentGames() {
+async function refreshRecentGames() {
   try {
     document.querySelector("#recentOutput").textContent = "";
     renderRecentGamesEmpty("Loading recent games...");
-    document.querySelector("#recentDialog").showModal();
     renderRecentGames(await call("RecentGames", 10));
-    focusDialogInitialControl("#recentList button:not(:disabled)", "#recentDialog button[value='cancel']");
+    focusDialogInitialControl("#recentList button:not(:disabled)", "#refreshRecentBtn");
     showSuccess("Recent games loaded.");
+    return true;
   } catch (err) {
     renderRecentGamesEmpty("Recent games could not be loaded.");
     showError(err, "#recentOutput");
-    focusDialogInitialControl("#recentDialog button[value='cancel']");
+    focusDialogInitialControl("#refreshRecentBtn");
+    return false;
   }
+}
+
+async function openRecentGames() {
+  const dialog = document.querySelector("#recentDialog");
+  if (!dialog.open) dialog.showModal();
+  await refreshRecentGames();
 }
 
 function activateTraceTab(btn, focus = false) {
@@ -2855,6 +2864,7 @@ document.querySelector("#settingProvider").addEventListener("change", () => {
   document.querySelector(selector).addEventListener("input", renderWorkflowPanel);
 });
 bindBusyButton("#recentBtn", openRecentGames);
+bindBusyButton("#refreshRecentBtn", refreshRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#analyzeBtn").addEventListener("click", analyzeCurrentPosition);
 bindBusyButton("#stopBtn", async () => {
