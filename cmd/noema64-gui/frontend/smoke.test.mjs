@@ -74,6 +74,10 @@ test("primary toolbar and dialogs expose expected controls", () => {
   ]) {
     assert.match(indexHTML, new RegExp(`aria-label="${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`), `missing aria-label for ${label}`);
   }
+  assert.match(indexHTML, /aria-label="Close dialog"/);
+  assert.match(indexHTML, /aria-keyshortcuts="N"/);
+  assert.match(indexHTML, /aria-keyshortcuts="Space"/);
+  assert.match(indexHTML, /title="Settings \(\,\)"/);
 });
 
 test("settings surface covers MVP and profile controls", () => {
@@ -252,4 +256,13 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);
   assert.match(stylesCSS, /\.candidate-arrow-head/);
   assert.doesNotMatch(stylesCSS, /marker-end/);
+});
+
+test("dialog and control styles stay usable on narrow screens", () => {
+  assert.match(stylesCSS, /button:focus-visible/);
+  assert.match(stylesCSS, /dialog > form/);
+  assert.match(stylesCSS, /position: sticky/);
+  assert.match(stylesCSS, /\.settings menu \{[\s\S]*flex-wrap: wrap;/);
+  assert.match(stylesCSS, /@media \(max-width: 520px\)/);
+  assert.match(stylesCSS, /\.settings menu button,\n  \.dialog-actions button \{[\s\S]*flex: 1 1 128px;/);
 });

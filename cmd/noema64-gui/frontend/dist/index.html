@@ -15,14 +15,14 @@
           <span>A chess engine that remembers what it is trying to do.</span>
         </div>
         <div class="toolbar">
-          <button id="newGameBtn" title="New game" aria-label="New game">N</button>
+          <button id="newGameBtn" title="New game (N)" aria-label="New game" aria-keyshortcuts="N">N</button>
           <button id="recentBtn" title="Recent games" aria-label="Recent games">◷</button>
-          <button id="engineBtn" title="Ask engine" aria-label="Ask engine">▶</button>
-          <button id="analyzeBtn" title="Analyze current position" aria-label="Analyze current position">◇</button>
+          <button id="engineBtn" title="Ask engine (Space)" aria-label="Ask engine" aria-keyshortcuts="Space">▶</button>
+          <button id="analyzeBtn" title="Analyze current position (A)" aria-label="Analyze current position" aria-keyshortcuts="A">◇</button>
           <button id="stopBtn" title="Stop thinking" aria-label="Stop thinking">■</button>
-          <button id="resignBtn" title="Resign" aria-label="Resign">⚑</button>
-          <button id="undoBtn" title="Undo" aria-label="Undo">↶</button>
-          <button id="flipBtn" title="Flip board" aria-label="Flip board">⇅</button>
+          <button id="resignBtn" title="Resign (R)" aria-label="Resign" aria-keyshortcuts="R">⚑</button>
+          <button id="undoBtn" title="Undo (U)" aria-label="Undo" aria-keyshortcuts="U">↶</button>
+          <button id="flipBtn" title="Flip board (F)" aria-label="Flip board" aria-keyshortcuts="F">⇅</button>
           <button id="reviewBtn" title="Post-game review" aria-label="Post-game review">◎</button>
           <button id="studyBtn" title="Study tools" aria-label="Study tools">※</button>
           <button id="experimentsBtn" title="Experiments" aria-label="Experiments">Σ</button>
@@ -30,7 +30,7 @@
           <button id="promptEditorBtn" title="Prompt editor" aria-label="Prompt editor">✎</button>
           <button id="importBtn" title="Import PGN or FEN" aria-label="Import PGN or FEN">⇧</button>
           <button id="exportBtn" title="Export PGN" aria-label="Export PGN">⇩</button>
-          <button id="settingsBtn" title="Settings" aria-label="Settings">⚙</button>
+          <button id="settingsBtn" title="Settings (,)" aria-label="Settings" aria-keyshortcuts=",">⚙</button>
         </div>
       </header>
 
@@ -79,7 +79,7 @@
         <form method="dialog" class="settings">
           <header>
             <h2>Settings</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <label>Mode
             <select id="settingMode">
@@ -192,7 +192,7 @@
         <form method="dialog">
           <header>
             <h2>Post-game Review</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
             <button id="refreshReviewBtn" value="none" type="button">Refresh</button>
@@ -205,7 +205,7 @@
         <form method="dialog" class="experiments">
           <header>
             <h2>Experiments</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
             <button id="providerDashboardBtn" value="none" type="button">Providers</button>
@@ -223,7 +223,7 @@
         <form method="dialog" class="prompt-editor">
           <header>
             <h2>Prompt Editor</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <label>Source <input id="promptSource" readonly /></label>
           <label>Save directory <input id="promptSaveDir" placeholder="~/noema64-prompts/v1" /></label>
@@ -245,7 +245,7 @@
         <form method="dialog" class="profiles-editor">
           <header>
             <h2>Provider Profiles</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
             <button id="exportProfilesBtn" value="none" type="button">Export</button>
@@ -260,7 +260,7 @@
         <form method="dialog" class="study-tools">
           <header>
             <h2>Study</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <menu class="dialog-actions">
             <button id="refreshStudyBtn" value="none" type="button">Refresh</button>
@@ -276,7 +276,7 @@
         <form method="dialog" class="lab-tools">
           <header>
             <h2>Lab</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div class="lab-grid">
             <label>Backup directory <input id="backupDir" placeholder="logs/backups" /></label>
@@ -309,7 +309,7 @@
         <form method="dialog">
           <header>
             <h2>Export</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div class="export-controls">
             <label>Type
@@ -331,7 +331,7 @@
         <form method="dialog">
           <header>
             <h2>Import Position</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div class="import-controls">
             <label>Type
@@ -351,7 +351,7 @@
         <form method="dialog">
           <header>
             <h2>Recent Games</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div id="recentList" class="recent-list"></div>
           <pre id="recentOutput"></pre>
@@ -362,7 +362,7 @@
         <form method="dialog" class="promotion">
           <header>
             <h2>Promote</h2>
-            <button value="cancel" title="Close">×</button>
+            <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <div id="promotionGrid" class="promotion-grid"></div>
         </form>

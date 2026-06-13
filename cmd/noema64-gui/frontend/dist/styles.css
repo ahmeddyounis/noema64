@@ -19,6 +19,7 @@ input,
 select,
 textarea {
   font: inherit;
+  min-width: 0;
 }
 
 button {
@@ -33,6 +34,14 @@ button {
 
 button:hover {
   background: #eef2f7;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #1e5fbf;
+  outline-offset: 2px;
 }
 
 .topbar {
@@ -353,7 +362,14 @@ dialog {
   border: 1px solid #cdd4df;
   border-radius: 8px;
   width: min(640px, 92vw);
+  max-height: calc(100vh - 32px);
+  overflow: hidden;
   padding: 0;
+}
+
+dialog > form {
+  max-height: calc(100vh - 34px);
+  overflow: auto;
 }
 
 #experimentsDialog,
@@ -371,11 +387,19 @@ dialog header {
   align-items: center;
   padding: 12px;
   border-bottom: 1px solid #e1e6ee;
+  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 dialog h2 {
   margin: 0;
   font-size: 16px;
+}
+
+dialog header button {
+  flex: 0 0 auto;
 }
 
 .settings {
@@ -387,6 +411,7 @@ dialog h2 {
 .prompt-editor label {
   display: grid;
   gap: 4px;
+  min-width: 0;
   padding: 0 12px;
 }
 
@@ -532,6 +557,7 @@ dialog h2 {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  flex-wrap: wrap;
   padding: 12px;
   margin: 0;
 }
@@ -617,5 +643,26 @@ textarea {
 
   .board-area {
     min-height: 620px;
+  }
+}
+
+@media (max-width: 520px) {
+  dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+
+  dialog > form {
+    max-height: calc(100vh - 26px);
+  }
+
+  .settings menu,
+  .dialog-actions {
+    justify-content: stretch;
+  }
+
+  .settings menu button,
+  .dialog-actions button {
+    flex: 1 1 128px;
   }
 }
