@@ -463,6 +463,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Engine move applied.",
     "Position imported.",
     "Settings saved.",
+    "Settings could not be loaded.",
     "Export canceled.",
     "showExportCanceled",
     "finishExport",

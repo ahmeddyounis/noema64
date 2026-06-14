@@ -3161,6 +3161,7 @@ async function init() {
     await loadSettings();
   } catch (err) {
     settings = null;
+    setAppActivity("Needs attention", `Settings could not be loaded. ${appErrorMessage(err)}`, "error");
   }
   await refresh();
 }
