@@ -3,9 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const dist = new URL("./dist/", import.meta.url);
-const indexHTML = await readFile(new URL("index.html", dist), "utf8");
-const appJS = await readFile(new URL("app.js", dist), "utf8");
-const stylesCSS = await readFile(new URL("styles.css", dist), "utf8");
+function normalizeSourceText(value) {
+  return value.replace(/\r\n?/g, "\n");
+}
+
+const indexHTML = normalizeSourceText(await readFile(new URL("index.html", dist), "utf8"));
+const appJS = normalizeSourceText(await readFile(new URL("app.js", dist), "utf8"));
+const stylesCSS = normalizeSourceText(await readFile(new URL("styles.css", dist), "utf8"));
 
 function expectMarkupID(id) {
   assert.match(indexHTML, new RegExp(`id="${id}"`), `missing #${id}`);
@@ -13,6 +17,22 @@ function expectMarkupID(id) {
 
 function expectScriptToken(token) {
   assert.ok(appJS.includes(token), `missing script token ${token}`);
+}
+
+function expectScriptPattern(pattern, label) {
+  assert.ok(pattern.test(appJS), `missing script pattern: ${label}`);
+}
+
+function expectStylePattern(pattern, label) {
+  assert.ok(pattern.test(stylesCSS), `missing style pattern: ${label}`);
+}
+
+function expectScriptPatternAbsent(pattern, label) {
+  assert.ok(!pattern.test(appJS), `unexpected script pattern: ${label}`);
+}
+
+function expectStylePatternAbsent(pattern, label) {
+  assert.ok(!pattern.test(stylesCSS), `unexpected style pattern: ${label}`);
 }
 
 test("main GUI screen exposes critical panels", () => {
@@ -143,7 +163,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
   assert.match(indexHTML, /title="Settings \(\,\)"/);
 });
 
-test("settings surface covers MVP and profile controls", () => {
+test("settings surface covers provider and profile controls", () => {
   for (const id of [
     "settingMode",
     "playModeSelect",
@@ -709,32 +729,33 @@ test("bundle wires core actions and renders trace metadata", () => {
   ]) {
     expectScriptToken(token);
   }
-  assert.match(appJS, /const decision = await call\("AnalyzeCurrentPosition"\);[\s\S]*state\.last_decision = decision;[\s\S]*renderStatus\(\);[\s\S]*renderBoard\(\);[\s\S]*renderDecision\(\);/);
-  assert.match(appJS, /--board-files/);
-  assert.match(appJS, /--board-ranks/);
-  assert.match(appJS, /aria-rowcount/);
-  assert.match(appJS, /aria-colindex/);
-  assert.match(appJS, /row\.className = "board-row"/);
-  assert.match(appJS, /row\.setAttribute\("role", "row"\)/);
-  assert.match(appJS, /row\.setAttribute\("aria-rowindex", "1"\)/);
-  assert.match(appJS, /empty\.setAttribute\("role", "gridcell"\)/);
-  assert.match(appJS, /empty\.setAttribute\("aria-colspan", "8"\)/);
-  assert.match(appJS, /board\.setAttribute\("aria-label", message\)/);
-  assert.match(appJS, /board\.setAttribute\("aria-label", "Chess board"\)/);
-  assert.match(appJS, /"openai", "openai_compatible", "anthropic", "gemini", "ollama"/);
-  assert.match(appJS, /openAIEndpoint = "https:\/\/api\.openai\.com\/v1"/);
-  assert.match(appJS, /settings\.llm\.provider === "openai" \? "" : document\.querySelector\("#settingEndpoint"\)\.value/);
-  assert.match(appJS, /initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/);
-  assert.match(appJS, /bindBusyButton\("#runImportBtn"/);
-  assert.match(appJS, /showExportError\(err\)/);
-  assert.doesNotMatch(appJS, /\.at\(/);
-  assert.match(appJS, /async function squareClicked\(sq, fromKeyboard = false\) \{[\s\S]*state\.snapshot\.outcome\?\.status !== "ongoing"[\s\S]*selected = null;[\s\S]*focusBoardSquare\(sq\);[\s\S]*return;/);
-  assert.match(appJS, /async function playFromTo\(from, to\) \{[\s\S]*state\.snapshot\.outcome\?\.status !== "ongoing"[\s\S]*selected = null;[\s\S]*focusBoardSquare\(to\);[\s\S]*return;/);
-  assert.match(appJS, /async function whyNotMove\(\)[\s\S]*call\("WhyNotMove", move\)[\s\S]*catch \(err\) \{\n      markFieldInvalid\(moveInput\);\n      showError\(err\);\n      focusMoveInput\(true\);/);
-  assert.match(appJS, /target\.closest\("dialog\[open\]"\)/);
-  assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);
-  assert.match(stylesCSS, /\.candidate-arrow-head/);
-  assert.doesNotMatch(stylesCSS, /marker-end/);
+  expectScriptPattern(/const decision = await call\("AnalyzeCurrentPosition"\);[\s\S]*state\.last_decision = decision;[\s\S]*renderStatus\(\);[\s\S]*renderBoard\(\);[\s\S]*renderDecision\(\);/, "analysis refreshes trace and board");
+  expectScriptPattern(/function bindWorkspaceNavigation\(\)[\s\S]*event\.key === "Home"[\s\S]*setWorkspaceView\(workspaceViews\[0\], true\)[\s\S]*event\.key === "End"[\s\S]*setWorkspaceView\(workspaceViews\[workspaceViews\.length - 1\], true\)/, "workspace tabs support Home and End keys");
+  expectScriptPattern(/--board-files/, "board file count CSS variable");
+  expectScriptPattern(/--board-ranks/, "board rank count CSS variable");
+  expectScriptPattern(/aria-rowcount/, "board row count ARIA");
+  expectScriptPattern(/aria-colindex/, "board column index ARIA");
+  expectScriptPattern(/row\.className = "board-row"/, "board row class");
+  expectScriptPattern(/row\.setAttribute\("role", "row"\)/, "board row role");
+  expectScriptPattern(/row\.setAttribute\("aria-rowindex", "1"\)/, "empty board row index");
+  expectScriptPattern(/empty\.setAttribute\("role", "gridcell"\)/, "empty board gridcell");
+  expectScriptPattern(/empty\.setAttribute\("aria-colspan", "8"\)/, "empty board colspan");
+  expectScriptPattern(/board\.setAttribute\("aria-label", message\)/, "empty board label");
+  expectScriptPattern(/board\.setAttribute\("aria-label", "Chess board"\)/, "loaded board label");
+  expectScriptPattern(/"openai", "openai_compatible", "anthropic", "gemini", "ollama"/, "supported provider list");
+  expectScriptPattern(/openAIEndpoint = "https:\/\/api\.openai\.com\/v1"/, "OpenAI default endpoint");
+  expectScriptPattern(/settings\.llm\.provider === "openai" \? "" : document\.querySelector\("#settingEndpoint"\)\.value/, "OpenAI endpoint remains implicit");
+  expectScriptPattern(/initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/, "time control initial minutes");
+  expectScriptPattern(/bindBusyButton\("#runImportBtn"/, "import busy state binding");
+  expectScriptPattern(/showExportError\(err\)/, "export error handling");
+  expectScriptPatternAbsent(/\.at\(/, "Array.prototype.at is avoided for embedded WebView compatibility");
+  expectScriptPattern(/async function squareClicked\(sq, fromKeyboard = false\) \{[\s\S]*state\.snapshot\.outcome\?\.status !== "ongoing"[\s\S]*selected = null;[\s\S]*focusBoardSquare\(sq\);[\s\S]*return;/, "square click blocks finished games");
+  expectScriptPattern(/async function playFromTo\(from, to\) \{[\s\S]*state\.snapshot\.outcome\?\.status !== "ongoing"[\s\S]*selected = null;[\s\S]*focusBoardSquare\(to\);[\s\S]*return;/, "drag/drop blocks finished games");
+  expectScriptPattern(/async function whyNotMove\(\)[\s\S]*call\("WhyNotMove", move\)[\s\S]*catch \(err\) \{\s+markFieldInvalid\(moveInput\);\s+showError\(err\);\s+focusMoveInput\(true\);/, "why-not move error focuses input");
+  expectScriptPattern(/target\.closest\("dialog\[open\]"\)/, "global shortcuts ignore open dialogs");
+  expectScriptPattern(/input, textarea, select, button, a, \[role='button'\]/, "global shortcuts ignore controls");
+  expectStylePattern(/\.candidate-arrow-head/, "CSS arrow head fallback");
+  expectStylePatternAbsent(/marker-end/, "SVG marker arrows are not used");
 });
 
 test("dialog and control styles stay usable on narrow screens", () => {
