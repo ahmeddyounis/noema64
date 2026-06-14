@@ -386,6 +386,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "\"#settingsBtn\": \"service\"",
     "\"#refreshRecentBtn\": \"service\"",
     "\"#engineBtn\": \"ongoing\"",
+    "\"#whyBtn\": \"ongoing\"",
     "\"#stopBtn\": \"thinking\"",
     "\"#undoBtn\": \"moves\"",
     "setPrimaryActionAvailability(snapshot)",

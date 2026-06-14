@@ -64,7 +64,7 @@ const primaryActionRequirements = {
   "#stopBtn": "thinking",
   "#studyBtn": "game",
   "#undoBtn": "moves",
-  "#whyBtn": "game"
+  "#whyBtn": "ongoing"
 };
 const operationLabels = {
   "#accessibilityAuditBtn": "Accessibility audit",
