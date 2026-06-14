@@ -1849,6 +1849,7 @@ const settingsSaveErrorFields = [
   [/llm\.model|model/i, "#settingModel"],
   [/llm\.temperature|temperature/i, "#settingTemperature"],
   [/llm\.timeout_ms|llm timeout/i, "#settingTimeout"],
+  [/llm\.retries|retries/i, "#settingRetries"],
   [/verifier\.movetime_ms|verifier movetime|movetime/i, "#settingVerifierMoveTime"],
   [/verifier\.max_centipawn_loss|max centipawn loss/i, "#settingVerifierMaxLoss"],
   [/tablebase_path|tablebase path/i, "#settingTablebasePath"],
@@ -1899,7 +1900,7 @@ async function saveSettings() {
       settings.llm.temperature = Number(document.querySelector("#settingTemperature").value);
       settings.llm.max_tokens = Number(document.querySelector("#settingMaxTokens").value) || settings.llm.max_tokens;
       settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
-      settings.llm.retries = Number(document.querySelector("#settingRetries").value) || 0;
+      settings.llm.retries = requireIntegerField("#settingRetries", "Retries", 0, 5);
       settings.llm.api_key = document.querySelector("#settingKey").value;
       settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
       const cloudAck = document.querySelector("#settingCloudAck");
