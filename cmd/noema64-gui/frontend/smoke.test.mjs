@@ -266,6 +266,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "promptPackFromInputs",
     "button.setAttribute(\"aria-label\", label)",
     "parseJSONField(\"#promptSchema\", \"Prompt output schema\")",
+    "requireIntegerField(\"#settingMaxCandidates\", \"Max candidates\", 1, 10)",
     "requireIntegerField(\"#tournamentGames\", \"Tournament games\", 1, 20)",
     "must be a whole number between ${min} and ${max}.",
     "promptValidationErrorMessage",

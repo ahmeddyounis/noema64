@@ -1887,7 +1887,7 @@ async function saveSettings() {
       settings.engine.default_mode = document.querySelector("#settingMode").value;
       settings.engine.personality = document.querySelector("#settingPersonality").value;
       settings.engine.custom_personality_id = document.querySelector("#settingCustomPersonality").value;
-      settings.engine.max_candidates = Number(document.querySelector("#settingMaxCandidates").value) || settings.engine.max_candidates;
+      settings.engine.max_candidates = requireIntegerField("#settingMaxCandidates", "Max candidates", 1, 10);
       settings.gui.theme = document.querySelector("#settingTheme").value || "system";
       settings.gui.time_control = document.querySelector("#settingTimeControl").value;
       settings.gui.clock_initial_ms = timeControl.initial_ms;
