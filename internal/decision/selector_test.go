@@ -79,6 +79,69 @@ func TestCurrentModeUsesSearchAndResetsStrategyMemory(t *testing.T) {
 	}
 }
 
+func TestChooseMovePassesCurrentGameContextToProvider(t *testing.T) {
+	game := chesscore.NewGame()
+	if _, err := game.ApplyUCI("e2e4"); err != nil {
+		t.Fatalf("apply opening move: %v", err)
+	}
+	game.AnnotateLastMove("Plan: stale comment should not reach the provider prompt")
+	provider := &capturingProvider{}
+	clock := map[string]int64{"white_ms": 298000, "black_ms": 300000, "increment_ms": 1000}
+
+	dec, err := ChooseMove(context.Background(), Request{
+		Game:          game,
+		Variant:       chesscore.StandardStart(game.InitialFEN()),
+		Clock:         clock,
+		Memory:        strategy.NewMemory(game.ID(), "black"),
+		Mode:          strategy.ModeCurrent,
+		Provider:      provider,
+		Verifier:      verifier.LegalOnlyVerifier{},
+		Model:         "capture",
+		MaxCandidates: 2,
+		Timeout:       time.Second,
+		LogRawPrompts: true,
+	})
+	if err != nil {
+		t.Fatalf("ChooseMove error = %v", err)
+	}
+	if provider.request.Metadata["fen"] != game.FEN() {
+		t.Fatalf("metadata fen = %q, want current %q", provider.request.Metadata["fen"], game.FEN())
+	}
+	wantMetadata := map[string]string{
+		"side_to_move": "black",
+		"ply":          "1",
+		"move_number":  "1",
+		"mode":         "current",
+		"variant":      "standard",
+	}
+	for key, want := range wantMetadata {
+		if got := provider.request.Metadata[key]; got != want {
+			t.Fatalf("metadata[%s] = %q, want %q", key, got, want)
+		}
+	}
+	if dec.FENBefore != game.FEN() || dec.LegalMovesCount != len(game.LegalMoves()) {
+		t.Fatalf("decision current context mismatch: fen=%q legal=%d", dec.FENBefore, dec.LegalMovesCount)
+	}
+	userPrompt := provider.request.User
+	for _, want := range []string{
+		game.FEN(),
+		`"side_to_move": "black"`,
+		`"ply": 1`,
+		`"variant": "standard"`,
+		`"white_ms": 298000`,
+		`"black_ms": 300000`,
+		`"increment_ms": 1000`,
+		"ENGINE_MODE\ncurrent",
+	} {
+		if !strings.Contains(userPrompt, want) {
+			t.Fatalf("provider prompt missing %q:\n%s", want, userPrompt)
+		}
+	}
+	if strings.Contains(userPrompt, "Plan: stale") {
+		t.Fatalf("provider prompt leaked PGN comment:\n%s", userPrompt)
+	}
+}
+
 func TestPureScoringIgnoresSearchScore(t *testing.T) {
 	candidates := []strategy.CandidateMove{
 		{UCI: "a2a3", Purpose: "high confidence", LLMConfidence: 0.9, SearchScore: -1},
@@ -327,6 +390,10 @@ type scriptedProvider struct {
 	moves []strategy.CandidateMove
 }
 
+type capturingProvider struct {
+	request providers.CompletionRequest
+}
+
 type countingVerifier struct {
 	calls *int
 }
@@ -379,4 +446,40 @@ func (p scriptedProvider) CompleteJSON(ctx context.Context, req providers.Comple
 		Model:        req.Model,
 		RawAvailable: true,
 	}, nil
+}
+
+func (p *capturingProvider) Name() string {
+	return "capturing"
+}
+
+func (p *capturingProvider) Capabilities() providers.Capabilities {
+	return providers.Capabilities{SupportsJSONMode: true, SupportsCancellation: true}
+}
+
+func (p *capturingProvider) HealthCheck(ctx context.Context) error {
+	return ctx.Err()
+}
+
+func (p *capturingProvider) CompleteJSON(ctx context.Context, req providers.CompletionRequest) (*providers.CompletionResponse, error) {
+	p.request = req
+	legal := strings.Split(req.Metadata["legal_moves"], ",")
+	move := strings.TrimSpace(legal[0])
+	out := strategy.DecisionOutput{
+		SchemaVersion:      strategy.DecisionSchemaVersion,
+		PreviousPlanStatus: "new",
+		PositionSummary:    "Captured current context.",
+		StrategyUpdate: strategy.StrategyUpdate{
+			PlanSummary:       "Use current context.",
+			Phase:             "opening",
+			OpponentPlanGuess: "Opponent develops.",
+			Confidence:        0.7,
+			LastUpdateSummary: "Context captured.",
+		},
+		CandidateMoves: []strategy.CandidateMove{{UCI: move, Purpose: "First legal move from captured metadata.", LLMConfidence: 0.7}},
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return nil, err
+	}
+	return &providers.CompletionResponse{Text: string(b), Provider: p.Name(), Model: req.Model, RawAvailable: true}, nil
 }

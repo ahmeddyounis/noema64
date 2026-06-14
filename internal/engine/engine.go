@@ -210,6 +210,8 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	start := time.Now()
 	req := decision.Request{
 		Game:               e.game.Clone(),
+		Variant:            chesscore.NormalizeVariantStart(e.variant, e.game.InitialFEN()),
+		Clock:              promptClock(e.clock),
 		Memory:             e.memory,
 		Mode:               e.opts.Mode,
 		Personality:        e.opts.Personality,
@@ -304,6 +306,8 @@ func (e *Engine) AnalyzePosition(ctx context.Context) (*decision.MoveDecision, e
 	e.activeID = activeID
 	req := decision.Request{
 		Game:               e.game.Clone(),
+		Variant:            chesscore.NormalizeVariantStart(e.variant, e.game.InitialFEN()),
+		Clock:              promptClock(e.clock),
 		Memory:             e.memory,
 		Mode:               e.opts.Mode,
 		Personality:        e.opts.Personality,
@@ -677,6 +681,17 @@ func newClock(tc TimeControl) ClockState {
 		WhiteMS:     tc.InitialMS,
 		BlackMS:     tc.InitialMS,
 		IncrementMS: increment,
+	}
+}
+
+func promptClock(clock ClockState) map[string]int64 {
+	if !clock.Enabled {
+		return nil
+	}
+	return map[string]int64{
+		"white_ms":     clock.WhiteMS,
+		"black_ms":     clock.BlackMS,
+		"increment_ms": clock.IncrementMS,
 	}
 }
 

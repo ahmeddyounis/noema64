@@ -51,6 +51,12 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 
 	snapshot := req.Game.Snapshot()
 	features := req.Game.Features()
+	variant := req.Variant
+	if variant.Variant == "" {
+		variant = chesscore.StandardStart(snapshot.FEN)
+	}
+	variant = chesscore.NormalizeVariantStart(variant, snapshot.FEN)
+	moveNumber := snapshot.Ply/2 + 1
 	stages.setGameID(snapshot.GameID)
 	readStage.finish("completed", fmt.Sprintf("%d legal moves found.", len(legal)))
 	memBefore := memoryForMode(req.Mode, req.Memory, snapshot, features)
@@ -64,10 +70,12 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		FEN:                snapshot.FEN,
 		PGN:                snapshot.PGN,
 		SideToMove:         snapshot.SideToMove,
-		MoveNumber:         snapshot.Ply/2 + 1,
+		MoveNumber:         moveNumber,
 		LastOpponentMove:   lastMove(snapshot.MoveHistory),
 		LegalMoves:         legal,
 		Features:           features,
+		Variant:            variant,
+		Clock:              req.Clock,
 		PreviousMemory:     memBefore,
 		Mode:               req.Mode,
 		Personality:        req.Personality,
@@ -95,6 +103,11 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 			"max_candidates": strconv.Itoa(req.MaxCandidates),
 			"game_id":        snapshot.GameID,
 			"fen":            snapshot.FEN,
+			"side_to_move":   snapshot.SideToMove,
+			"ply":            strconv.Itoa(snapshot.Ply),
+			"move_number":    strconv.Itoa(moveNumber),
+			"mode":           string(req.Mode),
+			"variant":        string(variant.Variant),
 		},
 	})
 	providerMS := time.Since(providerStart).Milliseconds()

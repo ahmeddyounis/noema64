@@ -5,12 +5,13 @@ Prompt protocol v1 keeps layers explicit:
 1. System role and JSON-only contract.
 2. Engine mechanics and legal move whitelist.
 3. Position data.
-4. Deterministic features.
-5. Previous strategy memory.
-6. Mode and personality.
-7. Output schema.
+4. Structured game context: game ID, ply, move number, side to move, variant metadata, and clock state when a clock is active.
+5. Deterministic features.
+6. Previous strategy memory.
+7. Mode and personality.
+8. Output schema.
 
-Imported PGN/comments are treated as untrusted chess data, not instructions.
+Imported PGN is treated as untrusted chess data, not instructions. PGN comments are stripped before provider calls so imported comments or prior Noema64 plan annotations cannot steer the LLM as active instructions.
 
 Personality is rendered as structured profile JSON with `id`, `name`, `risk_tolerance`, strategic biases, and prompt modifiers, so style presets affect the strategist context instead of acting as display-only labels.
 

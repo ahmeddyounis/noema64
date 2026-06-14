@@ -5,6 +5,9 @@ Side to move: {{side_to_move}}
 Move number: {{move_number}}
 Last opponent move: {{last_opponent_move}}
 
+GAME_CONTEXT
+{{game_context_json}}
+
 LEGAL_MOVES
 {{legal_moves_json}}
 
@@ -22,4 +25,3 @@ PERSONALITY
 
 OUTPUT_SCHEMA
 {{schema_json}}
-

@@ -263,6 +263,50 @@ func TestAnalyzePositionDoesNotMutateGameState(t *testing.T) {
 	}
 }
 
+func TestEnginePassesVariantAndClockContextToProvider(t *testing.T) {
+	provider := &promptCaptureProvider{}
+	e := New(Options{
+		Mode:          strategy.ModeCurrent,
+		Provider:      provider,
+		LogRawPrompts: true,
+	})
+	initial, err := e.NewGame(context.Background(), NewGameOptions{
+		Side:        "white",
+		Variant:     chesscore.VariantChess960,
+		Seed:        17,
+		TimeControl: TimeControl{InitialMS: 300000, IncrementMS: 2000},
+	})
+	if err != nil {
+		t.Fatalf("new game: %v", err)
+	}
+	dec, _, err := e.ChooseMove(context.Background())
+	if err != nil {
+		t.Fatalf("choose move: %v", err)
+	}
+	if provider.request.Metadata["fen"] != initial.Snapshot.FEN {
+		t.Fatalf("provider fen = %q, want initial %q", provider.request.Metadata["fen"], initial.Snapshot.FEN)
+	}
+	if provider.request.Metadata["variant"] != "chess960" || provider.request.Metadata["side_to_move"] != "white" || provider.request.Metadata["mode"] != "current" {
+		t.Fatalf("provider metadata missing runtime context: %+v", provider.request.Metadata)
+	}
+	userPrompt := provider.request.User
+	for _, want := range []string{
+		`"variant": "chess960"`,
+		`"seed": 17`,
+		`"white_ms": 300000`,
+		`"black_ms": 300000`,
+		`"increment_ms": 2000`,
+		initial.Snapshot.FEN,
+	} {
+		if !strings.Contains(userPrompt, want) {
+			t.Fatalf("provider prompt missing %q:\n%s", want, userPrompt)
+		}
+	}
+	if dec.Provider.RawPrompt == nil || !strings.Contains(dec.Provider.RawPrompt.User, `"variant": "chess960"`) {
+		t.Fatalf("raw prompt did not preserve runtime context: %+v", dec.Provider.RawPrompt)
+	}
+}
+
 func TestEngineStateIncludesFeaturesAndStrategyMetrics(t *testing.T) {
 	e := New(Options{Provider: providers.MockProvider{}})
 	initial, err := e.State(context.Background())
@@ -417,6 +461,10 @@ type lateProvider struct {
 	release chan struct{}
 }
 
+type promptCaptureProvider struct {
+	request providers.CompletionRequest
+}
+
 func (p *lateProvider) Name() string {
 	return "late"
 }
@@ -433,6 +481,23 @@ func (p *lateProvider) CompleteJSON(ctx context.Context, req providers.Completio
 	close(p.started)
 	<-p.release
 	return providers.MockProvider{}.CompleteJSON(context.Background(), req)
+}
+
+func (p *promptCaptureProvider) Name() string {
+	return "prompt-capture"
+}
+
+func (p *promptCaptureProvider) Capabilities() providers.Capabilities {
+	return providers.MockProvider{}.Capabilities()
+}
+
+func (p *promptCaptureProvider) HealthCheck(ctx context.Context) error {
+	return ctx.Err()
+}
+
+func (p *promptCaptureProvider) CompleteJSON(ctx context.Context, req providers.CompletionRequest) (*providers.CompletionResponse, error) {
+	p.request = req
+	return providers.MockProvider{}.CompleteJSON(ctx, req)
 }
 
 func containsLegalMove(moves []chesscore.LegalMove, uci string) bool {

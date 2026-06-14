@@ -11,6 +11,8 @@ import (
 
 type Request struct {
 	Game               *chesscore.Game
+	Variant            chesscore.VariantStart
+	Clock              map[string]int64
 	Memory             strategy.StrategyMemory
 	Mode               strategy.EngineMode
 	Personality        strategy.Personality

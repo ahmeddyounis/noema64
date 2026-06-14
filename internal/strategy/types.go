@@ -195,6 +195,7 @@ type StrategyRequest struct {
 	LastOpponentMove   string                   `json:"last_opponent_move"`
 	LegalMoves         []chesscore.LegalMove    `json:"legal_moves"`
 	Features           chesscore.FeatureSummary `json:"features"`
+	Variant            chesscore.VariantStart   `json:"variant"`
 	PreviousMemory     StrategyMemory           `json:"previous_memory"`
 	Mode               EngineMode               `json:"mode"`
 	Personality        Personality              `json:"personality"`
