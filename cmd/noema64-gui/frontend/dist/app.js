@@ -812,6 +812,19 @@ function requireField(selector, message) {
   throw new Error(message);
 }
 
+function requireIntegerField(selector, label, min, max) {
+  const field = document.querySelector(selector);
+  const value = Number(String(field?.value || "").trim());
+  if (Number.isInteger(value) && value >= min && value <= max) {
+    clearFieldInvalid(field);
+    return value;
+  }
+  markFieldInvalid(field);
+  field?.focus();
+  field?.select?.();
+  throw new Error(`${label} must be a whole number between ${min} and ${max}.`);
+}
+
 function markFieldInvalid(field) {
   if (!field) return;
   field.setAttribute("aria-invalid", "true");
@@ -2410,7 +2423,7 @@ async function exportFineTuneWorkflow() {
 
 async function runTournamentFromLab() {
   try {
-    const games = Number(document.querySelector("#tournamentGames").value) || 1;
+    const games = requireIntegerField("#tournamentGames", "Tournament games", 1, 20);
     document.querySelector("#labOutput").textContent = "Running tournament...";
     document.querySelector("#labOutput").textContent = renderTournament(await call("RunTournament", games, 64));
     showSuccess("Tournament complete.");
