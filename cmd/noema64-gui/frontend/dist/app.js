@@ -1941,11 +1941,11 @@ async function saveSettings() {
       clearFieldInvalid(cloudAck);
       settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
       settings.verifier.path = document.querySelector("#settingVerifierPath").value;
-      settings.verifier.movetime_ms = Number(document.querySelector("#settingVerifierMoveTime").value) || settings.verifier.movetime_ms;
-      settings.verifier.max_centipawn_loss = Number(document.querySelector("#settingVerifierMaxLoss").value) || settings.verifier.max_centipawn_loss;
+      settings.verifier.movetime_ms = requireIntegerMinField("#settingVerifierMoveTime", "Verifier movetime ms", 10);
+      settings.verifier.max_centipawn_loss = requireIntegerMinField("#settingVerifierMaxLoss", "Max centipawn loss", 0);
       settings.verifier.tablebase_enabled = document.querySelector("#settingTablebase").checked;
       settings.verifier.tablebase_path = document.querySelector("#settingTablebasePath").value;
-      settings.verifier.tablebase_timeout_ms = Number(document.querySelector("#settingTablebaseTimeout").value) || settings.verifier.tablebase_timeout_ms || 1000;
+      settings.verifier.tablebase_timeout_ms = requireIntegerField("#settingTablebaseTimeout", "Tablebase timeout ms", 50, 10000);
       settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
       settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
       settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
