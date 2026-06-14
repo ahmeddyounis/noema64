@@ -307,6 +307,34 @@ func TestEnginePassesVariantAndClockContextToProvider(t *testing.T) {
 	}
 }
 
+func TestEnginePassesPlayerLastMoveToProvider(t *testing.T) {
+	provider := &promptCaptureProvider{}
+	e := New(Options{
+		Mode:          strategy.ModeCurrent,
+		Provider:      provider,
+		LogRawPrompts: true,
+	})
+	if _, err := e.ApplyUserMove(context.Background(), "e2e4"); err != nil {
+		t.Fatalf("user move: %v", err)
+	}
+	dec, _, err := e.ChooseMove(context.Background())
+	if err != nil {
+		t.Fatalf("choose move: %v", err)
+	}
+	if provider.request.Metadata["side_to_move"] != "black" {
+		t.Fatalf("side_to_move metadata = %q, want black", provider.request.Metadata["side_to_move"])
+	}
+	if provider.request.Metadata["last_opponent_move"] != "e2e4" {
+		t.Fatalf("last_opponent_move metadata = %q, want e2e4", provider.request.Metadata["last_opponent_move"])
+	}
+	if !strings.Contains(provider.request.User, "Last opponent move: BEGIN_UNTRUSTED_CHESS_TEXT\ne2e4") {
+		t.Fatalf("provider prompt missing player last move:\n%s", provider.request.User)
+	}
+	if dec.FENBefore != provider.request.Metadata["fen"] {
+		t.Fatalf("decision/provider fen mismatch: decision=%q metadata=%q", dec.FENBefore, provider.request.Metadata["fen"])
+	}
+}
+
 func TestEngineStateIncludesFeaturesAndStrategyMetrics(t *testing.T) {
 	e := New(Options{Provider: providers.MockProvider{}})
 	initial, err := e.State(context.Background())

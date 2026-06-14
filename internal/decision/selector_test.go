@@ -108,11 +108,12 @@ func TestChooseMovePassesCurrentGameContextToProvider(t *testing.T) {
 		t.Fatalf("metadata fen = %q, want current %q", provider.request.Metadata["fen"], game.FEN())
 	}
 	wantMetadata := map[string]string{
-		"side_to_move": "black",
-		"ply":          "1",
-		"move_number":  "1",
-		"mode":         "current",
-		"variant":      "standard",
+		"side_to_move":       "black",
+		"ply":                "1",
+		"move_number":        "1",
+		"last_opponent_move": "e2e4",
+		"mode":               "current",
+		"variant":            "standard",
 	}
 	for key, want := range wantMetadata {
 		if got := provider.request.Metadata[key]; got != want {
@@ -131,6 +132,7 @@ func TestChooseMovePassesCurrentGameContextToProvider(t *testing.T) {
 		`"white_ms": 298000`,
 		`"black_ms": 300000`,
 		`"increment_ms": 1000`,
+		"Last opponent move: BEGIN_UNTRUSTED_CHESS_TEXT\ne2e4",
 		"ENGINE_MODE\ncurrent",
 	} {
 		if !strings.Contains(userPrompt, want) {

@@ -57,6 +57,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	}
 	variant = chesscore.NormalizeVariantStart(variant, snapshot.FEN)
 	moveNumber := snapshot.Ply/2 + 1
+	lastOpponentMove := lastMove(snapshot.MoveHistory)
 	stages.setGameID(snapshot.GameID)
 	readStage.finish("completed", fmt.Sprintf("%d legal moves found.", len(legal)))
 	memBefore := memoryForMode(req.Mode, req.Memory, snapshot, features)
@@ -71,7 +72,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		PGN:                snapshot.PGN,
 		SideToMove:         snapshot.SideToMove,
 		MoveNumber:         moveNumber,
-		LastOpponentMove:   lastMove(snapshot.MoveHistory),
+		LastOpponentMove:   lastOpponentMove,
 		LegalMoves:         legal,
 		Features:           features,
 		Variant:            variant,
@@ -99,15 +100,16 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		Temperature: req.Temperature,
 		MaxTokens:   req.MaxTokens,
 		Metadata: map[string]string{
-			"legal_moves":    strategy.LegalMoveCSV(stratReq),
-			"max_candidates": strconv.Itoa(req.MaxCandidates),
-			"game_id":        snapshot.GameID,
-			"fen":            snapshot.FEN,
-			"side_to_move":   snapshot.SideToMove,
-			"ply":            strconv.Itoa(snapshot.Ply),
-			"move_number":    strconv.Itoa(moveNumber),
-			"mode":           string(req.Mode),
-			"variant":        string(variant.Variant),
+			"legal_moves":        strategy.LegalMoveCSV(stratReq),
+			"max_candidates":     strconv.Itoa(req.MaxCandidates),
+			"game_id":            snapshot.GameID,
+			"fen":                snapshot.FEN,
+			"side_to_move":       snapshot.SideToMove,
+			"ply":                strconv.Itoa(snapshot.Ply),
+			"move_number":        strconv.Itoa(moveNumber),
+			"last_opponent_move": lastOpponentMove,
+			"mode":               string(req.Mode),
+			"variant":            string(variant.Variant),
 		},
 	})
 	providerMS := time.Since(providerStart).Milliseconds()
