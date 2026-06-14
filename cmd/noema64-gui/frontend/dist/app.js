@@ -180,7 +180,7 @@ function normalizePromptPack(value) {
     manifest: asObject(pack.manifest),
     system: asText(pack.system),
     user: asText(pack.user),
-    schema: asText(pack.schema)
+    schema: textAreaValue(pack.schema)
   };
 }
 

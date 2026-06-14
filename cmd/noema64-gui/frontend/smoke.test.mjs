@@ -346,6 +346,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "function requireIntegerField(selector, label, min, max)",
     "Number.isInteger(value) && value >= min && value <= max",
     "function normalizePromptPack(value)",
+    "schema: textAreaValue(pack.schema)",
     "function gameStateFromResult(value)",
     "function applyGameStateResult(value)",
     "normalizeRenderableState",
