@@ -43,6 +43,18 @@ func TestAnthropicProviderCompleteJSONRequestShape(t *testing.T) {
 	}
 }
 
+func TestAnthropicHealthCheckAcceptsFencedJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte("{\"model\":\"claude-test\",\"content\":[{\"type\":\"text\",\"text\":\"```json\\n{\\\"ok\\\":true}\\n```\"}]}"))
+	}))
+	defer server.Close()
+
+	if err := (AnthropicProvider{BaseURL: server.URL, Model: "claude-test"}).HealthCheck(context.Background()); err != nil {
+		t.Fatalf("health check: %v", err)
+	}
+}
+
 func TestGeminiProviderCompleteJSONRequestShape(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/models/gemini-test:generateContent") {

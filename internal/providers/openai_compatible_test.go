@@ -19,6 +19,16 @@ func TestOpenAICompatibleHealthCheckRequiresJSONResponse(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleHealthCheckAcceptsFencedJSON(t *testing.T) {
+	server := openAITestServer(t, "```json\n{\"ok\":true}\n```", nil)
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "test-model"}
+	if err := provider.HealthCheck(context.Background()); err != nil {
+		t.Fatalf("health check: %v", err)
+	}
+}
+
 func TestOpenAICompatibleHealthCheckRejectsNonJSONContent(t *testing.T) {
 	server := openAITestServer(t, `plain text`, nil)
 	defer server.Close()

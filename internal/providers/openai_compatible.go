@@ -38,7 +38,7 @@ func (p OpenAICompatible) HealthCheck(ctx context.Context) error {
 	}
 	req := CompletionRequest{
 		Model:       model,
-		System:      "Return JSON.",
+		System:      "Return exactly one JSON object. Do not wrap it in Markdown.",
 		User:        `{"ok":true}`,
 		MaxTokens:   16,
 		Temperature: 0,
@@ -47,11 +47,7 @@ func (p OpenAICompatible) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var parsed any
-	if err := json.Unmarshal([]byte(resp.Text), &parsed); err != nil {
-		return fmt.Errorf("provider health response was not valid JSON: %w", err)
-	}
-	return nil
+	return validateProviderHealthJSON(resp.Text)
 }
 
 func (p OpenAICompatible) CompleteJSON(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {

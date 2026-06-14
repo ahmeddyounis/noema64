@@ -363,7 +363,7 @@ func providerHTTPError(statusCode int, body io.Reader) error {
 func healthCheckJSON(ctx context.Context, provider Provider, model string) error {
 	resp, err := provider.CompleteJSON(ctx, CompletionRequest{
 		Model:       firstNonEmpty(model, "health-check"),
-		System:      "Return JSON only.",
+		System:      "Return exactly one JSON object. Do not wrap it in Markdown.",
 		User:        `{"ok":true}`,
 		MaxTokens:   16,
 		Temperature: 0,
@@ -371,11 +371,63 @@ func healthCheckJSON(ctx context.Context, provider Provider, model string) error
 	if err != nil {
 		return err
 	}
+	return validateProviderHealthJSON(resp.Text)
+}
+
+func validateProviderHealthJSON(text string) error {
+	text = strings.TrimSpace(text)
 	var parsed any
-	if err := json.Unmarshal([]byte(resp.Text), &parsed); err != nil {
+	directErr := json.Unmarshal([]byte(text), &parsed)
+	if directErr == nil {
+		return nil
+	}
+	extracted, err := firstJSONObject(text)
+	if err != nil {
+		return fmt.Errorf("provider health response was not valid JSON: %w", directErr)
+	}
+	if err := json.Unmarshal([]byte(extracted), &parsed); err != nil {
 		return fmt.Errorf("provider health response was not valid JSON: %w", err)
 	}
 	return nil
+}
+
+func firstJSONObject(s string) (string, error) {
+	start := strings.Index(s, "{")
+	if start < 0 {
+		return "", fmt.Errorf("no JSON object start")
+	}
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(s); i++ {
+		ch := s[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return s[start : i+1], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("unterminated JSON object")
 }
 
 func firstNonEmpty(values ...string) string {
