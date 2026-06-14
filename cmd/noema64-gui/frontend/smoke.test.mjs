@@ -323,6 +323,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "pieceGlyph",
     "renderPromotionChoices",
     "promotionGlyph",
+    "state?.snapshot?.side_to_move === \"black\" ? symbol.toLowerCase() : symbol.toUpperCase()",
     "handleBoardKeyboard",
     "shouldIgnoreGlobalShortcut",
     "triggerShortcut",

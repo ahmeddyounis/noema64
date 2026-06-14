@@ -1397,7 +1397,8 @@ function renderPromotionChoices(moves) {
 function promotionGlyph(promotion) {
   const symbol = String(promotion || "").trim();
   if (!symbol) return "";
-  return pieceGlyph(symbol.toUpperCase()) || symbol.toUpperCase();
+  const piece = state?.snapshot?.side_to_move === "black" ? symbol.toLowerCase() : symbol.toUpperCase();
+  return pieceGlyph(piece) || piece;
 }
 
 function promotionTitle(promotion) {
