@@ -408,7 +408,8 @@ body[data-workspace-view="lab"] [data-workspace-card="study"] {
 
 .board-area {
   display: grid;
-  grid-template-rows: auto minmax(360px, 1fr) auto minmax(120px, 0.35fr);
+  grid-template-rows: auto minmax(360px, auto) auto minmax(120px, auto);
+  align-self: start;
   gap: 10px;
   padding: 12px;
 }
@@ -447,7 +448,7 @@ body[data-workspace-view="lab"] [data-workspace-card="study"] {
 }
 
 .board {
-  align-self: center;
+  align-self: start;
   justify-self: center;
   width: min(
     100%,

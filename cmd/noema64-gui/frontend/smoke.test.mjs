@@ -372,6 +372,10 @@ test("bundle wires core actions and renders trace metadata", () => {
     "renderMoveListEmpty",
     "renderStrategyRows",
     "const dec = state?.last_decision",
+    "function isPlayerTurn(snapshot = state?.snapshot)",
+    "function isEngineTurn(snapshot = state?.snapshot)",
+    "playerTurnHelp(state.snapshot)",
+    "engineTurnHelp(state.snapshot)",
     "activateTraceTab",
     "moveTraceTabFocus",
     "tabIndex = selectedTab ? 0 : -1",
@@ -391,9 +395,14 @@ test("bundle wires core actions and renders trace metadata", () => {
     "\"#undoBtn\": \"moves\"",
     "setPrimaryActionAvailability(snapshot)",
     "const hasService = !!api()",
+    "const playerTurn = ongoing && isPlayerTurn(snapshot)",
+    "const engineTurn = ongoing && isEngineTurn(snapshot)",
+    "selector === \"#engineBtn\" && ongoing && !engineTurn",
+    "selector === \"#moveBtn\" && ongoing && !playerTurn",
+    "syncTurnControlHints(snapshot, hasService, ongoing, playerTurn, engineTurn)",
     "requirement === \"service\" && !hasService",
     "requirement === \"thinking\" && (!hasService || activeThinkingOperationCount === 0 || stopRequested)",
-    "moveInput.disabled = !hasService || !ongoing",
+    "moveInput.disabled = !hasService || !ongoing || !playerTurn",
     "busyDisabledState.set(control, control.disabled)",
     "const wasDisabled = busyDisabledState.get(control) || false",
     "control.disabled = wasDisabled",
@@ -765,6 +774,8 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /\.settings \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(stylesCSS, /\.settings menu \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /calc\(\(74vh - 154px\) \* var\(--board-files, 8\) \/ var\(--board-ranks, 8\)\)/);
+  assert.match(stylesCSS, /\.board-area\s*\{[\s\S]*grid-template-rows: auto minmax\(360px, auto\) auto minmax\(120px, auto\);[\s\S]*align-self: start;/);
+  assert.match(stylesCSS, /\.board\s*\{[\s\S]*align-self: start;/);
   assert.match(stylesCSS, /body \{[\s\S]*min-width: 0;/);
   assert.match(stylesCSS, /@media \(min-width: 1241px\)/);
   assert.match(stylesCSS, /@media \(min-width: 761px\) and \(max-height: 860px\)/);

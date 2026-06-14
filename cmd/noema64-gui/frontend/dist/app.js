@@ -198,6 +198,43 @@ function applyGameStateResult(value) {
   return state;
 }
 
+function normalizedSide(value) {
+  const side = String(value || "").trim().toLowerCase();
+  return side === "white" || side === "black" ? side : "";
+}
+
+function opponentSide(side) {
+  return normalizedSide(side) === "black" ? "white" : "black";
+}
+
+function playerSideValue() {
+  return normalizedSide(playerSide) || "white";
+}
+
+function turnSide(snapshot = state?.snapshot) {
+  return normalizedSide(snapshot?.side_to_move);
+}
+
+function isPlayerTurn(snapshot = state?.snapshot) {
+  const side = turnSide(snapshot);
+  return !!side && side === playerSideValue();
+}
+
+function isEngineTurn(snapshot = state?.snapshot) {
+  const side = turnSide(snapshot);
+  return !!side && side !== playerSideValue();
+}
+
+function playerTurnHelp(snapshot = state?.snapshot) {
+  const side = humanizeToken(turnSide(snapshot) || playerSideValue());
+  return `It is your turn as ${side}. Play a move first; the engine replies as ${humanizeToken(opponentSide(side))}.`;
+}
+
+function engineTurnHelp(snapshot = state?.snapshot) {
+  const side = humanizeToken(turnSide(snapshot) || opponentSide(playerSideValue()));
+  return `Engine to move as ${side}. Press Engine Move.`;
+}
+
 function defaultSettings() {
   return {
     engine: {
@@ -770,18 +807,67 @@ function setPrimaryActionAvailability(snapshot) {
   const hasGame = !!snapshot;
   const ongoing = hasGame && snapshot.outcome?.status === "ongoing";
   const hasMoves = hasGame && asArray(snapshot.move_history).length > 0;
+  const playerTurn = ongoing && isPlayerTurn(snapshot);
+  const engineTurn = ongoing && isEngineTurn(snapshot);
   for (const [selector, requirement] of Object.entries(primaryActionRequirements)) {
     const control = document.querySelector(selector);
     if (!control || busyControls.has(selector)) continue;
+    const blockedByTurn =
+      (selector === "#engineBtn" && ongoing && !engineTurn) ||
+      (selector === "#moveBtn" && ongoing && !playerTurn);
     control.disabled =
       (requirement === "service" && !hasService) ||
       (requirement === "game" && (!hasService || !hasGame)) ||
       (requirement === "ongoing" && (!hasService || !ongoing)) ||
       (requirement === "moves" && (!hasService || !hasMoves)) ||
-      (requirement === "thinking" && (!hasService || activeThinkingOperationCount === 0 || stopRequested));
+      (requirement === "thinking" && (!hasService || activeThinkingOperationCount === 0 || stopRequested)) ||
+      blockedByTurn;
+  }
+  syncTurnControlHints(snapshot, hasService, ongoing, playerTurn, engineTurn);
+}
+
+function syncTurnControlHints(snapshot, hasService, ongoing, playerTurn, engineTurn) {
+  const side = humanizeToken(turnSide(snapshot) || "unknown");
+  const player = humanizeToken(playerSideValue());
+  const engineTitle = !hasService
+    ? "Game service unavailable."
+    : !ongoing
+      ? "Engine move unavailable until a game is ongoing."
+      : engineTurn
+        ? `Ask engine to move as ${side} (Space).`
+        : playerTurn
+          ? playerTurnHelp(snapshot)
+          : "Engine move unavailable until a side to move is known.";
+  const moveTitle = !hasService
+    ? "Game service unavailable."
+    : !ongoing
+      ? "Move entry unavailable until a game is ongoing."
+      : playerTurn
+        ? `Enter a ${player} move.`
+        : engineTurn
+          ? engineTurnHelp(snapshot)
+          : "Move entry unavailable until a side to move is known.";
+  const engineButton = document.querySelector("#engineBtn");
+  if (engineButton && !busyControls.has("#engineBtn")) {
+    engineButton.title = engineTitle;
+    engineButton.setAttribute("aria-label", engineTurn ? `Ask engine to move as ${side}` : engineTitle);
+  }
+  document.querySelectorAll("#workflowPanel [data-command='engine']").forEach((button) => {
+    button.title = engineTitle;
+    button.setAttribute("aria-label", engineTurn ? `Ask engine to move as ${side}` : engineTitle);
+  });
+  const moveButton = document.querySelector("#moveBtn");
+  if (moveButton && !busyControls.has("#moveBtn")) {
+    moveButton.title = moveTitle;
+    moveButton.setAttribute("aria-label", playerTurn ? `Play ${player} move` : moveTitle);
   }
   const moveInput = document.querySelector("#moveInput");
-  if (moveInput) moveInput.disabled = !hasService || !ongoing;
+  if (moveInput) {
+    moveInput.disabled = !hasService || !ongoing || !playerTurn;
+    moveInput.placeholder = playerTurn ? "e2e4" : engineTurn ? "Engine to move" : "Move unavailable";
+    moveInput.title = moveTitle;
+    moveInput.setAttribute("aria-label", playerTurn ? `${player} move` : moveTitle);
+  }
 }
 
 function workflowCommandBusy(command) {
@@ -1090,6 +1176,7 @@ function renderBoard() {
   const dims = boardDimensions();
   const order = squareOrder();
   if (!order.includes(focusedSquare)) focusedSquare = order[0] || "a1";
+  const playerCanMove = isPlayerTurn(state.snapshot);
   board.style.setProperty("--board-files", dims.width);
   board.style.setProperty("--board-ranks", dims.height);
   board.style.aspectRatio = `${dims.width} / ${dims.height}`;
@@ -1124,7 +1211,7 @@ function renderBoard() {
     if (boardKeyboardMode && focusedSquare === sq) div.classList.add("keyboard-focus");
     if (legalTargets.includes(sq)) div.classList.add("target");
     if (lastSquares && (lastSquares.from === sq || lastSquares.to === sq)) div.classList.add("last-move");
-    div.draggable = !!state.snapshot.board[sq] && state.snapshot.outcome?.status === "ongoing";
+    div.draggable = playerCanMove && !!state.snapshot.board[sq] && state.snapshot.outcome?.status === "ongoing";
     div.textContent = pieceGlyph(state.snapshot.board[sq]);
     const coord = document.createElement("span");
     coord.className = "coord";
@@ -1232,6 +1319,13 @@ async function squareClicked(sq, fromKeyboard = false) {
     focusBoardSquare(sq);
     return;
   }
+  if (!isPlayerTurn(state.snapshot)) {
+    selected = null;
+    renderBoard();
+    focusBoardSquare(sq);
+    showError(engineTurnHelp(state.snapshot));
+    return;
+  }
   if (!selected) {
     if (state.snapshot.board[sq]) selected = sq;
     renderBoard();
@@ -1246,6 +1340,13 @@ async function playFromTo(from, to) {
     selected = null;
     renderBoard();
     focusBoardSquare(to);
+    return;
+  }
+  if (!isPlayerTurn(state.snapshot)) {
+    selected = null;
+    renderBoard();
+    focusBoardSquare(to);
+    showError(engineTurnHelp(state.snapshot));
     return;
   }
   const matches = asArray(state?.snapshot?.legal_moves).filter((m) => m?.from === from && m?.to === to);
@@ -1270,8 +1371,9 @@ async function playFromTo(from, to) {
 }
 
 function dragStarted(event, sq) {
-  if (!state?.snapshot?.board?.[sq] || state.snapshot.outcome?.status !== "ongoing") {
+  if (!state?.snapshot?.board?.[sq] || state.snapshot.outcome?.status !== "ongoing" || !isPlayerTurn(state.snapshot)) {
     event.preventDefault();
+    if (state?.snapshot?.outcome?.status === "ongoing") showError(engineTurnHelp(state.snapshot));
     return;
   }
   selected = sq;
@@ -1280,7 +1382,7 @@ function dragStarted(event, sq) {
 }
 
 function dragOver(event, sq) {
-  if (!selected) return;
+  if (!selected || !isPlayerTurn(state?.snapshot)) return;
   if (asArray(state?.snapshot?.legal_moves).some((m) => m?.from === selected && m?.to === sq)) {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
@@ -1658,6 +1760,13 @@ function stageLabel(value) {
 
 async function makeMove(move) {
   const moveInput = document.querySelector("#moveInput");
+  if (state?.snapshot?.outcome?.status === "ongoing" && !isPlayerTurn(state.snapshot)) {
+    selected = null;
+    renderBoard();
+    showError(engineTurnHelp(state.snapshot));
+    focusVisibleElement(document.querySelector("#engineBtn"));
+    return;
+  }
   const normalizedMove = String(move || "").trim();
   if (!normalizedMove) {
     markFieldInvalid(moveInput);
@@ -1685,6 +1794,11 @@ async function makeMove(move) {
 }
 
 async function askEngine() {
+  if (state?.snapshot?.outcome?.status === "ongoing" && !isEngineTurn(state.snapshot)) {
+    showError(playerTurnHelp(state.snapshot));
+    focusMoveInput();
+    return;
+  }
   return withThinkingControl("#engineBtn", async () => {
     try {
       lastStageEvent = null;
