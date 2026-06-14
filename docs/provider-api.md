@@ -23,6 +23,12 @@ Default providers:
 - `ollama`: local Ollama chat adapter using JSON output.
 - `policy_prior`: local exact-position policy-prior model trained from exported JSONL examples.
 
+End-to-end cloud setup guides live under [docs/providers](providers/):
+
+- [OpenAI](providers/openai.md)
+- [Anthropic](providers/anthropic.md)
+- [Gemini](providers/gemini.md)
+
 Provider responses are untrusted. Invalid JSON, illegal moves, empty output, and timeout all degrade to legal fallback.
 
 The app service exposes provider profiles to the GUI for:

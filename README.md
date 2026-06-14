@@ -95,6 +95,12 @@ Default config uses the offline `mock` provider, so Noema64 can run without an A
 
 From the GUI, open Settings, choose a provider profile or provider, enter a model, then save. For `OpenAI`, the endpoint field is managed automatically and uses `https://api.openai.com/v1`; you only need the model and API key. For `OpenAI-compatible`, enter the endpoint for your local or remote compatible server.
 
+End-to-end cloud setup guides:
+
+- [OpenAI provider setup](docs/providers/openai.md)
+- [Anthropic provider setup](docs/providers/anthropic.md)
+- [Gemini provider setup](docs/providers/gemini.md)
+
 Supported provider values:
 
 | Provider | Use case | Endpoint |
@@ -128,7 +134,7 @@ llm:
 
 Provider settings support `api_key` or `api_key_ref`. In the GUI, the keychain action stores a typed key in the OS keychain when supported and replaces the raw key with a reference.
 
-Endpoint-backed provider modes may send FEN, legal moves, move history, strategy memory, and settings to the configured provider, including OpenAI, local or remote OpenAI-compatible endpoints, and Ollama endpoints. The GUI requires an explicit data-sharing acknowledgement before saving those providers. Raw prompt logging is off by default.
+Endpoint-backed provider modes may send FEN, legal moves, move history, strategy memory, and settings to the configured provider, including OpenAI, Anthropic, Gemini, local or remote OpenAI-compatible endpoints, and Ollama endpoints. The GUI requires an explicit data-sharing acknowledgement before saving those providers. Raw prompt logging is off by default.
 
 ## Verifier Setup
 
