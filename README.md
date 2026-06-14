@@ -4,6 +4,12 @@ Noema64 is an open-source explainable chess engine that uses a language model as
 
 It is not a Stockfish replacement. The project is optimized for legal full-game play, inspectable strategy memory, provider failure recovery, study workflows, and protocol-safe UCI use.
 
+## Screenshots
+
+| Play workspace | Provider settings |
+| --- | --- |
+| ![Noema64 play workspace with board, decision trace, and strategy memory](docs/assets/screenshots/play-workspace.jpg) | ![Noema64 provider settings with OpenAI profile and verifier controls](docs/assets/screenshots/provider-settings.jpg) |
+
 ## Capabilities
 
 Noema64 includes:
