@@ -2375,6 +2375,20 @@ async function saveStudyMemory() {
   }
 }
 
+const labFieldSelectors = [
+  "#backupDir",
+  "#restoreArchive",
+  "#restoreTarget",
+  "#tournamentGames",
+  "#openingBookPath",
+  "#policyModelPath",
+  "#customBoardDefinition"
+];
+
+function clearLabFieldInvalidStates() {
+  labFieldSelectors.forEach((selector) => clearFieldInvalid(document.querySelector(selector)));
+}
+
 function openExperiments() {
   document.querySelector("#experimentsOutput").textContent = "";
   document.querySelector("#experimentsDialog").showModal();
@@ -2382,6 +2396,7 @@ function openExperiments() {
 }
 
 function openLab() {
+  clearLabFieldInvalidStates();
   document.querySelector("#labOutput").textContent = "";
   document.querySelector("#tournamentGames").value = document.querySelector("#tournamentGames").value || "1";
   const customBoardDefinition = document.querySelector("#customBoardDefinition");
@@ -2413,6 +2428,7 @@ function defaultCustomBoardDefinition() {
 }
 
 async function newChess960Game() {
+  clearLabFieldInvalidStates();
   try {
     const seed = Math.floor(Date.now() % 960);
     chess960Seed = seed;
@@ -2433,6 +2449,7 @@ async function newChess960Game() {
 }
 
 async function startCustomBoardFromLab() {
+  clearLabFieldInvalidStates();
   const customBoardDefinition = document.querySelector("#customBoardDefinition");
   let boardLoaded = false;
   try {
@@ -2465,6 +2482,7 @@ async function startCustomBoardFromLab() {
 }
 
 async function createBackup() {
+  clearLabFieldInvalidStates();
   const backupDir = document.querySelector("#backupDir");
   try {
     const manifest = await call("CreateBackup", backupDir.value.trim());
@@ -2483,6 +2501,7 @@ async function createBackup() {
 }
 
 async function restoreBackup() {
+  clearLabFieldInvalidStates();
   const restoreArchive = document.querySelector("#restoreArchive");
   const restoreTarget = document.querySelector("#restoreTarget");
   try {
@@ -2511,6 +2530,7 @@ async function restoreBackup() {
 }
 
 async function exportFineTuneWorkflow() {
+  clearLabFieldInvalidStates();
   try {
     const workflow = await call("ExportFineTuneDataset");
     if (!fineTuneDatasetJSONL(workflow)) {
@@ -2525,6 +2545,7 @@ async function exportFineTuneWorkflow() {
 }
 
 async function runTournamentFromLab() {
+  clearLabFieldInvalidStates();
   try {
     const games = requireIntegerField("#tournamentGames", "Tournament games", 1, 20);
     document.querySelector("#labOutput").textContent = "Running tournament...";
@@ -2536,6 +2557,7 @@ async function runTournamentFromLab() {
 }
 
 async function compareAnalysisModes() {
+  clearLabFieldInvalidStates();
   try {
     document.querySelector("#labOutput").textContent = "Comparing modes...";
     const comparison = await call("ComparePureHybridAnalysis");
@@ -2555,6 +2577,7 @@ async function compareAnalysisModes() {
 }
 
 async function comparePromptPlayground() {
+  clearLabFieldInvalidStates();
   try {
     const base = normalizePromptPack(await call("PromptTemplatePack"));
     const variant = { ...base, source: "playground", user: `${base.user || ""}\n\nPrefer concise contrast between the top two candidates.\n` };
@@ -2577,6 +2600,7 @@ async function runPromptPlaygroundFromEditor() {
 }
 
 async function buildPersonalityFromLab() {
+  clearLabFieldInvalidStates();
   try {
     const profile = await call("BuildCustomPersonalityProfile", "lab-balanced", "Lab Balanced", 0.55, ["development", "king safety"], ["Prefer clear plans with tactical checks."]);
     settings = await call("SaveCustomPersonalityProfile", profile, true);
@@ -2589,6 +2613,7 @@ async function buildPersonalityFromLab() {
 }
 
 async function trainPolicyPriorFromLab() {
+  clearLabFieldInvalidStates();
   try {
     const workflow = await call("ExportFineTuneDataset");
     const datasetJSONL = fineTuneDatasetJSONL(workflow);
@@ -2609,6 +2634,7 @@ async function trainPolicyPriorFromLab() {
 }
 
 async function enablePolicyPriorFromLab() {
+  clearLabFieldInvalidStates();
   const policyModelPath = document.querySelector("#policyModelPath");
   try {
     const path = requireField("#policyModelPath", "Enter a policy model path before enabling the prior.");
@@ -2626,6 +2652,7 @@ async function enablePolicyPriorFromLab() {
 }
 
 async function importOpeningBookFromLab() {
+  clearLabFieldInvalidStates();
   const openingBookPath = document.querySelector("#openingBookPath");
   try {
     const path = requireField("#openingBookPath", "Enter an opening book path before importing.");
@@ -3197,6 +3224,7 @@ bindBusyButton("#validatePromptBtn", validatePromptEditor);
 bindBusyButton("#runPromptPlaygroundBtn", runPromptPlaygroundFromEditor);
 bindBusyButton("#savePromptBtn", savePromptEditor);
 document.querySelector("#profilesDialog").addEventListener("close", restoreSettingsAfterProfiles);
+document.querySelector("#labDialog").addEventListener("close", clearLabFieldInvalidStates);
 bindBusyButton("#exportProfilesBtn", exportProfiles);
 bindBusyButton("#importProfilesBtn", importProfiles);
 async function refreshExport() {
