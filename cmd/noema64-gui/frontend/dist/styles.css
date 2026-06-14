@@ -1284,31 +1284,38 @@ textarea {
 
   .toolbar {
     display: flex;
-    flex-wrap: wrap;
-    overflow-x: visible;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
   }
 
   .toolbar-group {
     display: inline-flex;
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-    padding: 0 0 8px;
-    border-right: 0;
-    border-bottom: 1px solid #d9dee7;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    padding: 0 8px 0 0;
+    border-right: 1px solid #d9dee7;
+    border-bottom: 0;
   }
 
   .toolbar-group button {
-    flex: 1 1 calc(50% - 6px);
-    min-height: 38px;
+    flex: 0 0 auto;
+    min-height: 36px;
     min-width: 0;
     height: auto;
     padding: 0 10px;
     line-height: 1.15;
-    white-space: normal;
+    white-space: nowrap;
   }
 
   .toolbar-group:last-child {
+    border-right: 0;
     border-bottom: 0;
+    padding-right: 0;
     padding-bottom: 0;
   }
 
