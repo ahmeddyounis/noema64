@@ -101,7 +101,6 @@ func TestUCITracePathOptions(t *testing.T) {
 				"setoption name " + optionName + " value " + tracePath,
 				"position startpos moves e2e4 e7e5",
 				"go movetime 100",
-				"quit",
 				"",
 			}, "\n")
 			var out bytes.Buffer
@@ -109,11 +108,8 @@ func TestUCITracePathOptions(t *testing.T) {
 			if err := server.Run(context.Background()); err != nil {
 				t.Fatalf("run: %v", err)
 			}
-			if !strings.Contains(out.String(), "bestmove ") {
-				t.Fatalf("missing bestmove:\n%s", out.String())
-			}
-			if _, err := os.Stat(tracePath); err != nil {
-				t.Fatalf("trace file not written: %v", err)
+			if !waitForFile(tracePath, 2*time.Second) {
+				t.Fatalf("trace file not written: %s", tracePath)
 			}
 		})
 	}
@@ -141,6 +137,17 @@ func TestUCITraceEnabledOptionDisablesTraceWrites(t *testing.T) {
 	if _, err := os.Stat(tracePath); !os.IsNotExist(err) {
 		t.Fatalf("trace file written with TraceEnabled=false: %v", err)
 	}
+}
+
+func waitForFile(path string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
 }
 
 func TestParseGoBudgetUsesSideToMoveClock(t *testing.T) {

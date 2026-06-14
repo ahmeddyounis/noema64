@@ -121,7 +121,7 @@ func CreateBackup(ctx context.Context, req BackupRequest) (BackupManifest, error
 			if err != nil {
 				return err
 			}
-			return addFile(path, filepath.Join("logs", rel))
+			return addFile(path, "logs/"+filepath.ToSlash(rel))
 		})
 		if err != nil {
 			return BackupManifest{}, closeZipWithError(zipWriter, file, archivePath, err)
