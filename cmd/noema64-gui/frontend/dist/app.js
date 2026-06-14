@@ -1759,7 +1759,6 @@ async function resignGame() {
 async function loadSettings() {
   settings = normalizeSettingsShape(await call("GetSettings"));
   document.querySelector("#settingsOutput").textContent = "";
-  populateProviderProfiles(settings.llm?.profiles || []);
   populateCustomPersonalities(settings.engine?.custom_personalities || []);
   document.querySelector("#settingMode").value = settings.engine.default_mode;
   document.querySelector("#settingPersonality").value = settings.engine.personality;
@@ -1776,17 +1775,7 @@ async function loadSettings() {
   document.querySelector("#settingClockIncrement").value = Math.max(0, Math.round((Number.isFinite(clockIncrementMS) ? clockIncrementMS : 0) / 1000));
   document.querySelector("#settingAutoReply").checked = autoReply;
   document.querySelector("#settingMaxCandidates").value = settings.engine.max_candidates || 5;
-  document.querySelector("#settingProfile").value = providerProfileValue(settings.llm?.profile_id);
-  document.querySelector("#settingProvider").value = settings.llm.provider;
-  document.querySelector("#settingEndpoint").value = settings.llm.endpoint || "";
-  document.querySelector("#settingModel").value = settings.llm.model || "";
-  document.querySelector("#settingTemperature").value = settings.llm.temperature ?? 0.2;
-  document.querySelector("#settingMaxTokens").value = settings.llm.max_tokens || 1600;
-  document.querySelector("#settingTimeout").value = settings.llm.timeout_ms || 12000;
-  document.querySelector("#settingRetries").value = settings.llm.retries ?? 1;
-  document.querySelector("#settingKey").value = settings.llm.api_key || "";
-  document.querySelector("#settingKeyRef").value = settings.llm.api_key_ref || "";
-  document.querySelector("#settingCloudAck").checked = !!settings.privacy.cloud_provider_warning_acknowledged;
+  populateProviderSettingsControls();
   document.querySelector("#settingVerifier").checked = !!settings.verifier.enabled;
   document.querySelector("#settingVerifierPath").value = settings.verifier.path || "";
   document.querySelector("#settingVerifierMoveTime").value = settings.verifier.movetime_ms || 100;
@@ -1819,6 +1808,21 @@ function populateProviderProfiles(profiles) {
     option.textContent = profile.id;
     select.appendChild(option);
   }
+}
+
+function populateProviderSettingsControls() {
+  populateProviderProfiles(settings.llm?.profiles || []);
+  document.querySelector("#settingProfile").value = providerProfileValue(settings.llm?.profile_id);
+  document.querySelector("#settingProvider").value = settings.llm.provider;
+  document.querySelector("#settingEndpoint").value = settings.llm.endpoint || "";
+  document.querySelector("#settingModel").value = settings.llm.model || "";
+  document.querySelector("#settingTemperature").value = settings.llm.temperature ?? 0.2;
+  document.querySelector("#settingMaxTokens").value = settings.llm.max_tokens || 1600;
+  document.querySelector("#settingTimeout").value = settings.llm.timeout_ms || 12000;
+  document.querySelector("#settingRetries").value = settings.llm.retries ?? 1;
+  document.querySelector("#settingKey").value = settings.llm.api_key || "";
+  document.querySelector("#settingKeyRef").value = settings.llm.api_key_ref || "";
+  document.querySelector("#settingCloudAck").checked = !!settings.privacy.cloud_provider_warning_acknowledged;
 }
 
 function populateCustomPersonalities(profiles) {
@@ -2772,7 +2776,8 @@ async function importProfiles() {
     const text = requireField("#profilesText", "Paste provider profiles before importing.");
     settings = normalizeSettingsShape(await call("ImportProviderProfiles", text));
     clearFieldInvalid(profilesText);
-    populateProviderProfiles(settings.llm?.profiles || []);
+    populateProviderSettingsControls();
+    syncProviderDisclosure();
     document.querySelector("#profilesOutput").textContent = "Profiles imported.";
     renderWorkflowPanel();
     showSuccess("Provider profiles imported.");
