@@ -696,8 +696,18 @@ function recordFlowMeta(snapshot) {
 }
 
 function plyCountText(value) {
+  return countText(value, "ply", "plies");
+}
+
+function countText(value, singular, plural = `${singular}s`) {
   const count = Math.max(0, Math.trunc(Number(value) || 0));
-  return `${count} ${count === 1 ? "ply" : "plies"}`;
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function countRatioText(completed, requested, singular, plural = `${singular}s`) {
+  const done = Math.max(0, Math.trunc(Number(completed) || 0));
+  const total = Math.max(0, Math.trunc(Number(requested) || 0));
+  return `${done}/${total} ${total === 1 ? singular : plural}`;
 }
 
 function decisionFlowMeta(decision) {
@@ -2078,22 +2088,22 @@ function renderBenchmarkSummary(summary) {
   if (results.length && results[0]?.summary) {
     const rows = results.map((result) => {
       const s = result?.summary || {};
-      return `${result?.mode || "mode"}: ${s.games_completed || 0}/${s.games_requested || summary.games_per_mode || 0} games · ${s.total_plies || 0} plies · ${s.fallbacks_used || 0} fallbacks · ${s.engine_errors || 0} errors`;
+      return `${result?.mode || "mode"}: ${countRatioText(s.games_completed, s.games_requested || summary.games_per_mode, "game")} · ${plyCountText(s.total_plies)} · ${countText(s.fallbacks_used, "fallback")} · ${countText(s.engine_errors, "error")}`;
     });
-    return `Mode benchmark · ${summary.games_per_mode || 0} games/mode · seed ${summary.seed || 64}\n${rows.join("\n")}`;
+    return `Mode benchmark · ${countText(summary.games_per_mode, "game")}/mode · seed ${summary.seed || 64}\n${rows.join("\n")}`;
   }
-  return `Random benchmark · ${summary.games_completed || 0}/${summary.games_requested || 0} games · ${summary.total_plies || 0} plies · ${summary.fallbacks_used || 0} fallbacks · ${summary.engine_errors || 0} errors`;
+  return `Random benchmark · ${countRatioText(summary.games_completed, summary.games_requested, "game")} · ${plyCountText(summary.total_plies)} · ${countText(summary.fallbacks_used, "fallback")} · ${countText(summary.engine_errors, "error")}`;
 }
 
 function renderPositionSuiteSummary(summary) {
   if (!summary) return "No position suite result.";
   const rows = asArray(summary.results).map((result) => {
     const move = result?.selected_san ? `${result.selected_san} (${result.selected_move})` : result?.selected_move || "none";
-    const status = result?.engine_error ? `error: ${result.engine_error}` : `${move} · ${result?.candidate_count || 0} candidates · ${result?.duration_ms || 0} ms`;
+    const status = result?.engine_error ? `error: ${result.engine_error}` : `${move} · ${countText(result?.candidate_count, "candidate")} · ${result?.duration_ms || 0} ms`;
     return `${result?.index || 0}. ${result?.name || "Position"} · ${result?.side_to_move || "unknown"} · ${status}`;
   });
   return [
-    `Position suite · ${summary.positions_analyzed || 0}/${summary.positions_requested || 0} analyzed · ${summary.fallbacks_used || 0} fallbacks · ${summary.engine_errors || 0} errors`,
+    `Position suite · ${countRatioText(summary.positions_analyzed, summary.positions_requested, "position")} analyzed · ${countText(summary.fallbacks_used, "fallback")} · ${countText(summary.engine_errors, "error")}`,
     ...rows
   ].join("\n");
 }
@@ -2102,10 +2112,10 @@ function renderProviderComparison(summary) {
   if (!summary) return "No provider comparison result.";
   const rows = asArray(summary.results).map((result) => {
     const suite = result?.summary || {};
-    return `${result?.profile_id || "profile"} · ${result?.status || "unknown"} · ${suite.positions_analyzed || 0}/${suite.positions_requested || 0} positions · ${suite.fallbacks_used || 0} fallbacks · ${result?.error || ""}`.trim();
+    return `${result?.profile_id || "profile"} · ${result?.status || "unknown"} · ${countRatioText(suite.positions_analyzed, suite.positions_requested, "position")} · ${countText(suite.fallbacks_used, "fallback")} · ${result?.error || ""}`.trim();
   });
   return [
-    `Provider comparison · ${summary.profiles_compared || 0} profiles completed · ${asArray(summary.positions).length} positions`,
+    `Provider comparison · ${countText(summary.profiles_compared, "profile")} completed · ${countText(asArray(summary.positions).length, "position")}`,
     ...rows
   ].join("\n");
 }
@@ -2163,7 +2173,7 @@ function renderStudyDashboard(dashboard) {
     `Study · ${dashboard.game_id || "unknown"} · ply ${dashboard.ply || 0} · ${dashboard.variant?.variant || "standard"}`,
     `Memory: ${memory.plan_status || "unknown"} · confidence ${formatMetric(memory.plan_confidence)} · retained ${memory.retained_items || 0} · dropped ${memory.dropped_items || 0}`,
     `Coherence: ${coherence.status || "unknown"} · ${formatMetric(coherence.score)}`,
-    `Diversity: ${diversity.status || "unknown"} · ${formatMetric(diversity.score)} · ${diversity.candidate_count || 0} candidates`,
+    `Diversity: ${diversity.status || "unknown"} · ${formatMetric(diversity.score)} · ${countText(diversity.candidate_count, "candidate")}`,
     "",
     "LESSON",
     ...lessonLines,
@@ -2182,9 +2192,9 @@ function renderStudyDashboard(dashboard) {
 function renderTournament(summary) {
   if (!summary) return "No tournament result.";
   const ratings = asArray(summary.ratings).map((rating) => `${rating?.id || "profile"} · ${formatMetric(rating?.elo)} · ${rating?.wins || 0}-${rating?.draws || 0}-${rating?.losses || 0}`).join("\n");
-  const games = asArray(summary.results).slice(0, 12).map((game) => `${game?.game_index || 0}. ${game?.white_id || "white"}-${game?.black_id || "black"} · ${game?.outcome || "unknown"} · ${game?.winner_id || "draw"} · ${game?.plies || 0} plies`).join("\n");
+  const games = asArray(summary.results).slice(0, 12).map((game) => `${game?.game_index || 0}. ${game?.white_id || "white"}-${game?.black_id || "black"} · ${game?.outcome || "unknown"} · ${game?.winner_id || "draw"} · ${plyCountText(game?.plies)}`).join("\n");
   return [
-    `Tournament · ${summary.games_played || 0} games · seed ${summary.seed || 64}`,
+    `Tournament · ${countText(summary.games_played, "game")} · seed ${summary.seed || 64}`,
     "",
     "RATINGS",
     ratings || "No ratings.",
@@ -2197,11 +2207,11 @@ function renderTournament(summary) {
 function renderBackupManifest(manifest) {
   if (!manifest) return "No backup manifest.";
   const filesList = asArray(manifest.files);
-  const files = filesList.map((file) => `${file?.path || "file"} · ${file?.bytes || 0} bytes`).join("\n");
+  const files = filesList.map((file) => `${file?.path || "file"} · ${countText(file?.bytes, "byte")}`).join("\n");
   return [
     `Archive: ${manifest.archive_path || "unknown"}`,
     `SHA-256: ${manifest.sha256 || "pending"}`,
-    `Files: ${filesList.length} · bytes ${manifest.bytes || 0}`,
+    `Files: ${countText(filesList.length, "file", "files")} · ${countText(manifest.bytes, "byte")}`,
     "",
     files
   ].join("\n");
@@ -2213,7 +2223,7 @@ function renderFineTuneWorkflow(workflow) {
   const nextSteps = asArray(spec.next_steps);
   const safetyNotes = asArray(spec.safety_notes).filter((note) => String(note || "").trim());
   const datasetJSONL = fineTuneDatasetJSONL(workflow);
-  const lines = [`Fine tune · ${spec.example_count || 0} examples`];
+  const lines = [`Fine tune · ${countText(spec.example_count, "example")}`];
   if (spec.intended_use) lines.push(spec.intended_use);
   if (safetyNotes.length) lines.push("", "SAFETY", ...safetyNotes);
   lines.push("", "NEXT STEPS", ...(nextSteps.length ? nextSteps : ["Run an engine move or analysis with trace logging enabled before exporting."]));
