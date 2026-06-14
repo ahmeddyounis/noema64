@@ -692,8 +692,12 @@ function timeControlMeta() {
 
 function recordFlowMeta(snapshot) {
   if (!snapshot) return "No moves recorded";
-  const plies = asArray(snapshot.move_history).length;
-  return `${plies} ${plies === 1 ? "ply" : "plies"} · ${snapshot.outcome?.status || "unknown"}`;
+  return `${plyCountText(asArray(snapshot.move_history).length)} · ${snapshot.outcome?.status || "unknown"}`;
+}
+
+function plyCountText(value) {
+  const count = Math.max(0, Math.trunc(Number(value) || 0));
+  return `${count} ${count === 1 ? "ply" : "plies"}`;
 }
 
 function decisionFlowMeta(decision) {
@@ -2147,6 +2151,12 @@ function renderStudyDashboard(dashboard) {
   const diversity = dashboard.candidate_diversity || {};
   const lesson = dashboard.lesson || {};
   const multi = dashboard.multi_agent || {};
+  const lessonSteps = asArray(lesson.steps).filter((step) => String(step || "").trim());
+  const lessonSummary = [lesson.title, lesson.focus].map((item) => String(item || "").trim()).filter(Boolean).join(" · ");
+  const lessonLines = lessonSummary || lessonSteps.length ? [lessonSummary || "Study", ...lessonSteps] : ["No guided lesson available."];
+  const puzzleGoal = asText(dashboard.puzzle?.goal).trim();
+  const puzzleSolution = asText(dashboard.puzzle?.solution).trim();
+  const puzzleLines = puzzleGoal ? [puzzleGoal, `Solution: ${puzzleSolution || "pending"}`] : ["No puzzle available."];
   const agents = asArray(multi.reviews).map((review) => `${review?.role || "agent"}: ${review?.summary || "No summary"} (${formatMetric(review?.confidence)})`).join("\n");
   const heat = asArray(dashboard.heatmap).map((item) => `${item?.move || "move"} -> ${item?.square || "square"} · ${formatScore(item?.weight)} · ${item?.label || "candidate"}`).join("\n");
   return [
@@ -2156,8 +2166,7 @@ function renderStudyDashboard(dashboard) {
     `Diversity: ${diversity.status || "unknown"} · ${formatMetric(diversity.score)} · ${diversity.candidate_count || 0} candidates`,
     "",
     "LESSON",
-    `${lesson.title || "Study"} · ${lesson.focus || ""}`,
-    ...asArray(lesson.steps),
+    ...lessonLines,
     "",
     "AGENTS",
     agents || multi.arbiter || "No agent review.",
@@ -2166,7 +2175,7 @@ function renderStudyDashboard(dashboard) {
     heat || "No candidate heatmap.",
     "",
     "PUZZLE",
-    `${dashboard.puzzle?.goal || "No puzzle."}\nSolution: ${dashboard.puzzle?.solution || "pending"}`
+    ...puzzleLines
   ].join("\n");
 }
 
@@ -2202,19 +2211,14 @@ function renderFineTuneWorkflow(workflow) {
   if (!workflow) return "No fine-tune workflow.";
   const spec = workflow.workflow || {};
   const nextSteps = asArray(spec.next_steps);
-  return [
-    `Fine tune · ${spec.example_count || 0} examples`,
-    spec.intended_use || "",
-    "",
-    "SAFETY",
-    ...asArray(spec.safety_notes),
-    "",
-    "NEXT STEPS",
-    ...(nextSteps.length ? nextSteps : ["Run an engine move or analysis with trace logging enabled before exporting."]),
-    "",
-    "JSONL",
-    workflow.dataset_jsonl || ""
-  ].join("\n");
+  const safetyNotes = asArray(spec.safety_notes).filter((note) => String(note || "").trim());
+  const datasetJSONL = fineTuneDatasetJSONL(workflow);
+  const lines = [`Fine tune · ${spec.example_count || 0} examples`];
+  if (spec.intended_use) lines.push(spec.intended_use);
+  if (safetyNotes.length) lines.push("", "SAFETY", ...safetyNotes);
+  lines.push("", "NEXT STEPS", ...(nextSteps.length ? nextSteps : ["Run an engine move or analysis with trace logging enabled before exporting."]));
+  lines.push("", "JSONL", datasetJSONL || "No examples generated yet.");
+  return lines.join("\n");
 }
 
 function fineTuneDatasetJSONL(workflow) {
@@ -2807,7 +2811,7 @@ function renderRecentGames(records) {
     detail.className = "recent-game-detail";
     const title = document.createElement("strong");
     title.className = "recent-game-title";
-    title.textContent = snapshot.ply ? `${snapshot.ply} plies · ${snapshot.side_to_move || "unknown"} to move` : "New game";
+    title.textContent = snapshot.ply ? `${plyCountText(snapshot.ply)} · ${snapshot.side_to_move || "unknown"} to move` : "New game";
     const meta = document.createElement("small");
     meta.className = "recent-game-meta";
     const outcomeStatus = snapshot.outcome?.status || "ongoing";
