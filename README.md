@@ -4,9 +4,9 @@ Noema64 is an open-source explainable chess engine that uses a language model as
 
 It is not a Stockfish replacement. The project is optimized for legal full-game play, inspectable strategy memory, provider failure recovery, study workflows, and protocol-safe UCI use.
 
-## MVP Status
+## Capabilities
 
-Implemented in this repository:
+Noema64 includes:
 
 - Go chess core wrapper with legal moves, FEN, PGN, move history, outcomes, promotions, castling, and en passant through `github.com/corentings/chess/v2`.
 - Strategy memory v1.2 structs, diffing, versioned editable prompt packs, strict JSON parsing, candidate repair, and schema validation.
@@ -149,7 +149,7 @@ verifier:
   max_centipawn_loss: 180
 ```
 
-Noema64 does not bundle Stockfish in the MVP. When configured, the external UCI verifier analyzes LLM candidate moves with `searchmoves`, compares centipawn loss against the best candidate, and records verifier decisions in the trace.
+Noema64 does not bundle Stockfish. When configured, the external UCI verifier analyzes LLM candidate moves with `searchmoves`, compares centipawn loss against the best candidate, and records verifier decisions in the trace.
 
 External verifier and tablebase paths are executed without a shell and are validated before launch. Simple PATH binary names such as `stockfish` are allowed; paths containing whitespace, control characters, path traversal, or non-executable absolute targets are rejected.
 
@@ -181,7 +181,6 @@ For bot bridge usage, see [docs/lichess-bot.md](docs/lichess-bot.md).
 
 - The static verifier is intentionally shallow.
 - Chess960 castling is handled by Noema64's compatibility layer rather than the upstream move generator.
-- The GUI is a Wails MVP surface, not a polished app-store release.
 - LLM quality depends on the configured provider.
 - Raw prompts are not stored unless the user enables logging.
 
