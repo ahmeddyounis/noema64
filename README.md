@@ -90,9 +90,23 @@ Study returns compressed memory, opening-book suggestions, endgame trainer drill
 
 ## Provider Setup
 
-Default config uses the offline mock provider. Supported provider values are `mock`, `openai`, `openai_compatible`, `anthropic`, `gemini`, `ollama`, and `policy_prior`.
+Default config uses the offline `mock` provider, so Noema64 can run without an API key.
 
-For OpenAI, set the provider and model; Noema64 uses `https://api.openai.com/v1` automatically:
+From the GUI, open Settings, choose a provider profile or provider, enter a model, then save. For `OpenAI`, the endpoint field is managed automatically and uses `https://api.openai.com/v1`; you only need the model and API key. For `OpenAI-compatible`, enter the endpoint for your local or remote compatible server.
+
+Supported provider values:
+
+| Provider | Use case | Endpoint |
+| --- | --- | --- |
+| `mock` | Offline demos, tests, and CI | Not used |
+| `openai` | OpenAI API | Managed automatically |
+| `openai_compatible` | Local or hosted OpenAI-compatible chat completions API | Required |
+| `anthropic` | Anthropic Messages API | Configured endpoint |
+| `gemini` | Gemini generateContent API | Configured endpoint |
+| `ollama` | Local Ollama JSON chat | Configured endpoint |
+| `policy_prior` | Local exact-position policy-prior model | Model path |
+
+For OpenAI in YAML, set the provider and model:
 
 ```yaml
 llm:
@@ -101,7 +115,7 @@ llm:
   api_key: ""
 ```
 
-To use another OpenAI-compatible endpoint, set:
+To use another OpenAI-compatible endpoint in YAML, set:
 
 ```yaml
 llm:
@@ -111,7 +125,9 @@ llm:
   api_key: ""
 ```
 
-Endpoint-backed provider modes may send FEN, legal moves, move history, strategy memory, and settings to the configured provider, including OpenAI, local or remote OpenAI-compatible endpoints, and Ollama endpoints. Raw prompt logging is off by default.
+Provider settings support `api_key` or `api_key_ref`. In the GUI, the keychain action stores a typed key in the OS keychain when supported and replaces the raw key with a reference.
+
+Endpoint-backed provider modes may send FEN, legal moves, move history, strategy memory, and settings to the configured provider, including OpenAI, local or remote OpenAI-compatible endpoints, and Ollama endpoints. The GUI requires an explicit data-sharing acknowledgement before saving those providers. Raw prompt logging is off by default.
 
 ## Verifier Setup
 
