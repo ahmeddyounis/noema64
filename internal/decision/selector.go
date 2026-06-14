@@ -158,6 +158,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	if len(candidates) > req.MaxCandidates {
 		candidates = candidates[:req.MaxCandidates]
 	}
+	candidates = supplementGuardrailCandidates(req.Game, candidates, req.Mode, 3)
 	repairStage.finish("completed", fmt.Sprintf("%d legal candidates retained.", len(candidates)))
 
 	verifyStage := stages.begin("verifying_tactics", "Run verifier or legal-only safety checks.")
@@ -205,7 +206,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		Mode:               req.Mode,
 		SelectedMove:       chosen.LegalMove,
 		Explanation:        chosen.Purpose,
-		PositionSummary:    parse.Decision.PositionSummary,
+		PositionSummary:    groundedPositionSummary(features, parse.Decision.PositionSummary),
 		PreviousPlanStatus: parse.Decision.PreviousPlanStatus,
 		StrategyBefore:     memBefore,
 		StrategyAfter:      memAfter,
@@ -389,7 +390,7 @@ func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyM
 		case strategy.ModeHybrid:
 			candidates[i].FinalScore = 0.20*llm + 0.20*plan + 0.20*tactical + 0.35*candidates[i].SearchScore + 0.03*personalityFit
 		case strategy.ModeBlunderguard:
-			candidates[i].FinalScore = 0.35*llm + 0.25*plan + 0.30*tactical + 0.05*personalityFit
+			candidates[i].FinalScore = 0.25*llm + 0.20*plan + 0.30*tactical + 0.23*candidates[i].SearchScore + 0.02*personalityFit
 		default:
 			candidates[i].FinalScore = 0.55*llm + 0.35*plan + 0.05*personalityFit
 		}
@@ -410,6 +411,112 @@ func selectCandidate(candidates []strategy.CandidateMove, mode strategy.EngineMo
 		return candidate, true
 	}
 	return strategy.CandidateMove{}, false
+}
+
+func supplementGuardrailCandidates(game *chesscore.Game, candidates []strategy.CandidateMove, mode strategy.EngineMode, limit int) []strategy.CandidateMove {
+	if game == nil || limit <= 0 || !usesGuardrailCandidates(mode) {
+		return candidates
+	}
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		seen[candidate.UCI] = struct{}{}
+	}
+	added := 0
+	for _, move := range prioritizedSearchMoves(game.LegalMoves(), 12) {
+		if added >= limit {
+			break
+		}
+		if !isGuardrailCandidate(move) {
+			continue
+		}
+		if _, ok := seen[move.UCI]; ok {
+			continue
+		}
+		seen[move.UCI] = struct{}{}
+		candidates = append(candidates, strategy.CandidateMove{
+			UCI:           move.UCI,
+			SAN:           move.SAN,
+			Purpose:       guardrailPurpose(move),
+			Risk:          "Added from the legal move list and ranked by verifier plus deterministic search.",
+			LLMConfidence: 0.30,
+			LegalMove:     move,
+			RepairMethod:  "engine_guardrail",
+		})
+		added++
+	}
+	return candidates
+}
+
+func usesGuardrailCandidates(mode strategy.EngineMode) bool {
+	return mode == strategy.ModeBlunderguard || mode == strategy.ModeHybrid || mode == strategy.ModeCurrent
+}
+
+func isGuardrailCandidate(move chesscore.LegalMove) bool {
+	return move.Capture || move.Check || move.Promotion != ""
+}
+
+func guardrailPurpose(move chesscore.LegalMove) string {
+	switch {
+	case move.Promotion != "" && move.Check:
+		return "Tactical safety candidate: promotion with check from the current board."
+	case move.Promotion != "":
+		return "Tactical safety candidate: promotion from the current board."
+	case move.Capture && move.Check:
+		return "Tactical safety candidate: forcing capture with check from the current board."
+	case move.Capture:
+		return "Tactical safety candidate: available capture from the current board."
+	case move.Check:
+		return "Tactical safety candidate: checking move from the current board."
+	default:
+		return "Tactical safety candidate from the current board."
+	}
+}
+
+func groundedPositionSummary(features chesscore.FeatureSummary, providerSummary string) string {
+	material := strategy.MaterialContextSummary(features)
+	summary := strings.TrimSpace(providerSummary)
+	if summary == "" || containsMaterialClaim(summary) {
+		return material
+	}
+	return material + " " + summary
+}
+
+func containsMaterialClaim(summary string) bool {
+	text := strings.ToLower(summary)
+	claims := []string{
+		"material",
+		"materially",
+		"up a pawn",
+		"up a piece",
+		"up a knight",
+		"up a bishop",
+		"up a rook",
+		"up a queen",
+		"down a pawn",
+		"down a piece",
+		"down a knight",
+		"down a bishop",
+		"down a rook",
+		"down a queen",
+		"extra pawn",
+		"extra piece",
+		"extra knight",
+		"extra bishop",
+		"extra rook",
+		"extra queen",
+		"ahead by a pawn",
+		"ahead by a piece",
+		"ahead by a knight",
+		"ahead by a bishop",
+		"ahead by a rook",
+		"ahead by a queen",
+	}
+	for _, claim := range claims {
+		if strings.Contains(text, claim) {
+			return true
+		}
+	}
+	return false
 }
 
 func personalityAlignment(candidate strategy.CandidateMove, profile strategy.PersonalityProfile) float64 {

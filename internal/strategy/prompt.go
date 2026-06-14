@@ -27,6 +27,10 @@ Your job:
 If ENGINE_MODE is "current", ignore prior strategic commitments and choose from the current
 position only. Treat PREVIOUS_STRATEGY_MEMORY as reset context, not a plan to preserve.
 
+Ground all material claims in DETERMINISTIC_FEATURES.material_balance. It is white-minus-black
+centipawns: positive means White is ahead, negative means Black is ahead, and zero means
+material is equal.
+
 Do not provide hidden chain-of-thought. Provide concise reasons only.`
 
 const UserPromptTemplate = `POSITION
@@ -44,6 +48,9 @@ LEGAL_MOVES
 
 DETERMINISTIC_FEATURES
 {{features_json}}
+
+MATERIAL_CONTEXT
+{{material_context}}
 
 PREVIOUS_STRATEGY_MEMORY
 {{strategy_memory_json}}
@@ -232,6 +239,7 @@ func BuildPromptWithTemplates(req StrategyRequest, templates PromptTemplates) (s
 		"game_context_json":    string(contextJSON),
 		"legal_moves_json":     string(legal),
 		"features_json":        string(features),
+		"material_context":     MaterialContextSummary(req.Features),
 		"strategy_memory_json": string(memory),
 		"mode":                 string(req.Mode),
 		"personality_json":     string(personality),

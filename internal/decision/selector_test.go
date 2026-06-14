@@ -37,6 +37,66 @@ func TestHybridSearchScoresMaterialWin(t *testing.T) {
 	}
 }
 
+func TestBlunderguardSearchScoresMaterialWin(t *testing.T) {
+	game := searchTestGame(t)
+	candidates := []strategy.CandidateMove{
+		searchTestCandidate(t, game, "e1e2", 0.99),
+		searchTestCandidate(t, game, "g3h4", 0.30),
+	}
+
+	used, name := applySearchScores(context.Background(), game, candidates, strategy.ModeBlunderguard)
+	if !used {
+		t.Fatal("expected blunderguard search scores to be applied")
+	}
+	if name != deterministicSearchName {
+		t.Fatalf("search name = %q, want %q", name, deterministicSearchName)
+	}
+
+	scoreCandidates(candidates, strategy.StrategyMemory{}, strategy.ModeBlunderguard, strategy.ProfileForPersonality(strategy.PersonalityBalanced))
+	if candidates[0].UCI != "g3h4" {
+		t.Fatalf("top blunderguard candidate = %s, want queen capture g3h4; candidates=%+v", candidates[0].UCI, candidates)
+	}
+}
+
+func TestChooseMoveBlunderguardAddsTacticalGuardrailCandidate(t *testing.T) {
+	game := searchTestGame(t)
+	provider := scriptedProvider{
+		moves: []strategy.CandidateMove{
+			{UCI: "e1e2", Purpose: "Keep the king flexible.", LLMConfidence: 0.99},
+		},
+	}
+
+	dec, err := ChooseMove(context.Background(), Request{
+		Game:          game,
+		Memory:        strategy.NewMemory(game.ID(), "white"),
+		Mode:          strategy.ModeBlunderguard,
+		Provider:      provider,
+		Verifier:      verifier.LegalOnlyVerifier{},
+		Model:         "scripted",
+		MaxCandidates: 1,
+		Timeout:       time.Second,
+	})
+	if err != nil {
+		t.Fatalf("ChooseMove error = %v", err)
+	}
+	if dec.SelectedMove.UCI != "g3h4" {
+		t.Fatalf("selected move = %s, want guardrail queen capture g3h4; candidates=%+v", dec.SelectedMove.UCI, dec.CandidateMoves)
+	}
+	if !dec.Assistance.SearchUsed || dec.Assistance.SearchName != deterministicSearchName {
+		t.Fatalf("search assistance = %+v, want blunderguard search", dec.Assistance)
+	}
+	foundGuardrail := false
+	for _, candidate := range dec.CandidateMoves {
+		if candidate.UCI == "g3h4" && candidate.RepairMethod == "engine_guardrail" {
+			foundGuardrail = true
+			break
+		}
+	}
+	if !foundGuardrail {
+		t.Fatalf("guardrail candidate was not added: %+v", dec.CandidateMoves)
+	}
+}
+
 func TestCurrentModeUsesSearchAndResetsStrategyMemory(t *testing.T) {
 	game := searchTestGame(t)
 	staleMemory := strategy.NewMemory(game.ID(), "white")
@@ -141,6 +201,34 @@ func TestChooseMovePassesCurrentGameContextToProvider(t *testing.T) {
 	}
 	if strings.Contains(userPrompt, "Plan: stale") {
 		t.Fatalf("provider prompt leaked PGN comment:\n%s", userPrompt)
+	}
+}
+
+func TestChooseMoveGroundsMaterialSummary(t *testing.T) {
+	game := chesscore.NewGame()
+	provider := scriptedProvider{
+		positionSummary: "Black is materially ahead by a piece.",
+		moves:           []strategy.CandidateMove{{UCI: "g1f3", Purpose: "Develop the knight.", LLMConfidence: 0.7}},
+	}
+
+	dec, err := ChooseMove(context.Background(), Request{
+		Game:          game,
+		Memory:        strategy.NewMemory(game.ID(), "white"),
+		Mode:          strategy.ModeBlunderguard,
+		Provider:      provider,
+		Verifier:      verifier.LegalOnlyVerifier{},
+		Model:         "scripted",
+		MaxCandidates: 1,
+		Timeout:       time.Second,
+	})
+	if err != nil {
+		t.Fatalf("ChooseMove error = %v", err)
+	}
+	if dec.PositionSummary != "Material is equal." {
+		t.Fatalf("position summary = %q, want deterministic equality summary", dec.PositionSummary)
+	}
+	if strings.Contains(dec.PositionSummary, "Black is materially ahead") {
+		t.Fatalf("provider material hallucination leaked into summary: %q", dec.PositionSummary)
 	}
 }
 
@@ -389,7 +477,8 @@ func sameStrings(got, want []string) bool {
 }
 
 type scriptedProvider struct {
-	moves []strategy.CandidateMove
+	moves           []strategy.CandidateMove
+	positionSummary string
 }
 
 type capturingProvider struct {
@@ -425,10 +514,14 @@ func (p scriptedProvider) CompleteJSON(ctx context.Context, req providers.Comple
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	positionSummary := p.positionSummary
+	if positionSummary == "" {
+		positionSummary = "White can win a loose queen."
+	}
 	out := strategy.DecisionOutput{
 		SchemaVersion:      strategy.DecisionSchemaVersion,
 		PreviousPlanStatus: "continue",
-		PositionSummary:    "White can win a loose queen.",
+		PositionSummary:    positionSummary,
 		StrategyUpdate: strategy.StrategyUpdate{
 			PlanSummary:       "Win material when tactics permit.",
 			Phase:             "endgame",

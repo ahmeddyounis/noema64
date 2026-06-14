@@ -155,6 +155,8 @@ func TestBuildPromptIncludesGameContextAndStripsPGNComments(t *testing.T) {
 		`"black_ms": 301000`,
 		`"increment_ms": 2000`,
 		"1. e4 e5 2. Nf3 *",
+		"MATERIAL_CONTEXT",
+		"Material is equal.",
 	} {
 		if !strings.Contains(user, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, user)

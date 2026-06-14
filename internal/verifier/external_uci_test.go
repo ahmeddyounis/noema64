@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -163,8 +164,10 @@ func warmTestExecutable(t *testing.T, path string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := exec.CommandContext(ctx, path).Run(); err != nil {
-		t.Fatalf("warm test executable %s: %v", path, err)
+	cmd := exec.CommandContext(ctx, path)
+	cmd.Stdin = strings.NewReader("")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("warm test executable %s: %v\n%s", path, err, out)
 	}
 }
 
