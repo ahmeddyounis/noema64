@@ -2,7 +2,7 @@
 
 Noema64 is local-first and does not upload telemetry by default.
 
-Mock provider mode is fully offline. Endpoint-backed provider modes may send the current FEN, legal moves, move history, strategy memory, selected settings, and optional user notes to the configured provider, including local or remote OpenAI-compatible and Ollama endpoints.
+Mock provider mode is fully offline. Endpoint-backed provider modes may send the current FEN, legal moves, move history, strategy memory, selected settings, and optional user notes to the configured provider, including OpenAI, local or remote OpenAI-compatible endpoints, and Ollama endpoints.
 
 Raw prompt logging is disabled by default. API keys are redacted from traces and logs. Normal JSONL trace export strips raw prompts and raw LLM responses even if they were logged. Full debug trace export keeps raw prompt/response fields and requires explicit GUI confirmation.
 

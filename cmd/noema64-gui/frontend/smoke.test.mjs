@@ -128,6 +128,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
   assert.match(indexHTML, />Engine Move</);
   assert.match(indexHTML, />Developer Lab</);
   assert.match(indexHTML, /class="check-label"><input id="settingAutoReply"/);
+  assert.match(indexHTML, /<option value="openai">OpenAI<\/option>/);
   assert.match(indexHTML, /id="settingClockInitial" type="number" min="0"/);
   assert.match(indexHTML, /dialog id="settingsDialog" aria-labelledby="settingsTitle"/);
   assert.match(indexHTML, /dialog id="promotionDialog" aria-labelledby="promotionTitle"/);
@@ -714,7 +715,9 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /empty\.setAttribute\("aria-colspan", "8"\)/);
   assert.match(appJS, /board\.setAttribute\("aria-label", message\)/);
   assert.match(appJS, /board\.setAttribute\("aria-label", "Chess board"\)/);
-  assert.match(appJS, /"openai_compatible", "anthropic", "gemini", "ollama"/);
+  assert.match(appJS, /"openai", "openai_compatible", "anthropic", "gemini", "ollama"/);
+  assert.match(appJS, /openAIEndpoint = "https:\/\/api\.openai\.com\/v1"/);
+  assert.match(appJS, /settings\.llm\.provider === "openai" \? "" : document\.querySelector\("#settingEndpoint"\)\.value/);
   assert.match(appJS, /initialInput\.value = Math\.max\(0, Math\.round\(\(tc\.initial_ms \|\| 0\) \/ 60000\)\);/);
   assert.match(appJS, /bindBusyButton\("#runImportBtn"/);
   assert.match(appJS, /showExportError\(err\)/);

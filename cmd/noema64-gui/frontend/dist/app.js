@@ -135,7 +135,8 @@ const knownHumanizedTokens = {
   pgn: "PGN",
   uci: "UCI"
 };
-const cloudProviderAckMessage = "Acknowledge provider endpoint data sharing before saving.";
+const openAIEndpoint = "https://api.openai.com/v1";
+const cloudProviderAckMessage = "Acknowledge provider data sharing before saving.";
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -2107,7 +2108,7 @@ async function saveSettings() {
       settings.gui.clock_increment_ms = timeControl.increment_ms;
       settings.llm.profile_id = document.querySelector("#settingProfile").value || "custom";
       settings.llm.provider = document.querySelector("#settingProvider").value;
-      settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
+      settings.llm.endpoint = settings.llm.provider === "openai" ? "" : document.querySelector("#settingEndpoint").value;
       settings.llm.model = document.querySelector("#settingModel").value;
       settings.llm.temperature = requireNumberField("#settingTemperature", "Temperature", 0, 2);
       settings.llm.max_tokens = requireIntegerMinField("#settingMaxTokens", "Max tokens", 1);
@@ -2172,8 +2173,18 @@ async function saveProviderKeyToKeychain() {
 
 function syncProviderDisclosure() {
   const warning = document.querySelector("#cloudProviderWarning");
-  const isCloud = providerRequiresAck(document.querySelector("#settingProvider").value);
+  const provider = document.querySelector("#settingProvider").value;
+  const isCloud = providerRequiresAck(provider);
+  const endpoint = document.querySelector("#settingEndpoint");
+  const managedOpenAIEndpoint = provider === "openai";
   warning.classList.toggle("hidden", !isCloud);
+  endpoint.disabled = managedOpenAIEndpoint;
+  endpoint.placeholder = managedOpenAIEndpoint ? `${openAIEndpoint} (default)` : "http://localhost:11434/v1";
+  endpoint.title = managedOpenAIEndpoint ? "OpenAI uses the default API endpoint automatically." : "";
+  if (managedOpenAIEndpoint) {
+    endpoint.value = "";
+    clearFieldInvalid(endpoint);
+  }
   if (!isCloud) clearCloudProviderAckWarning();
 }
 
@@ -2190,7 +2201,7 @@ function clearCloudProviderAckWarning() {
 }
 
 function providerRequiresAck(provider) {
-  return ["openai_compatible", "anthropic", "gemini", "ollama"].includes(provider);
+  return ["openai", "openai_compatible", "anthropic", "gemini", "ollama"].includes(provider);
 }
 
 function syncTimeControlInputsFromPreset(overwrite) {

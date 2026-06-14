@@ -205,10 +205,10 @@ func DefaultProviderProfiles() []ProviderProfile {
 			Retries:     1,
 		},
 		{
-			ID:          "cloud-strong",
-			Provider:    "openai_compatible",
+			ID:          "openai-cloud",
+			Provider:    "openai",
 			Mode:        "quality",
-			IntendedUse: "analysis_and_high_quality_strategy",
+			IntendedUse: "openai_cloud_strategy",
 			Model:       "user_configured",
 			Temperature: 0.2,
 			MaxTokens:   2000,
@@ -443,7 +443,7 @@ func validateSettings(settings Settings) error {
 		return err
 	}
 	switch settings.LLM.Provider {
-	case "mock", "openai_compatible", "anthropic", "gemini", "ollama", "policy_prior":
+	case "mock", "openai", "openai_compatible", "anthropic", "gemini", "ollama", "policy_prior":
 	default:
 		return errors.New("settings llm.provider is invalid")
 	}
@@ -496,7 +496,7 @@ func validateProviderProfiles(profiles []ProviderProfile) error {
 		}
 		seen[profile.ID] = struct{}{}
 		switch profile.Provider {
-		case "mock", "openai_compatible", "anthropic", "gemini", "ollama", "policy_prior":
+		case "mock", "openai", "openai_compatible", "anthropic", "gemini", "ollama", "policy_prior":
 		default:
 			return errors.New("settings llm.profiles.provider is invalid")
 		}

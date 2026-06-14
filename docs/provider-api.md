@@ -16,6 +16,7 @@ The strategy layer owns prompt construction, schema parsing, repair, and fallbac
 Default providers:
 
 - `mock`: deterministic, offline, CI-safe.
+- `openai`: OpenAI chat completions adapter using `https://api.openai.com/v1`.
 - `openai_compatible`: HTTP chat completions adapter for local or cloud endpoints.
 - `anthropic`: Anthropic Messages API adapter.
 - `gemini`: Gemini generateContent adapter with JSON response mode.
@@ -30,4 +31,4 @@ The app service exposes provider profiles to the GUI for:
 - Provider comparison across the deterministic position suite.
 - YAML import/export of configured profiles.
 
-Profile export redacts API keys. Import preserves an existing secret when the imported profile contains `[REDACTED]` for the same profile ID. Profiles can also use `api_key_ref`; on macOS, Noema64 resolves refs through the system keychain service name `noema64`, and in CI or local automation refs can be supplied through `NOEMA64_KEYCHAIN_<REF>` environment variables with non-alphanumeric characters converted to underscores. Endpoint-backed health checks and provider comparison are skipped until the cloud-provider acknowledgement is enabled, because those actions can transmit FEN, legal moves, move history, strategy memory, and selected settings to the configured endpoint.
+Profile export redacts API keys. Import preserves an existing secret when the imported profile contains `[REDACTED]` for the same profile ID. Profiles can also use `api_key_ref`; on macOS, Noema64 resolves refs through the system keychain service name `noema64`, and in CI or local automation refs can be supplied through `NOEMA64_KEYCHAIN_<REF>` environment variables with non-alphanumeric characters converted to underscores. Endpoint-backed health checks and provider comparison are skipped until the cloud-provider acknowledgement is enabled, because those actions can transmit FEN, legal moves, move history, strategy memory, and selected settings to the configured provider.

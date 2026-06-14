@@ -10,7 +10,7 @@ Implemented in this repository:
 
 - Go chess core wrapper with legal moves, FEN, PGN, move history, outcomes, promotions, castling, and en passant through `github.com/corentings/chess/v2`.
 - Strategy memory v1.2 structs, diffing, versioned editable prompt packs, strict JSON parsing, candidate repair, and schema validation.
-- Mock provider that works offline, OpenAI-compatible HTTP, Anthropic, Gemini, Ollama, and local policy-prior provider adapters.
+- Mock provider that works offline, OpenAI, OpenAI-compatible HTTP, Anthropic, Gemini, Ollama, and local policy-prior provider adapters.
 - Deterministic fallback ladder that always chooses a legal move when legal moves exist.
 - Static blunderguard verifier plus optional external UCI verifier and external tablebase probe path support.
 - UCI binary with `uci`, `isready`, `ucinewgame`, `position`, `go`, `stop`, `quit`, and `setoption`.
@@ -26,7 +26,7 @@ Implemented in this repository:
 - Go 1.22 or newer.
 - Node.js for frontend syntax and GUI smoke checks.
 - Wails v2 CLI for packaged desktop builds.
-- Optional: a local OpenAI-compatible LLM endpoint or cloud endpoint.
+- Optional: an OpenAI API key, local OpenAI-compatible LLM endpoint, or other cloud provider key.
 - Optional: a user-supplied UCI verifier such as Stockfish or an external tablebase probe. No verifier or tablebase binary is bundled.
 
 ## Quick Start
@@ -90,7 +90,18 @@ Study returns compressed memory, opening-book suggestions, endgame trainer drill
 
 ## Provider Setup
 
-Default config uses the offline mock provider. Supported provider values are `mock`, `openai_compatible`, `anthropic`, `gemini`, `ollama`, and `policy_prior`. To use an OpenAI-compatible endpoint, set:
+Default config uses the offline mock provider. Supported provider values are `mock`, `openai`, `openai_compatible`, `anthropic`, `gemini`, `ollama`, and `policy_prior`.
+
+For OpenAI, set the provider and model; Noema64 uses `https://api.openai.com/v1` automatically:
+
+```yaml
+llm:
+  provider: openai
+  model: your-openai-model
+  api_key: ""
+```
+
+To use another OpenAI-compatible endpoint, set:
 
 ```yaml
 llm:
@@ -100,7 +111,7 @@ llm:
   api_key: ""
 ```
 
-Endpoint-backed provider modes may send FEN, legal moves, move history, strategy memory, and settings to the configured provider, including local or remote OpenAI-compatible and Ollama endpoints. Raw prompt logging is off by default.
+Endpoint-backed provider modes may send FEN, legal moves, move history, strategy memory, and settings to the configured provider, including OpenAI, local or remote OpenAI-compatible endpoints, and Ollama endpoints. Raw prompt logging is off by default.
 
 ## Verifier Setup
 

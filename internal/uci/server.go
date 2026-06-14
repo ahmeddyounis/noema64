@@ -253,6 +253,9 @@ func (s *Server) setOption(line string) error {
 
 func (s *Server) refreshProviderLocked() {
 	switch strings.ToLower(s.providerKind) {
+	case "openai":
+		s.opts.Provider = providers.OpenAIProvider{BaseURL: providers.OpenAIBaseURL, APIKey: s.apiKey, Model: s.opts.Model, Retries: s.providerRetries}
+		return
 	case "openai_compatible":
 		if s.endpoint == "" {
 			break
@@ -671,6 +674,8 @@ func engineOptions(settings storage.Settings) engine.Options {
 func uciProviderFromSettings(settings storage.Settings) providers.Provider {
 	apiKey, _ := security.ResolveAPIKey(settings.LLM.APIKey, settings.LLM.APIKeyRef)
 	switch settings.LLM.Provider {
+	case "openai":
+		return providers.OpenAIProvider{BaseURL: providers.OpenAIBaseURL, APIKey: apiKey, Model: settings.LLM.Model, Retries: settings.LLM.Retries}
 	case "openai_compatible":
 		if settings.LLM.Endpoint == "" {
 			return nil

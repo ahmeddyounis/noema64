@@ -275,6 +275,7 @@
           <label>Provider
             <select id="settingProvider">
               <option value="mock">Mock</option>
+              <option value="openai">OpenAI</option>
               <option value="openai_compatible">OpenAI-compatible</option>
               <option value="anthropic">Anthropic</option>
               <option value="gemini">Gemini</option>
@@ -282,7 +283,7 @@
               <option value="policy_prior">Policy prior</option>
             </select>
           </label>
-          <label id="cloudProviderWarning" class="provider-warning hidden"><input id="settingCloudAck" type="checkbox" /> I understand this provider endpoint may receive FEN, legal moves, move history, strategy memory, and selected settings.</label>
+          <label id="cloudProviderWarning" class="provider-warning hidden"><input id="settingCloudAck" type="checkbox" /> I understand this provider may receive FEN, legal moves, move history, strategy memory, and selected settings.</label>
           <label>Endpoint <input id="settingEndpoint" placeholder="http://localhost:11434/v1" /></label>
           <label>Model <input id="settingModel" placeholder="mock-balanced" /></label>
           <label>Temperature <input id="settingTemperature" type="number" min="0" max="2" step="0.05" /></label>

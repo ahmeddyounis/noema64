@@ -12,7 +12,7 @@ Core packages:
 
 - `chesscore`: deterministic chess wrapper. It does not import GUI, UCI, providers, strategy, or verifier code.
 - `strategy`: memory schema, prompt construction, JSON parsing, and move repair.
-- `providers`: LLM adapter interface with mock, OpenAI-compatible, Anthropic, Gemini, Ollama, and local policy-prior implementations.
+- `providers`: LLM adapter interface with mock, OpenAI, OpenAI-compatible, Anthropic, Gemini, Ollama, and local policy-prior implementations.
 - `verifier`: static safety and optional external UCI verifier boundary.
 - `decision`: move decision state machine, scoring, fallback, and traces.
 - `engine`: stateful game engine used by CLI, UCI, and app services.

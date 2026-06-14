@@ -69,6 +69,20 @@ func TestOpenAICompatibleCompleteJSONRequestShape(t *testing.T) {
 	}
 }
 
+func TestOpenAIProviderWrapsCompatibleEndpointWithOpenAIName(t *testing.T) {
+	server := openAITestServer(t, `{"move":"e2e4"}`, nil)
+	defer server.Close()
+
+	provider := OpenAIProvider{BaseURL: server.URL, Model: "model-a"}
+	resp, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 16})
+	if err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
+	if resp.Provider != "openai" || resp.Text != `{"move":"e2e4"}` {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
 func TestOpenAICompatibleUsesConfiguredModelWhenRequestModelEmpty(t *testing.T) {
 	var seen struct {
 		Model string `json:"model"`

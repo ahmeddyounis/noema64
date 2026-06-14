@@ -406,6 +406,17 @@ func providerFromProfile(profile storage.ProviderProfile) (providers.Provider, s
 	switch profile.Provider {
 	case "mock", "":
 		return providers.MockProvider{}, "configured", nil
+	case "openai":
+		apiKey, err := security.ResolveAPIKey(profile.APIKey, profile.APIKeyRef)
+		if err != nil {
+			return providers.OpenAIProvider{BaseURL: providers.OpenAIBaseURL, Model: profile.Model, Retries: profile.Retries}, "keychain_unavailable", err
+		}
+		return providers.OpenAIProvider{
+			BaseURL: providers.OpenAIBaseURL,
+			APIKey:  apiKey,
+			Model:   profile.Model,
+			Retries: profile.Retries,
+		}, "configured", nil
 	case "openai_compatible":
 		if strings.TrimSpace(profile.Endpoint) == "" {
 			return providers.OpenAICompatible{Model: profile.Model, Retries: profile.Retries}, "config_missing", fmt.Errorf("provider endpoint is required")

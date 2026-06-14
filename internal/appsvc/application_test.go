@@ -228,8 +228,9 @@ func TestSaveSettingsKeepsNormalizedRuntimeSettings(t *testing.T) {
 func TestSaveSettingsRequiresCloudProviderAcknowledgement(t *testing.T) {
 	app, _ := newTestApplication(t)
 	settings := app.settings
-	settings.LLM.Provider = "openai_compatible"
-	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.LLM.Provider = "openai"
+	settings.LLM.Endpoint = ""
+	settings.LLM.Model = "test-model"
 	settings.Privacy.CloudProviderWarningAcknowledged = false
 	if err := app.SaveSettings(settings); err == nil {
 		t.Fatal("expected cloud provider settings without acknowledgement to fail")
@@ -237,6 +238,25 @@ func TestSaveSettingsRequiresCloudProviderAcknowledgement(t *testing.T) {
 	settings.Privacy.CloudProviderWarningAcknowledged = true
 	if err := app.SaveSettings(settings); err != nil {
 		t.Fatalf("save acknowledged cloud provider settings: %v", err)
+	}
+}
+
+func TestEngineOptionsUsesOpenAIDefaultEndpoint(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.Provider = "openai"
+	settings.LLM.Endpoint = ""
+	settings.LLM.Model = "test-model"
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save openai settings: %v", err)
+	}
+	provider, ok := app.engineOptions().Provider.(providers.OpenAIProvider)
+	if !ok {
+		t.Fatalf("provider = %T, want OpenAIProvider", app.engineOptions().Provider)
+	}
+	if provider.BaseURL != providers.OpenAIBaseURL {
+		t.Fatalf("provider base url = %q, want %q", provider.BaseURL, providers.OpenAIBaseURL)
 	}
 }
 
@@ -807,7 +827,7 @@ func TestProviderDashboardHonorsProfilePrivacy(t *testing.T) {
 		if profile.Provider == "mock" && profile.Healthy {
 			sawMockHealthy = true
 		}
-		if profile.Provider == "openai_compatible" && profile.Status == "privacy_ack_required" {
+		if (profile.Provider == "openai" || profile.Provider == "openai_compatible") && profile.Status == "privacy_ack_required" {
 			sawPrivacyGate = true
 		}
 		if profile.Provider == "ollama" && profile.Status == "privacy_ack_required" {

@@ -166,6 +166,17 @@ func TestSaveSettingsValidatesProvider(t *testing.T) {
 	}
 }
 
+func TestSaveSettingsAllowsOpenAIWithoutEndpoint(t *testing.T) {
+	settings := DefaultSettings()
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.Provider = "openai"
+	settings.LLM.Endpoint = ""
+	settings.LLM.Model = "test-model"
+	if err := SaveSettings(filepath.Join(t.TempDir(), "config.yaml"), settings); err != nil {
+		t.Fatalf("save openai settings without endpoint: %v", err)
+	}
+}
+
 func TestSaveSettingsValidatesTimeControl(t *testing.T) {
 	settings := DefaultSettings()
 	settings.GUI.TimeControl = "sudden_mystery"
