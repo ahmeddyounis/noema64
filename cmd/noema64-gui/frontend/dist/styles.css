@@ -570,6 +570,14 @@ body[data-theme="high_contrast"] .dark {
   color: #ffffff;
 }
 
+body[data-theme="high_contrast"] .light .coord {
+  color: rgba(11, 12, 14, 0.82);
+}
+
+body[data-theme="high_contrast"] .dark .coord {
+  color: rgba(255, 255, 255, 0.88);
+}
+
 body[data-theme="classic"] .light {
   background: #f0d9b5;
 }

@@ -192,6 +192,7 @@ test("settings surface covers MVP and profile controls", () => {
     expectMarkupID(id);
   }
   assert.match(indexHTML, /high_contrast/);
+  assert.match(stylesCSS, /body\[data-theme="high_contrast"\] \.dark \.coord \{[\s\S]*color: rgba\(255, 255, 255, 0\.88\);/);
   for (const section of ["Game", "Provider", "Verifier", "Logging"]) {
     assert.match(indexHTML, new RegExp(`<h3 class="settings-section">${section}</h3>`), `missing settings section ${section}`);
   }
