@@ -113,6 +113,27 @@ func TestOpenAICompatibleRejectsEmptyResponseContent(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleIncludesRedactedHTTPErrorBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"You exceeded your current quota.","type":"insufficient_quota","api_key":"sk-testsecret1234567890"}}`))
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "model-a"}
+	_, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 16})
+	if err == nil {
+		t.Fatal("expected HTTP error")
+	}
+	text := err.Error()
+	if !strings.Contains(text, "provider returned HTTP 429") || !strings.Contains(text, "insufficient_quota") {
+		t.Fatalf("error = %q, want HTTP status and provider detail", text)
+	}
+	if strings.Contains(text, "sk-testsecret") {
+		t.Fatalf("error leaked secret: %q", text)
+	}
+}
+
 func TestOpenAICompatibleRetriesTransientFailure(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

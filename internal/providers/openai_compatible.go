@@ -117,7 +117,7 @@ func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRe
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("provider returned HTTP %d", resp.StatusCode)
+		return nil, providerHTTPError(resp.StatusCode, resp.Body)
 	}
 	var decoded struct {
 		Model   string `json:"model"`

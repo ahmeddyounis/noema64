@@ -10,9 +10,12 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/ahmedyounis/noema64/internal/security"
 )
 
 const maxProviderResponseBytes = 4 << 20
+const maxProviderErrorBytes = 8 << 10
 
 type AnthropicProvider struct {
 	BaseURL string
@@ -89,7 +92,7 @@ func (p AnthropicProvider) completeJSONOnce(ctx context.Context, req CompletionR
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode >= 400 {
-		return nil, fmt.Errorf("provider returned HTTP %d", httpResp.StatusCode)
+		return nil, providerHTTPError(httpResp.StatusCode, httpResp.Body)
 	}
 	var decoded struct {
 		Content []struct {
@@ -187,7 +190,7 @@ func (p GeminiProvider) completeJSONOnce(ctx context.Context, req CompletionRequ
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode >= 400 {
-		return nil, fmt.Errorf("provider returned HTTP %d", httpResp.StatusCode)
+		return nil, providerHTTPError(httpResp.StatusCode, httpResp.Body)
 	}
 	var decoded struct {
 		Candidates []struct {
@@ -281,7 +284,7 @@ func (p OllamaProvider) completeJSONOnce(ctx context.Context, req CompletionRequ
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode >= 400 {
-		return nil, fmt.Errorf("provider returned HTTP %d", httpResp.StatusCode)
+		return nil, providerHTTPError(httpResp.StatusCode, httpResp.Body)
 	}
 	var decoded struct {
 		Message struct {
@@ -333,6 +336,28 @@ func decodeProviderResponse(body io.Reader, target any) error {
 		return err
 	}
 	return nil
+}
+
+func providerHTTPError(statusCode int, body io.Reader) error {
+	data, err := io.ReadAll(io.LimitReader(body, maxProviderErrorBytes+1))
+	if err != nil {
+		return fmt.Errorf("provider returned HTTP %d; failed to read error body: %w", statusCode, err)
+	}
+	if len(data) == 0 {
+		return fmt.Errorf("provider returned HTTP %d", statusCode)
+	}
+	truncated := len(data) > maxProviderErrorBytes
+	if truncated {
+		data = data[:maxProviderErrorBytes]
+	}
+	detail := security.RedactSecrets(strings.Join(strings.Fields(string(data)), " "))
+	if detail == "" {
+		return fmt.Errorf("provider returned HTTP %d", statusCode)
+	}
+	if truncated {
+		detail += "..."
+	}
+	return fmt.Errorf("provider returned HTTP %d: %s", statusCode, detail)
 }
 
 func healthCheckJSON(ctx context.Context, provider Provider, model string) error {
