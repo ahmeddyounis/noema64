@@ -1826,6 +1826,7 @@ async function analyzeCurrentPosition() {
       }
       if (state?.snapshot) {
         renderStatus();
+        renderBoard();
       } else {
         const status = document.querySelector("#statusText");
         status.textContent = "Analysis complete. No game state is loaded.";

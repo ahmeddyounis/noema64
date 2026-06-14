@@ -702,6 +702,7 @@ test("bundle wires core actions and renders trace metadata", () => {
   ]) {
     expectScriptToken(token);
   }
+  assert.match(appJS, /const decision = await call\("AnalyzeCurrentPosition"\);[\s\S]*state\.last_decision = decision;[\s\S]*renderStatus\(\);[\s\S]*renderBoard\(\);[\s\S]*renderDecision\(\);/);
   assert.match(appJS, /--board-files/);
   assert.match(appJS, /--board-ranks/);
   assert.match(appJS, /aria-rowcount/);
