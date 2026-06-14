@@ -825,6 +825,19 @@ function requireIntegerField(selector, label, min, max) {
   throw new Error(`${label} must be a whole number between ${min} and ${max}.`);
 }
 
+function requireNumberField(selector, label, min, max) {
+  const field = document.querySelector(selector);
+  const value = Number(String(field?.value || "").trim());
+  if (Number.isFinite(value) && value >= min && value <= max) {
+    clearFieldInvalid(field);
+    return value;
+  }
+  markFieldInvalid(field);
+  field?.focus();
+  field?.select?.();
+  throw new Error(`${label} must be a number between ${min} and ${max}.`);
+}
+
 function markFieldInvalid(field) {
   if (!field) return;
   field.setAttribute("aria-invalid", "true");
@@ -1897,7 +1910,7 @@ async function saveSettings() {
       settings.llm.provider = document.querySelector("#settingProvider").value;
       settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
       settings.llm.model = document.querySelector("#settingModel").value;
-      settings.llm.temperature = Number(document.querySelector("#settingTemperature").value);
+      settings.llm.temperature = requireNumberField("#settingTemperature", "Temperature", 0, 2);
       settings.llm.max_tokens = Number(document.querySelector("#settingMaxTokens").value) || settings.llm.max_tokens;
       settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
       settings.llm.retries = requireIntegerField("#settingRetries", "Retries", 0, 5);
