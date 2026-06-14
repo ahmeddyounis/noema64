@@ -31,6 +31,8 @@ Noema64 includes:
 
 ## Quick Start
 
+Download packaged desktop builds from [GitHub Releases](https://github.com/ahmeddyounis/noema64/releases). Release assets are currently unsigned Windows and macOS builds, so your OS may show a security warning until code signing and notarization are added.
+
 ```sh
 go test ./...
 npm --prefix cmd/noema64-gui/frontend test
