@@ -114,7 +114,7 @@ func buildFakeTablebaseProbe(t *testing.T) string {
 	}
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "main.go")
-	probePath := filepath.Join(dir, "fake-tablebase")
+	probePath := testExecutablePath(dir, "fake-tablebase")
 	source := `package main
 
 import (

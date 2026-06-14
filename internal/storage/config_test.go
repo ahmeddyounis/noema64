@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/ahmedyounis/noema64/internal/strategy"
@@ -54,6 +55,9 @@ func TestSettingsRoundTripAPIKeyRefs(t *testing.T) {
 }
 
 func TestSaveSettingsForcesPrivateFilePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose POSIX 0600 file permissions through os.FileMode")
+	}
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(path, []byte("schema_version: \"1.0\"\n"), 0o644); err != nil {
 		t.Fatalf("write loose config: %v", err)

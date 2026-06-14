@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -67,7 +68,7 @@ func buildFakeUCIEngine(t *testing.T, ignoreQuit bool) string {
 	}
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "main.go")
-	enginePath := filepath.Join(dir, "fake-uci")
+	enginePath := testExecutablePath(dir, "fake-uci")
 	quitAction := "return"
 	if ignoreQuit {
 		quitAction = "continue"
@@ -114,7 +115,7 @@ func buildFakeScoringUCIEngine(t *testing.T) string {
 	}
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "main.go")
-	enginePath := filepath.Join(dir, "fake-scoring-uci")
+	enginePath := testExecutablePath(dir, "fake-scoring-uci")
 	source := `package main
 
 import (
@@ -169,6 +170,13 @@ func warmTestExecutable(t *testing.T, path string) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("warm test executable %s: %v\n%s", path, err, out)
 	}
+}
+
+func testExecutablePath(dir string, name string) string {
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return filepath.Join(dir, name)
 }
 
 func TestParseUCIScore(t *testing.T) {

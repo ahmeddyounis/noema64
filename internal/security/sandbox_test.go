@@ -3,6 +3,7 @@ package security
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -26,12 +27,22 @@ func TestValidateExternalCommandRejectsShellLikeInput(t *testing.T) {
 
 func TestValidateExternalCommandChecksAbsoluteExecutable(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "engine")
-	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o600); err != nil {
+	nonExecutablePath := filepath.Join(dir, "engine")
+	if runtime.GOOS == "windows" {
+		nonExecutablePath = filepath.Join(dir, "engine.txt")
+	}
+	if err := os.WriteFile(nonExecutablePath, []byte("#!/bin/sh\nexit 0\n"), 0o600); err != nil {
 		t.Fatalf("write command: %v", err)
 	}
-	if _, err := ValidateExternalCommand(path, DefaultExternalCommandPolicy()); err == nil {
+	if _, err := ValidateExternalCommand(nonExecutablePath, DefaultExternalCommandPolicy()); err == nil {
 		t.Fatal("expected non-executable file to fail")
+	}
+	path := filepath.Join(dir, "engine")
+	if runtime.GOOS == "windows" {
+		path += ".exe"
+	}
+	if err := os.WriteFile(path, []byte("#!/bin/sh\nexit 0\n"), 0o600); err != nil {
+		t.Fatalf("write executable command: %v", err)
 	}
 	if err := os.Chmod(path, 0o700); err != nil {
 		t.Fatalf("chmod command: %v", err)

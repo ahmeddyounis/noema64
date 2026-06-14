@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"unicode"
 )
@@ -31,7 +32,7 @@ func ValidateExternalCommand(path string, policy ExternalCommandPolicy) (string,
 		}
 	}
 	if !filepath.IsAbs(path) {
-		if strings.ContainsRune(path, filepath.Separator) || strings.Contains(path, "..") {
+		if strings.Contains(path, "/") || strings.Contains(path, "\\") || strings.Contains(path, "..") {
 			return "", fmt.Errorf("external command must be an absolute path or a simple PATH binary name")
 		}
 		if !policy.AllowPATHLookup {
@@ -53,10 +54,22 @@ func ValidateExternalCommand(path string, policy ExternalCommandPolicy) (string,
 	if info.IsDir() {
 		return "", fmt.Errorf("external command %q is a directory", resolved)
 	}
-	if info.Mode()&0o111 == 0 {
+	if !isExecutableFile(resolved, info.Mode()) {
 		return "", fmt.Errorf("external command %q is not executable", resolved)
 	}
 	return resolved, nil
+}
+
+func isExecutableFile(path string, mode os.FileMode) bool {
+	if runtime.GOOS == "windows" {
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".exe", ".com", ".bat", ".cmd":
+			return true
+		default:
+			return false
+		}
+	}
+	return mode&0o111 != 0
 }
 
 func pathWithinAnyDir(path string, dirs []string) bool {
