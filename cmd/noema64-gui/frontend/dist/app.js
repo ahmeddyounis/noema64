@@ -1874,6 +1874,7 @@ const settingsSaveErrorFields = [
   [/engine\.default_mode|default mode/i, "#settingMode"],
   [/engine\.personality|personality/i, "#settingPersonality"],
   [/engine\.max_candidates|max candidates/i, "#settingMaxCandidates"],
+  [/chess960 seed|variant seed/i, "#settingVariantSeed"],
   [/clock_initial|initial minutes/i, "#settingClockInitial"],
   [/clock_increment|increment seconds/i, "#settingClockIncrement"],
   [/llm\.provider|provider is invalid/i, "#settingProvider"],
@@ -1889,6 +1890,11 @@ const settingsSaveErrorFields = [
   [/tablebase_timeout|tablebase timeout/i, "#settingTablebaseTimeout"],
   [/verifier\.path|verifier path/i, "#settingVerifierPath"],
   [/logging\.output_dir|log output directory|output_dir/i, "#settingLogDir"]
+];
+const gameSetupErrorFields = [
+  [/chess960 seed|variant seed/i, "#settingVariantSeed"],
+  [/clock_initial|initial minutes/i, "#settingClockInitial"],
+  [/clock_increment|increment seconds/i, "#settingClockIncrement"]
 ];
 
 function clearSettingsSaveErrorFields() {
@@ -1908,6 +1914,20 @@ function focusSettingsSaveError(err) {
   field.select?.();
 }
 
+function focusGameSetupError(err) {
+  const message = appErrorMessage(err);
+  const match = gameSetupErrorFields.find(([pattern]) => pattern.test(message));
+  const field = match ? document.querySelector(match[1]) : null;
+  if (!field) return false;
+  const dialog = document.querySelector("#settingsDialog");
+  if (dialog && !dialog.open) dialog.showModal();
+  showError(message, "#settingsOutput");
+  markFieldInvalid(field);
+  field.focus();
+  field.select?.();
+  return true;
+}
+
 async function saveSettings() {
   return withBusyControl("#saveSettingsBtn", async () => {
     try {
@@ -1916,7 +1936,7 @@ async function saveSettings() {
       if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
       autoReply = document.querySelector("#settingAutoReply").checked;
       gameVariant = document.querySelector("#settingVariant").value || "standard";
-      chess960Seed = Number(document.querySelector("#settingVariantSeed").value) || 0;
+      chess960Seed = requireIntegerField("#settingVariantSeed", "Chess960 seed", 0, 959);
       const timeControl = timeControlForNewGame();
       settings.engine.default_mode = document.querySelector("#settingMode").value;
       settings.engine.personality = document.querySelector("#settingPersonality").value;
@@ -2907,7 +2927,7 @@ bindBusyButton("#newGameBtn", async () => {
     applyGameStateResult(await call("NewGame", {
       side,
       variant: document.querySelector("#settingVariant")?.value || gameVariant,
-      seed: Number(document.querySelector("#settingVariantSeed")?.value) || chess960Seed,
+      seed: requireIntegerField("#settingVariantSeed", "Chess960 seed", 0, 959),
       mode: document.querySelector("#settingMode")?.value || "blunderguard",
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
@@ -2916,6 +2936,7 @@ bindBusyButton("#newGameBtn", async () => {
     if (autoReply && side === "black") await askEngine();
   } catch (err) {
     showError(err);
+    focusGameSetupError(err);
   }
 });
 document.querySelector("#settingTimeControl").addEventListener("change", () => {
