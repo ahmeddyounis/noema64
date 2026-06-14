@@ -26,6 +26,7 @@ const busyControls = new Set();
 const busyDisabledState = new WeakMap();
 let activeOperationCount = 0;
 let activeThinkingOperationCount = 0;
+let stopRequested = false;
 let appActivitySequence = 0;
 let activityEvents = [];
 const maxActivityEvents = 30;
@@ -462,12 +463,14 @@ async function withThinkingControl(controlOrSelector, action) {
   const control = controlFrom(controlOrSelector);
   const key = busyKey(controlOrSelector, control);
   if (!control || busyControls.has(key)) return undefined;
+  if (activeThinkingOperationCount === 0) stopRequested = false;
   activeThinkingOperationCount += 1;
   setPrimaryActionAvailability(state?.snapshot);
   try {
     return await withBusyControl(controlOrSelector, action);
   } finally {
     activeThinkingOperationCount = Math.max(0, activeThinkingOperationCount - 1);
+    if (activeThinkingOperationCount === 0) stopRequested = false;
     setPrimaryActionAvailability(state?.snapshot);
   }
 }
@@ -775,7 +778,7 @@ function setPrimaryActionAvailability(snapshot) {
       (requirement === "game" && (!hasService || !hasGame)) ||
       (requirement === "ongoing" && (!hasService || !ongoing)) ||
       (requirement === "moves" && (!hasService || !hasMoves)) ||
-      (requirement === "thinking" && (!hasService || activeThinkingOperationCount === 0));
+      (requirement === "thinking" && (!hasService || activeThinkingOperationCount === 0 || stopRequested));
   }
   const moveInput = document.querySelector("#moveInput");
   if (moveInput) moveInput.disabled = !hasService || !ongoing;
@@ -3016,14 +3019,23 @@ bindBusyButton("#recentBtn", openRecentGames);
 bindBusyButton("#refreshRecentBtn", refreshRecentGames);
 document.querySelector("#engineBtn").addEventListener("click", askEngine);
 document.querySelector("#analyzeBtn").addEventListener("click", analyzeCurrentPosition);
-bindBusyButton("#stopBtn", async () => {
-  try {
-    await call("StopEngine");
-    document.querySelector("#thinkingStage").textContent = "Stop requested";
-    showSuccess("Stop requested.");
-  } catch (err) {
-    showError(err);
-  }
+document.querySelector("#stopBtn").addEventListener("click", async (event) => {
+  event.preventDefault();
+  if (stopRequested) return;
+  await withBusyControl("#stopBtn", async () => {
+    stopRequested = true;
+    setPrimaryActionAvailability(state?.snapshot);
+    try {
+      await call("StopEngine");
+      document.querySelector("#thinkingStage").textContent = "Stop requested";
+      showSuccess("Stop requested.");
+    } catch (err) {
+      stopRequested = false;
+      setPrimaryActionAvailability(state?.snapshot);
+      showError(err);
+    }
+  });
+  setPrimaryActionAvailability(state?.snapshot);
 });
 document.querySelector("#resignBtn").addEventListener("click", resignGame);
 bindBusyButton("#undoBtn", async () => {
