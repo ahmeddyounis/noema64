@@ -682,8 +682,12 @@ function setupFlowMeta() {
 function timeControlMeta() {
   const preset = document.querySelector("#settingTimeControl")?.value || settings?.gui?.time_control || "untimed";
   if (preset !== "custom") return humanizeToken(preset);
-  const tc = timeControlForNewGame();
-  return `${Math.round((tc.initial_ms || 0) / 60000)}+${Math.round((tc.increment_ms || 0) / 1000)}`;
+  const initial = Number(document.querySelector("#settingClockInitial")?.value);
+  const increment = Number(document.querySelector("#settingClockIncrement")?.value);
+  if (!Number.isInteger(initial) || initial < 0 || initial > 180 || !Number.isInteger(increment) || increment < 0 || increment > 120) {
+    return "Custom clock needs review";
+  }
+  return `${initial}+${increment}`;
 }
 
 function recordFlowMeta(snapshot) {
@@ -1870,6 +1874,8 @@ const settingsSaveErrorFields = [
   [/engine\.default_mode|default mode/i, "#settingMode"],
   [/engine\.personality|personality/i, "#settingPersonality"],
   [/engine\.max_candidates|max candidates/i, "#settingMaxCandidates"],
+  [/clock_initial|initial minutes/i, "#settingClockInitial"],
+  [/clock_increment|increment seconds/i, "#settingClockIncrement"],
   [/llm\.provider|provider is invalid/i, "#settingProvider"],
   [/llm\.endpoint|endpoint/i, "#settingEndpoint"],
   [/llm\.model|model/i, "#settingModel"],
@@ -2015,16 +2021,9 @@ function timeControlForNewGame() {
   const preset = document.querySelector("#settingTimeControl")?.value || settings?.gui?.time_control || "untimed";
   if (preset !== "custom") return timeControlPresets[preset] || timeControlPresets.untimed;
   return {
-    initial_ms: numericInputMS("#settingClockInitial", 60000, settings?.gui?.clock_initial_ms || 0),
-    increment_ms: numericInputMS("#settingClockIncrement", 1000, settings?.gui?.clock_increment_ms || 0)
+    initial_ms: requireIntegerField("#settingClockInitial", "Initial minutes", 0, 180) * 60000,
+    increment_ms: requireIntegerField("#settingClockIncrement", "Increment seconds", 0, 120) * 1000
   };
-}
-
-function numericInputMS(selector, multiplier, fallbackMS) {
-  const raw = document.querySelector(selector)?.value;
-  const value = Number(raw);
-  if (Number.isFinite(value) && value >= 0) return Math.round(value * multiplier);
-  return Math.max(0, Number(fallbackMS) || 0);
 }
 
 function formatSavedAt(value) {
