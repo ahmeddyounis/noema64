@@ -1517,7 +1517,9 @@ function humanizeToken(value) {
 function renderDecision() {
   const dec = state?.last_decision;
   const candidates = asArray(dec?.candidate_moves);
-  document.querySelector("#thinkingStage").textContent = dec ? stageStatusText(lastDecisionStage(dec), "Decision finished") : "Idle";
+  if (activeThinkingOperationCount === 0) {
+    setThinkingStageFromDecision();
+  }
   const tab = document.querySelector("#tabContent");
   tab.textContent = tabText(dec);
   tab.classList.toggle("empty-copy", !dec);
@@ -1554,6 +1556,11 @@ function renderDecision() {
     div.append(move, detail, score);
     box.appendChild(div);
   }
+}
+
+function setThinkingStageFromDecision(fallback = "Idle") {
+  const dec = state?.last_decision;
+  document.querySelector("#thinkingStage").textContent = dec ? stageStatusText(lastDecisionStage(dec), "Decision finished") : fallback;
 }
 
 function renderCandidatesEmpty(message) {
@@ -1683,6 +1690,7 @@ async function askEngine() {
       lastStageEvent = null;
       document.querySelector("#thinkingStage").textContent = "Thinking: provider, repair, verifier, scoring";
       applyGameStateResult(await call("RequestEngineMove"));
+      setThinkingStageFromDecision("Decision finished");
       showSuccess("Engine move applied.");
     } catch (err) {
       showError(err);
@@ -1710,6 +1718,7 @@ async function analyzeCurrentPosition() {
         status.title = status.textContent;
       }
       renderDecision();
+      setThinkingStageFromDecision("Decision finished");
       renderWorkflowPanel();
       showSuccess("Analysis complete.");
     } catch (err) {
