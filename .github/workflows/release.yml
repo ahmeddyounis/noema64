@@ -1,0 +1,133 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, for example v1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  WAILS_VERSION: v2.12.0
+
+jobs:
+  build-desktop:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos
+          - os: windows-latest
+            platform: windows
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@${{ env.WAILS_VERSION }}
+
+      - name: Run release smoke checks
+        shell: bash
+        run: |
+          go list ./... | grep -v '/cmd/noema64-gui$' | xargs go test
+          npm --prefix cmd/noema64-gui/frontend test
+
+      - name: Build Wails desktop app
+        shell: bash
+        run: |
+          cd cmd/noema64-gui
+          wails build -clean
+
+      - name: Package macOS unsigned app
+        if: runner.os == 'macOS'
+        id: package_macos
+        shell: bash
+        run: |
+          archive="noema64-${RELEASE_TAG}-macos-unsigned.zip"
+          app_path="cmd/noema64-gui/build/bin/Noema64.app"
+          if [ ! -d "$app_path" ]; then
+            echo "Expected app bundle not found: $app_path" >&2
+            find cmd/noema64-gui/build/bin -maxdepth 3 -print >&2
+            exit 1
+          fi
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "$archive"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Package Windows unsigned app
+        if: runner.os == 'Windows'
+        id: package_windows
+        shell: pwsh
+        run: |
+          $archive = "noema64-${env:RELEASE_TAG}-windows-unsigned.zip"
+          $bin = "cmd/noema64-gui/build/bin"
+          if (-not (Test-Path $bin)) {
+            Write-Error "Expected build directory not found: $bin"
+          }
+          Compress-Archive -Path "$bin/*" -DestinationPath $archive -Force
+          "archive=$archive" >> $env:GITHUB_OUTPUT
+
+      - name: Upload unsigned desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: noema64-${{ env.RELEASE_TAG }}-${{ matrix.platform }}-unsigned
+          path: ${{ steps.package_macos.outputs.archive || steps.package_windows.outputs.archive }}
+          if-no-files-found: error
+
+  publish-draft:
+    name: Publish draft release
+    needs: build-desktop
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download unsigned desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          find dist -type f -name '*.zip' -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
+          name: Noema64 ${{ env.RELEASE_TAG }}
+          draft: true
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
+          fail_on_unmatched_files: true
+          body: |
+            Draft unsigned desktop release for Noema64 ${{ env.RELEASE_TAG }}.
+
+            Artifacts:
+            - `noema64-${{ env.RELEASE_TAG }}-macos-unsigned.zip`
+            - `noema64-${{ env.RELEASE_TAG }}-windows-unsigned.zip`
+            - `SHA256SUMS.txt`
+
+            These artifacts are not code signed or notarized. macOS Gatekeeper and Windows SmartScreen may warn users until signing is added.
+          files: |
+            dist/**/*.zip
+            SHA256SUMS.txt
