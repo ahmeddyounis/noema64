@@ -825,6 +825,19 @@ function requireIntegerField(selector, label, min, max) {
   throw new Error(`${label} must be a whole number between ${min} and ${max}.`);
 }
 
+function requireIntegerMinField(selector, label, min) {
+  const field = document.querySelector(selector);
+  const value = Number(String(field?.value || "").trim());
+  if (Number.isInteger(value) && value >= min) {
+    clearFieldInvalid(field);
+    return value;
+  }
+  markFieldInvalid(field);
+  field?.focus();
+  field?.select?.();
+  throw new Error(`${label} must be a whole number of at least ${min}.`);
+}
+
 function requireNumberField(selector, label, min, max) {
   const field = document.querySelector(selector);
   const value = Number(String(field?.value || "").trim());
@@ -1861,6 +1874,7 @@ const settingsSaveErrorFields = [
   [/llm\.endpoint|endpoint/i, "#settingEndpoint"],
   [/llm\.model|model/i, "#settingModel"],
   [/llm\.temperature|temperature/i, "#settingTemperature"],
+  [/llm\.max_tokens|max tokens/i, "#settingMaxTokens"],
   [/llm\.timeout_ms|llm timeout/i, "#settingTimeout"],
   [/llm\.retries|retries/i, "#settingRetries"],
   [/verifier\.movetime_ms|verifier movetime|movetime/i, "#settingVerifierMoveTime"],
@@ -1911,8 +1925,8 @@ async function saveSettings() {
       settings.llm.endpoint = document.querySelector("#settingEndpoint").value;
       settings.llm.model = document.querySelector("#settingModel").value;
       settings.llm.temperature = requireNumberField("#settingTemperature", "Temperature", 0, 2);
-      settings.llm.max_tokens = Number(document.querySelector("#settingMaxTokens").value) || settings.llm.max_tokens;
-      settings.llm.timeout_ms = Number(document.querySelector("#settingTimeout").value) || settings.llm.timeout_ms;
+      settings.llm.max_tokens = requireIntegerMinField("#settingMaxTokens", "Max tokens", 1);
+      settings.llm.timeout_ms = requireIntegerMinField("#settingTimeout", "LLM timeout ms", 100);
       settings.llm.retries = requireIntegerField("#settingRetries", "Retries", 0, 5);
       settings.llm.api_key = document.querySelector("#settingKey").value;
       settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
