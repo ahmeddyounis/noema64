@@ -381,7 +381,7 @@ function clearActivityHistory() {
 function beginAppOperation(label) {
   activeOperationCount += 1;
   document.body.dataset.appBusy = "true";
-  return setAppActivity("Working", `${label}...`, "busy");
+  return setAppActivity("Working", `${label}...`, "busy", false);
 }
 
 function finishAppOperation(marker) {
@@ -390,7 +390,7 @@ function finishAppOperation(marker) {
     delete document.body.dataset.appBusy;
   }
   if (marker === appActivitySequence) {
-    setAppActivity("Ready", "Noema64 is ready.", "ready");
+    setAppActivity("Ready", "Noema64 is ready.", "ready", false);
   }
 }
 
