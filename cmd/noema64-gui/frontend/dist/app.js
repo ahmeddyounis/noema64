@@ -2153,6 +2153,19 @@ function renderFineTuneWorkflow(workflow) {
   ].join("\n");
 }
 
+function fineTuneDatasetJSONL(workflow) {
+  const datasetJSONL = workflow?.dataset_jsonl || "";
+  return String(datasetJSONL).trim() ? datasetJSONL : "";
+}
+
+function renderFineTuneEmptyState(workflow) {
+  return [
+    "No fine-tune examples available yet.",
+    "",
+    renderFineTuneWorkflow(workflow)
+  ].join("\n");
+}
+
 function renderReview(review) {
   if (!review) return "No review available.";
   const metrics = review.strategy_metrics || {};
@@ -2449,9 +2462,18 @@ async function buildPersonalityFromLab() {
 async function trainPolicyPriorFromLab() {
   try {
     const workflow = await call("ExportFineTuneDataset");
+    const datasetJSONL = fineTuneDatasetJSONL(workflow);
+    if (!datasetJSONL) {
+      const labOutput = document.querySelector("#labOutput");
+      labOutput.textContent = renderFineTuneEmptyState(workflow);
+      labOutput.title = "No fine-tune examples available yet.";
+      setAppActivity("Needs attention", "No fine-tune examples available yet.", "error");
+      focusDialogInitialControl("#fineTuneBtn", "#trainPolicyPriorBtn");
+      return;
+    }
     const policyModelPath = document.querySelector("#policyModelPath");
     const path = policyModelPath.value.trim() || "logs/policy-prior-model.json";
-    const result = await call("TrainLocalPolicyPrior", workflow?.dataset_jsonl || "", path);
+    const result = await call("TrainLocalPolicyPrior", datasetJSONL, path);
     policyModelPath.value = result?.model_path || path;
     clearFieldInvalid(policyModelPath);
     document.querySelector("#labOutput").textContent = JSON.stringify(result, null, 2);
@@ -3074,8 +3096,8 @@ function finishExport(value, message) {
 }
 
 function finishFineTuneExport(workflow) {
-  const datasetJSONL = workflow?.dataset_jsonl || "";
-  if (String(datasetJSONL).trim()) {
+  const datasetJSONL = fineTuneDatasetJSONL(workflow);
+  if (datasetJSONL) {
     finishExport(datasetJSONL, "Fine-tune export ready.");
     return;
   }
