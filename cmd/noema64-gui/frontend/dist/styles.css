@@ -1030,18 +1030,18 @@ dialog header button {
   border-bottom: 1px solid #e1e6ee;
 }
 
-.recent-game div {
+.recent-game-detail {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.recent-game strong,
-.recent-game small {
+.recent-game-title,
+.recent-game-meta {
   overflow-wrap: anywhere;
 }
 
-.recent-game small {
+.recent-game-meta {
   color: #607083;
 }
 

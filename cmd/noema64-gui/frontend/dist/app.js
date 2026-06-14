@@ -2799,19 +2799,24 @@ function renderRecentGames(records) {
     row.className = "recent-game";
     row.setAttribute("role", "listitem");
     const detail = document.createElement("div");
+    detail.className = "recent-game-detail";
     const title = document.createElement("strong");
+    title.className = "recent-game-title";
     title.textContent = snapshot.ply ? `${snapshot.ply} plies · ${snapshot.side_to_move || "unknown"} to move` : "New game";
     const meta = document.createElement("small");
+    meta.className = "recent-game-meta";
     const outcomeStatus = snapshot.outcome?.status || "ongoing";
-    meta.textContent = `${formatSavedAt(savedAt)} · ${outcomeStatus}`;
+    const savedAtText = formatSavedAt(savedAt);
+    meta.textContent = `${savedAtText} · ${outcomeStatus}`;
+    row.setAttribute("aria-label", `${title.textContent}. Saved ${savedAtText}. Status ${outcomeStatus}.${gameID ? "" : " Missing game id."}`);
     detail.append(title, meta);
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = "Load";
+    button.textContent = gameID ? "Load" : "Unavailable";
     button.disabled = !gameID;
     button.title = gameID ? "" : "This recent game record is missing an id.";
     button.setAttribute("aria-label", gameID
-      ? `Load ${title.textContent} from ${formatSavedAt(savedAt)}, ${outcomeStatus}`
+      ? `Load ${title.textContent} from ${savedAtText}, ${outcomeStatus}`
       : `Cannot load ${title.textContent}; missing game id`);
     button.addEventListener("click", () => withBusyControl(button, async () => {
       try {
