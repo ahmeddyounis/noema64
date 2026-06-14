@@ -2166,6 +2166,14 @@ function renderFineTuneEmptyState(workflow) {
   ].join("\n");
 }
 
+function showFineTuneLabEmptyState(workflow, focusSelector = "#fineTuneBtn", fallbackSelector = "#trainPolicyPriorBtn") {
+  const labOutput = document.querySelector("#labOutput");
+  labOutput.textContent = renderFineTuneEmptyState(workflow);
+  labOutput.title = "No fine-tune examples available yet.";
+  setAppActivity("Needs attention", "No fine-tune examples available yet.", "error");
+  focusDialogInitialControl(focusSelector, fallbackSelector);
+}
+
 function renderReview(review) {
   if (!review) return "No review available.";
   const metrics = review.strategy_metrics || {};
@@ -2388,7 +2396,12 @@ async function restoreBackup() {
 
 async function exportFineTuneWorkflow() {
   try {
-    document.querySelector("#labOutput").textContent = renderFineTuneWorkflow(await call("ExportFineTuneDataset"));
+    const workflow = await call("ExportFineTuneDataset");
+    if (!fineTuneDatasetJSONL(workflow)) {
+      showFineTuneLabEmptyState(workflow);
+      return;
+    }
+    document.querySelector("#labOutput").textContent = renderFineTuneWorkflow(workflow);
     showSuccess("Fine-tune dataset ready.");
   } catch (err) {
     showError(err, "#labOutput");
@@ -2464,11 +2477,7 @@ async function trainPolicyPriorFromLab() {
     const workflow = await call("ExportFineTuneDataset");
     const datasetJSONL = fineTuneDatasetJSONL(workflow);
     if (!datasetJSONL) {
-      const labOutput = document.querySelector("#labOutput");
-      labOutput.textContent = renderFineTuneEmptyState(workflow);
-      labOutput.title = "No fine-tune examples available yet.";
-      setAppActivity("Needs attention", "No fine-tune examples available yet.", "error");
-      focusDialogInitialControl("#fineTuneBtn", "#trainPolicyPriorBtn");
+      showFineTuneLabEmptyState(workflow);
       return;
     }
     const policyModelPath = document.querySelector("#policyModelPath");
