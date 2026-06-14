@@ -354,6 +354,46 @@ func TestEngineOptionsResolvesAPIKeyRef(t *testing.T) {
 	}
 }
 
+func TestEngineOptionsKeepsConfiguredProviderWhenKeyRefUnavailable(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.Provider = "openai"
+	settings.LLM.Model = "test-model"
+	settings.LLM.APIKey = ""
+	settings.LLM.APIKeyRef = "provider/missing-openai-test-ref"
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save openai key ref settings: %v", err)
+	}
+	provider, ok := app.engineOptions().Provider.(providers.OpenAIProvider)
+	if !ok {
+		t.Fatalf("provider = %T, want OpenAIProvider", app.engineOptions().Provider)
+	}
+	if provider.BaseURL != providers.OpenAIBaseURL {
+		t.Fatalf("provider base url = %q, want %q", provider.BaseURL, providers.OpenAIBaseURL)
+	}
+}
+
+func TestHealthCheckProviderReportsKeychainUnavailableWithoutMockFallback(t *testing.T) {
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.Provider = "openai"
+	settings.LLM.Model = "test-model"
+	settings.LLM.APIKey = ""
+	settings.LLM.APIKeyRef = "provider/missing-openai-health-ref"
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save openai key ref settings: %v", err)
+	}
+	health, err := app.HealthCheckProvider()
+	if err == nil {
+		t.Fatal("expected health check to report keychain lookup error")
+	}
+	if health["provider"] != "openai" || health["status"] != "keychain_unavailable" || health["healthy"] != false {
+		t.Fatalf("health check = %+v, want openai keychain_unavailable unhealthy", health)
+	}
+}
+
 func TestEngineOptionsWrapsTablebaseVerifier(t *testing.T) {
 	app, _ := newTestApplication(t)
 	settings := app.settings

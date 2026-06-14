@@ -88,7 +88,7 @@ func NewApplication(settingsPath string) *Application {
 
 func (a *Application) engineOptions() engine.Options {
 	var provider providers.Provider = providers.MockProvider{}
-	if built, _, err := providerFromSettings(a.settings.LLM); err == nil && built != nil {
+	if built, _, _ := providerFromSettings(a.settings.LLM); built != nil {
 		provider = built
 	}
 	var verify verifier.Verifier = verifier.StaticVerifier{Enabled: a.settings.Verifier.Enabled}
@@ -480,12 +480,22 @@ func (a *Application) LoadRecentGame(gameID string) (*engine.GameState, error) {
 }
 
 func (a *Application) HealthCheckProvider() (map[string]any, error) {
-	provider := a.engineOptions().Provider
+	provider, status, providerErr := providerFromSettings(a.settings.LLM)
+	if provider == nil {
+		provider = providers.MockProvider{}
+	}
+	if status == "" {
+		status = "configured"
+	}
+	err := providerErr
 	healthCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	err := provider.HealthCheck(healthCtx)
+	if err == nil {
+		err = provider.HealthCheck(healthCtx)
+	}
 	return map[string]any{
 		"provider":     provider.Name(),
+		"status":       status,
 		"healthy":      err == nil,
 		"capabilities": provider.Capabilities(),
 	}, appErr("ERR_PROVIDER_HEALTH", err, true)
