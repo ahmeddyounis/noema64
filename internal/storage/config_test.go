@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ahmedyounis/noema64/internal/strategy"
 )
 
 func TestSettingsRoundTrip(t *testing.T) {
@@ -88,6 +90,22 @@ func TestLoadSettingsMergesDefaults(t *testing.T) {
 	}
 	if loaded.Verifier.TablebaseTimeoutMS != 1000 {
 		t.Fatalf("tablebase timeout default = %d, want 1000", loaded.Verifier.TablebaseTimeoutMS)
+	}
+}
+
+func TestSaveSettingsAllowsCurrentEngineMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	settings := DefaultSettings()
+	settings.Engine.DefaultMode = strategy.ModeCurrent
+	if err := SaveSettings(path, settings); err != nil {
+		t.Fatalf("save current mode settings: %v", err)
+	}
+	loaded, err := LoadSettings(path)
+	if err != nil {
+		t.Fatalf("load current mode settings: %v", err)
+	}
+	if loaded.Engine.DefaultMode != strategy.ModeCurrent {
+		t.Fatalf("default_mode = %s, want %s", loaded.Engine.DefaultMode, strategy.ModeCurrent)
 	}
 }
 

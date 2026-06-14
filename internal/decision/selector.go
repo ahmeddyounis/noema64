@@ -50,10 +50,15 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	}
 
 	snapshot := req.Game.Snapshot()
+	features := req.Game.Features()
 	stages.setGameID(snapshot.GameID)
 	readStage.finish("completed", fmt.Sprintf("%d legal moves found.", len(legal)))
-	memBefore := req.Memory
-	memoryStage := stages.begin("updating_strategy_memory", "Prepare current strategy memory and prompt context.")
+	memBefore := memoryForMode(req.Mode, req.Memory, snapshot, features)
+	memoryMessage := "Prepare current strategy memory and prompt context."
+	if req.Mode == strategy.ModeCurrent {
+		memoryMessage = "Use a fresh current-position context; persistent strategy memory is disabled."
+	}
+	memoryStage := stages.begin("updating_strategy_memory", memoryMessage)
 	stratReq := strategy.StrategyRequest{
 		GameID:             snapshot.GameID,
 		FEN:                snapshot.FEN,
@@ -62,8 +67,8 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		MoveNumber:         snapshot.Ply/2 + 1,
 		LastOpponentMove:   lastMove(snapshot.MoveHistory),
 		LegalMoves:         legal,
-		Features:           req.Game.Features(),
-		PreviousMemory:     req.Memory,
+		Features:           features,
+		PreviousMemory:     memBefore,
 		Mode:               req.Mode,
 		Personality:        req.Personality,
 		PersonalityProfile: req.PersonalityProfile,
@@ -164,7 +169,7 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 	searchStart := time.Now()
 	searchUsed, searchName := applySearchScores(ctx, req.Game, candidates, req.Mode)
 	searchMS := time.Since(searchStart).Milliseconds()
-	scoreCandidates(candidates, req.Memory, req.Mode, strategy.ResolvePersonalityProfile(req.Personality, req.PersonalityProfile))
+	scoreCandidates(candidates, memBefore, req.Mode, strategy.ResolvePersonalityProfile(req.Personality, req.PersonalityProfile))
 	chosen, ok := selectCandidate(candidates, req.Mode)
 	if !ok {
 		scoreStage.finish("failed", "No acceptable candidate after scoring.")
@@ -213,6 +218,24 @@ func ChooseMove(ctx context.Context, req Request) (*MoveDecision, error) {
 		FENBefore:       snapshot.FEN,
 		LegalMovesCount: len(legal),
 	}, nil
+}
+
+func memoryForMode(mode strategy.EngineMode, mem strategy.StrategyMemory, snapshot chesscore.Snapshot, features chesscore.FeatureSummary) strategy.StrategyMemory {
+	if mode != strategy.ModeCurrent {
+		return mem
+	}
+	fresh := strategy.NewMemory(snapshot.GameID, snapshot.SideToMove)
+	fresh.Ply = snapshot.Ply
+	if features.Phase != "" {
+		fresh.Phase = features.Phase
+	}
+	fresh.Plan.Summary = "Memory strategy disabled. Choose the best move from the current position."
+	fresh.Plan.Status = "new"
+	fresh.Plan.HorizonMoves = 1
+	fresh.OpponentModel.LikelyPlan = "Not modeled in current-position mode."
+	fresh.OpponentModel.Confidence = 0
+	fresh.StyleNotes = []string{"Ignore earlier plans; prioritize legal, tactical, and search-supported moves now."}
+	return fresh
 }
 
 func fallbackDecision(req Request, decisionID string, mem strategy.StrategyMemory, reason string, start time.Time, providerTrace *ProviderTrace, stages []StageTrace) *MoveDecision {
@@ -328,7 +351,10 @@ func applyVerifierScores(candidates []strategy.CandidateMove, result *verifier.R
 
 func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyMemory, mode strategy.EngineMode, profile strategy.PersonalityProfile) {
 	for i := range candidates {
-		plan := planAlignment(candidates[i], mem)
+		plan := 0.0
+		if mode != strategy.ModeCurrent {
+			plan = planAlignment(candidates[i], mem)
+		}
 		candidates[i].PlanAlignmentScore = plan
 		personalityFit := personalityAlignment(candidates[i], profile)
 		candidates[i].PersonalityScore = personalityFit
@@ -343,6 +369,8 @@ func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyM
 		}
 		llm := candidates[i].LLMConfidence
 		switch mode {
+		case strategy.ModeCurrent:
+			candidates[i].FinalScore = 0.12*llm + 0.18*tactical + 0.65*candidates[i].SearchScore + 0.05*personalityFit
 		case strategy.ModeHybrid:
 			candidates[i].FinalScore = 0.20*llm + 0.20*plan + 0.20*tactical + 0.35*candidates[i].SearchScore + 0.03*personalityFit
 		case strategy.ModeBlunderguard:
@@ -361,7 +389,7 @@ func scoreCandidates(candidates []strategy.CandidateMove, mem strategy.StrategyM
 
 func selectCandidate(candidates []strategy.CandidateMove, mode strategy.EngineMode) (strategy.CandidateMove, bool) {
 	for _, candidate := range candidates {
-		if (mode == strategy.ModeBlunderguard || mode == strategy.ModeHybrid) && candidate.VerifierScore.Status == "rejected" {
+		if (mode == strategy.ModeCurrent || mode == strategy.ModeBlunderguard || mode == strategy.ModeHybrid) && candidate.VerifierScore.Status == "rejected" {
 			continue
 		}
 		return candidate, true

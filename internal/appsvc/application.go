@@ -409,6 +409,25 @@ func (a *Application) SaveSettings(settings storage.Settings) error {
 	return appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
 }
 
+func (a *Application) SetEngineMode(mode strategy.EngineMode) (*engine.GameState, error) {
+	if !strategy.ValidEngineMode(mode) {
+		return nil, &AppError{Code: "ERR_SETTINGS_INVALID", Message: "Engine mode is invalid", Recoverable: true}
+	}
+	settings := cloneSettings(a.settings)
+	settings.Engine.DefaultMode = mode
+	settings = storage.NormalizeSettings(settings)
+	if err := storage.SaveSettings(a.settingsPath, settings); err != nil {
+		return nil, appErr("ERR_SETTINGS_INVALID", err, true)
+	}
+	a.settings = settings
+	a.engine.SetOptions(a.engineOptions())
+	state, err := a.engine.State(context.Background())
+	if err != nil {
+		return state, appErr("ERR_GAME_STATE", err, true)
+	}
+	return state, appErr("ERR_SAVE_GAME", a.persistGameState(state), true)
+}
+
 func preserveRedactedProfileKeys(settings *storage.Settings, previous storage.Settings) {
 	previousKeys := map[string]string{}
 	for _, profile := range previous.LLM.Profiles {
@@ -556,7 +575,7 @@ func (a *Application) RunModeBenchmark(games int, seed int64) (experiments.ModeB
 }
 
 func (a *Application) Modes() []strategy.EngineMode {
-	return []strategy.EngineMode{strategy.ModePure, strategy.ModeBlunderguard, strategy.ModeHybrid, strategy.ModeCoach}
+	return []strategy.EngineMode{strategy.ModePure, strategy.ModeCurrent, strategy.ModeBlunderguard, strategy.ModeHybrid, strategy.ModeCoach}
 }
 
 func (a *Application) restoreLatestGame() {

@@ -161,7 +161,18 @@
         <section class="board-area" aria-label="Chess board workspace">
           <div class="status-row">
             <span id="statusText" role="status" aria-live="polite">Loading game...</span>
-            <span class="status-meta"><span id="clockText">Untimed</span><span id="modeText">mode</span></span>
+            <span class="status-meta">
+              <span id="clockText">Untimed</span>
+              <label class="play-mode-control"><span id="modeText">Mode</span>
+                <select id="playModeSelect" aria-label="Play mode">
+                  <option value="pure">Pure</option>
+                  <option value="current">Best now</option>
+                  <option value="blunderguard">Blunderguard</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="coach">Coach</option>
+                </select>
+              </label>
+            </span>
           </div>
           <div id="board" class="board board-empty-state" role="grid" aria-label="Chess board">
             <div class="board-empty">Loading board...</div>
@@ -210,6 +221,7 @@
           <label>Mode
             <select id="settingMode">
               <option value="pure">Pure</option>
+              <option value="current">Best now</option>
               <option value="blunderguard">Blunderguard</option>
               <option value="hybrid">Hybrid</option>
               <option value="coach">Coach</option>

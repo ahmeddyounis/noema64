@@ -64,13 +64,14 @@ CI runs Go format/vet/tests, race tests for the non-Wails packages, frontend smo
 ## Modes
 
 - `pure`: provider candidates are repaired and legality-filtered; no tactical verifier is used.
+- `current`: "Best now" mode; resets strategy memory for each decision and ranks current-position tactics/search over long-term plan continuity.
 - `blunderguard`: default mode; static verifier can reject obvious mate-in-one risks and discloses assistance.
 - `hybrid`: scoring reserves more weight for verifier/search-style signals.
 - `coach`: uses the same legal pipeline with teaching-oriented personality settings.
 
 Personality profiles are not display-only. Their risk tolerance is included in the arbiter as a small `personality_score` on each candidate, so aggressive profiles can break close ties toward safe forcing moves while positional and coach profiles lean toward clearer low-risk choices.
 
-Hybrid mode records `deterministic_mcts_material` search assistance in the decision trace. It is a bounded deterministic playout scorer, not a claim of engine-strength MCTS.
+Current and hybrid modes record `deterministic_mcts_material` search assistance in the decision trace. It is a bounded deterministic playout scorer, not a claim of engine-strength MCTS.
 
 ## Study And Roadmap Workflows
 

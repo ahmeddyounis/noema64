@@ -12,7 +12,7 @@ import (
 const deterministicSearchName = "deterministic_mcts_material"
 
 func applySearchScores(ctx context.Context, game *chesscore.Game, candidates []strategy.CandidateMove, mode strategy.EngineMode) (bool, string) {
-	if mode != strategy.ModeHybrid || game == nil {
+	if (mode != strategy.ModeHybrid && mode != strategy.ModeCurrent) || game == nil {
 		return false, ""
 	}
 	side := game.SideToMove()

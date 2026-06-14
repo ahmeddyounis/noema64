@@ -429,9 +429,7 @@ func validateSettings(settings Settings) error {
 	if settings.SchemaVersion != settingsSchemaVersion {
 		return fmt.Errorf("%w: settings schema_version %q is unsupported by this release", ErrUnsupportedSchema, settings.SchemaVersion)
 	}
-	switch settings.Engine.DefaultMode {
-	case "pure", "blunderguard", "hybrid", "coach":
-	default:
+	if !strategy.ValidEngineMode(settings.Engine.DefaultMode) {
 		return errors.New("settings engine.default_mode is invalid")
 	}
 	switch settings.Engine.Personality {

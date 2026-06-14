@@ -56,6 +56,7 @@ const primaryActionRequirements = {
   "#moveBtn": "ongoing",
   "#newGameBtn": "service",
   "#promptEditorBtn": "service",
+  "#playModeSelect": "service",
   "#recentBtn": "service",
   "#refreshRecentBtn": "service",
   "#resignBtn": "ongoing",
@@ -88,6 +89,7 @@ const operationLabels = {
   "#newChess960Btn": "Chess960 game",
   "#newGameBtn": "New game",
   "#personalityBuilderBtn": "Personality profile",
+  "#playModeSelect": "Play mode",
   "#positionSuiteBtn": "Position suite",
   "#profilesBtn": "Provider profiles",
   "#promptCompareBtn": "Prompt comparison",
@@ -137,6 +139,7 @@ const knownHumanizedTokens = {
 };
 const openAIEndpoint = "https://api.openai.com/v1";
 const cloudProviderAckMessage = "Acknowledge provider data sharing before saving.";
+const engineModes = ["pure", "current", "blunderguard", "hybrid", "coach"];
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -281,6 +284,34 @@ function defaultSettings() {
       output_dir: "logs"
     }
   };
+}
+
+function normalizeEngineMode(value, fallback = "blunderguard") {
+  const mode = String(value || "").trim();
+  return engineModes.includes(mode) ? mode : fallback;
+}
+
+function engineModeLabel(value) {
+  const mode = normalizeEngineMode(value);
+  return mode === "current" ? "Best now" : humanizeToken(mode);
+}
+
+function currentEngineMode() {
+  return normalizeEngineMode(
+    settings?.engine?.default_mode ||
+    document.querySelector("#settingMode")?.value ||
+    document.querySelector("#playModeSelect")?.value ||
+    "blunderguard"
+  );
+}
+
+function syncEngineModeControls(mode) {
+  const value = normalizeEngineMode(mode);
+  for (const selector of ["#settingMode", "#playModeSelect"]) {
+    const control = document.querySelector(selector);
+    if (control && control.value !== value) control.value = value;
+  }
+  setText("#modeText", "Mode");
 }
 
 function normalizeSettingsShape(value) {
@@ -716,9 +747,9 @@ function gameFlowMeta(snapshot) {
 }
 
 function setupFlowMeta() {
-  const mode = document.querySelector("#settingMode")?.value || settings?.engine?.default_mode || "blunderguard";
+  const mode = currentEngineMode();
   const personality = document.querySelector("#settingPersonality")?.value || settings?.engine?.personality || "balanced";
-  return `${humanizeToken(mode)} · ${humanizeToken(personality)} · ${timeControlMeta()}`;
+  return `${engineModeLabel(mode)} · ${humanizeToken(personality)} · ${timeControlMeta()}`;
 }
 
 function timeControlMeta() {
@@ -757,7 +788,7 @@ function decisionFlowMeta(decision) {
   const move = decision.selected_move?.san || decision.selected_move?.uci || "Decision recorded";
   const mode = decision.mode || settings?.engine?.default_mode || "mode";
   const fallback = decision.fallback_used ? "fallback" : "selected";
-  return `${move} · ${humanizeToken(mode)} · ${fallback}`;
+  return `${move} · ${engineModeLabel(mode)} · ${fallback}`;
 }
 
 function studyFlowMeta(snapshot, decision) {
@@ -1044,7 +1075,7 @@ function renderUnavailableState(message) {
   status.title = status.textContent;
   setAppActivity("Unavailable", status.textContent, "error");
   document.querySelector("#clockText").textContent = "Untimed";
-  document.querySelector("#modeText").textContent = settings?.engine?.default_mode || "offline";
+  syncEngineModeControls(settings?.engine?.default_mode || "blunderguard");
   document.querySelector("#thinkingStage").textContent = "Unavailable";
   const tab = document.querySelector("#tabContent");
   tab.textContent = "Decision traces will appear after the game service is connected and the engine makes a decision.";
@@ -1091,7 +1122,7 @@ function renderStatus() {
   status.textContent = statusSummary(s, variant);
   status.title = statusDetail(s, variant);
   document.querySelector("#clockText").textContent = formatClock(state.clock);
-  document.querySelector("#modeText").textContent = state.last_decision?.mode || settings?.engine?.default_mode || "blunderguard";
+  syncEngineModeControls(settings?.engine?.default_mode || state.last_decision?.mode || "blunderguard");
 }
 
 function statusSummary(snapshot, variant) {
@@ -1916,7 +1947,7 @@ async function loadSettings() {
   settings = normalizeSettingsShape(await call("GetSettings"));
   document.querySelector("#settingsOutput").textContent = "";
   populateCustomPersonalities(settings.engine?.custom_personalities || []);
-  document.querySelector("#settingMode").value = settings.engine.default_mode;
+  syncEngineModeControls(settings.engine.default_mode);
   document.querySelector("#settingPersonality").value = settings.engine.personality;
   document.querySelector("#settingCustomPersonality").value = settings.engine.custom_personality_id || "";
   document.querySelector("#settingSide").value = playerSide;
@@ -2098,7 +2129,7 @@ async function saveSettings() {
       gameVariant = document.querySelector("#settingVariant").value || "standard";
       chess960Seed = requireIntegerField("#settingVariantSeed", "Chess960 seed", 0, 959);
       const timeControl = timeControlForNewGame();
-      settings.engine.default_mode = document.querySelector("#settingMode").value;
+      settings.engine.default_mode = normalizeEngineMode(document.querySelector("#settingMode").value);
       settings.engine.personality = document.querySelector("#settingPersonality").value;
       settings.engine.custom_personality_id = document.querySelector("#settingCustomPersonality").value;
       settings.engine.max_candidates = requireIntegerField("#settingMaxCandidates", "Max candidates", 1, 10);
@@ -2138,6 +2169,7 @@ async function saveSettings() {
       settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
       await call("SaveSettings", settings);
       applyTheme(settings.gui.theme);
+      syncEngineModeControls(settings.engine.default_mode);
       clearSettingsSaveErrorFields();
       showSuccess("Settings saved.", "#settingsOutput");
       renderWorkflowPanel();
@@ -2145,6 +2177,31 @@ async function saveSettings() {
     } catch (err) {
       showError(err, "#settingsOutput");
       focusSettingsSaveError(err);
+    }
+  });
+}
+
+async function savePlayMode() {
+  const select = document.querySelector("#playModeSelect");
+  const nextMode = normalizeEngineMode(select?.value);
+  const previousMode = normalizeEngineMode(settings?.engine?.default_mode || document.querySelector("#settingMode")?.value);
+  if (nextMode === previousMode) {
+    syncEngineModeControls(nextMode);
+    renderWorkflowPanel();
+    return;
+  }
+  return withBusyControl("#playModeSelect", async () => {
+    try {
+      settings = normalizeSettingsShape(settings);
+      settings.engine.default_mode = nextMode;
+      syncEngineModeControls(nextMode);
+      applyGameStateResult(await call("SetEngineMode", nextMode));
+      showSuccess(`${engineModeLabel(nextMode)} mode enabled.`);
+    } catch (err) {
+      if (settings?.engine) settings.engine.default_mode = previousMode;
+      syncEngineModeControls(previousMode);
+      renderWorkflowPanel();
+      showError(err);
     }
   });
 }
@@ -2563,7 +2620,7 @@ async function newChess960Game() {
       side: playerSide || "white",
       variant: "chess960",
       seed,
-      mode: document.querySelector("#settingMode")?.value || "blunderguard",
+      mode: currentEngineMode(),
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     }));
@@ -2588,7 +2645,7 @@ async function startCustomBoardFromLab() {
       side,
       variant: "custom",
       board_definition: definition,
-      mode: document.querySelector("#settingMode")?.value || "blunderguard",
+      mode: currentEngineMode(),
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     }));
@@ -3143,7 +3200,7 @@ bindBusyButton("#newGameBtn", async () => {
       side,
       variant: document.querySelector("#settingVariant")?.value || gameVariant,
       seed: requireIntegerField("#settingVariantSeed", "Chess960 seed", 0, 959),
-      mode: document.querySelector("#settingMode")?.value || "blunderguard",
+      mode: currentEngineMode(),
       personality: document.querySelector("#settingPersonality")?.value || "balanced",
       time_control: timeControlForNewGame()
     }));
@@ -3159,6 +3216,7 @@ document.querySelector("#settingTimeControl").addEventListener("change", () => {
   renderWorkflowPanel();
 });
 document.querySelector("#settingTheme").addEventListener("change", () => applyTheme(document.querySelector("#settingTheme").value));
+document.querySelector("#playModeSelect").addEventListener("change", savePlayMode);
 document.querySelector("#settingProfile").addEventListener("change", applySelectedProviderProfile);
 document.querySelector("#settingProvider").addEventListener("change", () => {
   markProviderProfileCustom();

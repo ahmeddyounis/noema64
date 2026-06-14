@@ -444,7 +444,26 @@ body[data-workspace-view="lab"] [data-workspace-card="study"] {
   display: flex;
   gap: 10px;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   white-space: nowrap;
+}
+
+.play-mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #59697c;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.play-mode-control select {
+  min-height: 30px;
+  max-width: 150px;
+  padding: 0 8px;
+  border: 1px solid #c7ced8;
+  border-radius: 6px;
 }
 
 .board {

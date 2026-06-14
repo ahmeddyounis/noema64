@@ -14,10 +14,20 @@ type EngineMode string
 
 const (
 	ModePure         EngineMode = "pure"
+	ModeCurrent      EngineMode = "current"
 	ModeBlunderguard EngineMode = "blunderguard"
 	ModeHybrid       EngineMode = "hybrid"
 	ModeCoach        EngineMode = "coach"
 )
+
+func ValidEngineMode(mode EngineMode) bool {
+	switch mode {
+	case ModePure, ModeCurrent, ModeBlunderguard, ModeHybrid, ModeCoach:
+		return true
+	default:
+		return false
+	}
+}
 
 type Personality string
 

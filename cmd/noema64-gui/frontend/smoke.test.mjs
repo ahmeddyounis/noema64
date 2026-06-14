@@ -16,7 +16,7 @@ function expectScriptToken(token) {
 }
 
 test("main GUI screen exposes critical panels", () => {
-  for (const id of ["workspaceNav", "viewPlayBtn", "viewStudyBtn", "viewLabBtn", "appActivity", "appActivityLabel", "appActivityMessage", "activityHistoryBtn", "activityDialog", "activityTitle", "clearActivityBtn", "activityLog", "mainWorkspace", "workflowPanel", "workflowEyebrow", "workflowTitle", "workflowDetail", "playFlowMeta", "setupFlowMeta", "recordFlowMeta", "reviewFlowMeta", "studyFlowMeta", "memoryFlowMeta", "providerFlowMeta", "promptFlowMeta", "assetFlowMeta", "board", "statusText", "clockText", "modeText", "moveInput", "moveList", "tabContent", "candidates", "strategyMemory"]) {
+  for (const id of ["workspaceNav", "viewPlayBtn", "viewStudyBtn", "viewLabBtn", "appActivity", "appActivityLabel", "appActivityMessage", "activityHistoryBtn", "activityDialog", "activityTitle", "clearActivityBtn", "activityLog", "mainWorkspace", "workflowPanel", "workflowEyebrow", "workflowTitle", "workflowDetail", "playFlowMeta", "setupFlowMeta", "recordFlowMeta", "reviewFlowMeta", "studyFlowMeta", "memoryFlowMeta", "providerFlowMeta", "promptFlowMeta", "assetFlowMeta", "board", "statusText", "clockText", "modeText", "playModeSelect", "moveInput", "moveList", "tabContent", "candidates", "strategyMemory"]) {
     expectMarkupID(id);
   }
   assert.match(indexHTML, /body data-workspace-view="play"/);
@@ -47,6 +47,8 @@ test("main GUI screen exposes critical panels", () => {
   assert.match(indexHTML, />Position Setup</);
   assert.match(indexHTML, />Provider Health</);
   assert.match(indexHTML, /aria-label="Chess board workspace"/);
+  assert.match(indexHTML, /id="playModeSelect" aria-label="Play mode"/);
+  assert.match(indexHTML, /<option value="current">Best now<\/option>/);
   assert.match(indexHTML, /aria-label="Decision trace"/);
   assert.match(indexHTML, /aria-label="Strategy memory"/);
   assert.match(indexHTML, /id="candidates" class="candidates" role="list" aria-label="Candidate moves" aria-live="polite"/);
@@ -144,6 +146,7 @@ test("primary toolbar and dialogs expose expected controls", () => {
 test("settings surface covers MVP and profile controls", () => {
   for (const id of [
     "settingMode",
+    "playModeSelect",
     "settingPersonality",
     "settingCustomPersonality",
     "settingVariant",
@@ -197,12 +200,15 @@ test("settings surface covers MVP and profile controls", () => {
   for (const section of ["Game", "Provider", "Verifier", "Logging"]) {
     assert.match(indexHTML, new RegExp(`<h3 class="settings-section">${section}</h3>`), `missing settings section ${section}`);
   }
+  assert.match(indexHTML, /id="settingMode"[\s\S]*<option value="current">Best now<\/option>/);
 });
 
 test("bundle wires core actions and renders trace metadata", () => {
   for (const token of [
     "RequestEngineMove",
     "AnalyzeCurrentPosition",
+    "SetEngineMode",
+    "savePlayMode",
     "analyzeCurrentPosition",
     "WhyNotMove",
     "whyNotMove",

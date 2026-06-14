@@ -37,6 +37,48 @@ func TestHybridSearchScoresMaterialWin(t *testing.T) {
 	}
 }
 
+func TestCurrentModeUsesSearchAndResetsStrategyMemory(t *testing.T) {
+	game := searchTestGame(t)
+	staleMemory := strategy.NewMemory(game.ID(), "white")
+	staleMemory.Plan.Summary = "Preserve an old long-term king walk."
+	staleMemory.Targets.Squares = []string{"e2"}
+	staleMemory.Commitments = []string{"Keep the king flexible."}
+	provider := scriptedProvider{
+		moves: []strategy.CandidateMove{
+			{UCI: "e1e2", Purpose: "Follow the old king-walk plan.", LLMConfidence: 0.95},
+			{UCI: "g3h4", Purpose: "Win the loose queen immediately.", LLMConfidence: 0.55},
+		},
+	}
+
+	dec, err := ChooseMove(context.Background(), Request{
+		Game:          game,
+		Memory:        staleMemory,
+		Mode:          strategy.ModeCurrent,
+		Provider:      provider,
+		Verifier:      verifier.LegalOnlyVerifier{},
+		Model:         "scripted",
+		MaxCandidates: 2,
+		Timeout:       time.Second,
+	})
+	if err != nil {
+		t.Fatalf("ChooseMove error = %v", err)
+	}
+	if dec.SelectedMove.UCI != "g3h4" {
+		t.Fatalf("selected move = %s, want immediate queen capture g3h4; candidates=%+v", dec.SelectedMove.UCI, dec.CandidateMoves)
+	}
+	if !dec.Assistance.SearchUsed || dec.Assistance.SearchName != deterministicSearchName {
+		t.Fatalf("search assistance = %+v, want current-position search", dec.Assistance)
+	}
+	if dec.StrategyBefore.Plan.Summary == staleMemory.Plan.Summary {
+		t.Fatalf("current mode reused stale strategy memory: %+v", dec.StrategyBefore.Plan)
+	}
+	for _, candidate := range dec.CandidateMoves {
+		if candidate.PlanAlignmentScore != 0 {
+			t.Fatalf("current mode candidate kept plan alignment: %+v", candidate)
+		}
+	}
+}
+
 func TestPureScoringIgnoresSearchScore(t *testing.T) {
 	candidates := []strategy.CandidateMove{
 		{UCI: "a2a3", Purpose: "high confidence", LLMConfidence: 0.9, SearchScore: -1},

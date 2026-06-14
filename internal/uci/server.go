@@ -114,7 +114,7 @@ func (s *Server) handle(ctx context.Context, line string) error {
 	case "uci":
 		s.write("id name " + EngineName)
 		s.write("id author Noema64 contributors")
-		s.write("option name Mode type combo default blunderguard var pure var blunderguard var hybrid var coach")
+		s.write("option name Mode type combo default blunderguard var pure var current var blunderguard var hybrid var coach")
 		s.write("option name Personality type combo default balanced var balanced var aggressive var positional var beginner_coach")
 		s.write("option name LLMProvider type string default mock")
 		s.write("option name LLMModel type string default mock-balanced")

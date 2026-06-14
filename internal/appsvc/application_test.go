@@ -129,6 +129,39 @@ func TestAnalyzeCurrentPositionDoesNotMutateCurrentGame(t *testing.T) {
 	}
 }
 
+func TestSetEngineModePersistsAndUpdatesRuntime(t *testing.T) {
+	app, _ := newTestApplication(t)
+	if _, err := app.SetEngineMode(strategy.ModeCurrent); err != nil {
+		t.Fatalf("set engine mode: %v", err)
+	}
+	settings, err := app.GetSettings()
+	if err != nil {
+		t.Fatalf("get settings: %v", err)
+	}
+	if settings.Engine.DefaultMode != strategy.ModeCurrent {
+		t.Fatalf("default mode = %s, want %s", settings.Engine.DefaultMode, strategy.ModeCurrent)
+	}
+	restored := NewApplication(app.settingsPath)
+	restoredSettings, err := restored.GetSettings()
+	if err != nil {
+		t.Fatalf("get restored settings: %v", err)
+	}
+	if restoredSettings.Engine.DefaultMode != strategy.ModeCurrent {
+		t.Fatalf("restored default mode = %s, want %s", restoredSettings.Engine.DefaultMode, strategy.ModeCurrent)
+	}
+	result, appErr := app.RequestEngineMove()
+	if appErr != nil {
+		t.Fatalf("engine move: %v", appErr)
+	}
+	dec, ok := result.(map[string]any)["decision"].(*decision.MoveDecision)
+	if !ok || dec == nil {
+		t.Fatalf("decision result = %#v", result)
+	}
+	if dec.Mode != strategy.ModeCurrent {
+		t.Fatalf("decision mode = %s, want %s", dec.Mode, strategy.ModeCurrent)
+	}
+}
+
 func TestExportTraceReturnsCurrentGameJSONL(t *testing.T) {
 	app, _ := newTestApplication(t)
 	if _, err := app.RequestEngineMove(); err != nil {
