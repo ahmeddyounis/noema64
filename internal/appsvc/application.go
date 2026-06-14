@@ -174,6 +174,9 @@ func (a *Application) MakeUserMove(moveUCI string) (*engine.GameState, error) {
 }
 
 func (a *Application) RequestEngineMove() (any, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return map[string]any{"decision": nil, "state": nil}, err
+	}
 	dec, state, err := a.engine.ChooseMove(context.Background())
 	var traceErr error
 	if err == nil && a.settings.Engine.TraceEnabled {
@@ -189,6 +192,9 @@ func (a *Application) RequestEngineMove() (any, error) {
 }
 
 func (a *Application) AnalyzeCurrentPosition() (*decision.MoveDecision, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return nil, err
+	}
 	dec, err := a.engine.AnalyzePosition(context.Background())
 	var traceErr error
 	if err == nil && a.settings.Engine.TraceEnabled {
@@ -456,6 +462,13 @@ func providerRequiresPrivacyAck(provider string) bool {
 	}
 }
 
+func (a *Application) requireActiveProviderPrivacyAck() error {
+	if providerRequiresPrivacyAck(a.settings.LLM.Provider) && !a.settings.Privacy.CloudProviderWarningAcknowledged {
+		return &AppError{Code: "ERR_PRIVACY_ACK_REQUIRED", Message: "Cloud/local provider data sharing must be acknowledged before using this provider.", Recoverable: true}
+	}
+	return nil
+}
+
 func tablebaseProbeForPath(path string, timeoutMS int) verifier.TablebaseProbe {
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
 		return verifier.NativeSyzygyProbe{Path: path}
@@ -481,6 +494,13 @@ func (a *Application) LoadRecentGame(gameID string) (*engine.GameState, error) {
 }
 
 func (a *Application) HealthCheckProvider() (map[string]any, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return map[string]any{
+			"provider": a.settings.LLM.Provider,
+			"status":   "privacy_ack_required",
+			"healthy":  false,
+		}, err
+	}
 	provider, status, providerErr := providerFromSettings(a.settings.LLM)
 	if provider == nil {
 		provider = providers.MockProvider{}
@@ -503,6 +523,9 @@ func (a *Application) HealthCheckProvider() (map[string]any, error) {
 }
 
 func (a *Application) RunRandomBenchmark(games int, seed int64) (experiments.Summary, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return experiments.Summary{}, err
+	}
 	if games <= 0 {
 		games = 100
 	}
@@ -515,6 +538,9 @@ func (a *Application) RunRandomBenchmark(games int, seed int64) (experiments.Sum
 }
 
 func (a *Application) RunModeBenchmark(games int, seed int64) (experiments.ModeBenchmarkSummary, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return experiments.ModeBenchmarkSummary{}, err
+	}
 	if games <= 0 {
 		games = 20
 	}

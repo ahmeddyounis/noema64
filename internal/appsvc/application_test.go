@@ -243,6 +243,92 @@ func TestSaveSettingsRequiresCloudProviderAcknowledgement(t *testing.T) {
 	}
 }
 
+func TestActiveProviderOperationsRequirePrivacyAckForDirectConfig(t *testing.T) {
+	app, _ := newTestApplication(t)
+	app.settings.LLM.Provider = "openai"
+	app.settings.LLM.Model = "test-model"
+	app.settings.Privacy.CloudProviderWarningAcknowledged = false
+	app.engine.SetOptions(app.engineOptions())
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{
+			name: "engine move",
+			run: func() error {
+				_, err := app.RequestEngineMove()
+				return err
+			},
+		},
+		{
+			name: "analysis",
+			run: func() error {
+				_, err := app.AnalyzeCurrentPosition()
+				return err
+			},
+		},
+		{
+			name: "health",
+			run: func() error {
+				_, err := app.HealthCheckProvider()
+				return err
+			},
+		},
+		{
+			name: "random benchmark",
+			run: func() error {
+				_, err := app.RunRandomBenchmark(1, 64)
+				return err
+			},
+		},
+		{
+			name: "mode benchmark",
+			run: func() error {
+				_, err := app.RunModeBenchmark(1, 64)
+				return err
+			},
+		},
+		{
+			name: "position suite",
+			run: func() error {
+				_, err := app.RunPositionSuite(nil)
+				return err
+			},
+		},
+		{
+			name: "analysis comparison",
+			run: func() error {
+				_, err := app.ComparePureHybridAnalysis()
+				return err
+			},
+		},
+		{
+			name: "prompt playground",
+			run: func() error {
+				_, err := app.RunPromptPlayground(PromptTemplatePack{}, PromptTemplatePack{})
+				return err
+			},
+		},
+		{
+			name: "tournament",
+			run: func() error {
+				_, err := app.RunTournament(1, 64)
+				return err
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.run()
+			appErr, ok := err.(*AppError)
+			if !ok || appErr.Code != "ERR_PRIVACY_ACK_REQUIRED" || !appErr.Recoverable {
+				t.Fatalf("error = %#v, want recoverable privacy ack error", err)
+			}
+		})
+	}
+}
+
 func TestEngineOptionsUsesOpenAIDefaultEndpoint(t *testing.T) {
 	app, _ := newTestApplication(t)
 	settings := app.settings

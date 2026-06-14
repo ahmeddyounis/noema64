@@ -258,6 +258,37 @@ func TestUCIOptionRangesMatchHandshake(t *testing.T) {
 	}
 }
 
+func TestUCIProviderRefreshPreservesResolvedAPIKeyRef(t *testing.T) {
+	t.Setenv("NOEMA64_KEYCHAIN_PROVIDER_CLOUD", "resolved-secret")
+	settings := storage.DefaultSettings()
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = "http://localhost:11434/v1"
+	settings.LLM.Model = "model-a"
+	settings.LLM.APIKey = ""
+	settings.LLM.APIKeyRef = "provider/cloud"
+	server := NewServer(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, settings)
+	provider, ok := server.opts.Provider.(providers.OpenAICompatible)
+	if !ok {
+		t.Fatalf("provider = %T, want OpenAICompatible", server.opts.Provider)
+	}
+	if provider.APIKey != "resolved-secret" {
+		t.Fatalf("initial api key = %q, want resolved secret", provider.APIKey)
+	}
+	if err := server.setOption("setoption name LLMModel value model-b"); err != nil {
+		t.Fatalf("set model: %v", err)
+	}
+	provider, ok = server.opts.Provider.(providers.OpenAICompatible)
+	if !ok {
+		t.Fatalf("provider after refresh = %T, want OpenAICompatible", server.opts.Provider)
+	}
+	if provider.APIKey != "resolved-secret" {
+		t.Fatalf("refreshed api key = %q, want resolved secret", provider.APIKey)
+	}
+	if provider.Model != "model-b" {
+		t.Fatalf("refreshed model = %q, want model-b", provider.Model)
+	}
+}
+
 func TestUCIVerifierEnabledControlsExternalPath(t *testing.T) {
 	server := NewServer(strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}, storage.DefaultSettings())
 	if err := server.setOption("setoption name VerifierPath value /usr/bin/stockfish"); err != nil {

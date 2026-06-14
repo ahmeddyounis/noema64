@@ -234,6 +234,9 @@ func (a *Application) OpeningBookLibrary() ([]chesscore.ImportedOpeningBook, err
 }
 
 func (a *Application) ComparePureHybridAnalysis() (AnalysisComparison, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return AnalysisComparison{}, err
+	}
 	state, err := a.engine.State(context.Background())
 	if err != nil {
 		return AnalysisComparison{}, appErr("ERR_GAME_STATE", err, true)
@@ -293,6 +296,9 @@ func (a *Application) ComparePromptTemplatePacks(left PromptTemplatePack, right 
 }
 
 func (a *Application) RunPromptPlayground(left PromptTemplatePack, right PromptTemplatePack) (PromptPlaygroundResult, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return PromptPlaygroundResult{}, err
+	}
 	state, err := a.engine.State(context.Background())
 	if err != nil {
 		return PromptPlaygroundResult{}, appErr("ERR_GAME_STATE", err, true)

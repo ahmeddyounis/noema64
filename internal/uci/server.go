@@ -55,6 +55,7 @@ type Server struct {
 
 func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.Settings) *Server {
 	opts := engineOptions(settings)
+	apiKey, _ := security.ResolveAPIKey(settings.LLM.APIKey, settings.LLM.APIKeyRef)
 	traceDir := settings.Logging.OutputDir
 	if traceDir == "" {
 		traceDir = "logs"
@@ -72,7 +73,7 @@ func NewServer(in io.Reader, out io.Writer, errOut io.Writer, settings storage.S
 		traceStore:       storage.NewTraceStore(traceDir),
 		providerKind:     settings.LLM.Provider,
 		endpoint:         settings.LLM.Endpoint,
-		apiKey:           settings.LLM.APIKey,
+		apiKey:           apiKey,
 		providerRetries:  settings.LLM.Retries,
 		moveOverheadMS:   100,
 		maxProviderMS:    clampInt(maxProviderMS, 100, 120000),

@@ -290,6 +290,9 @@ func (a *Application) SavePromptTemplatePack(dir string, pack PromptTemplatePack
 }
 
 func (a *Application) RunPositionSuite(positions []experiments.SuitePosition) (experiments.PositionSuiteSummary, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return experiments.PositionSuiteSummary{}, err
+	}
 	opts := a.engineOptions()
 	runner := experiments.Runner{Options: opts}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

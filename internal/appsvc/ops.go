@@ -109,6 +109,9 @@ func (a *Application) EnablePolicyPriorModel(modelPath string) (storage.Settings
 }
 
 func (a *Application) RunTournament(gamesPerPair int, seed int64) (experiments.TournamentSummary, error) {
+	if err := a.requireActiveProviderPrivacyAck(); err != nil {
+		return experiments.TournamentSummary{}, err
+	}
 	if gamesPerPair <= 0 {
 		gamesPerPair = 2
 	}
