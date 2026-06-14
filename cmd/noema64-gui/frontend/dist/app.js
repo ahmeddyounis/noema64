@@ -134,6 +134,7 @@ const knownHumanizedTokens = {
   pgn: "PGN",
   uci: "UCI"
 };
+const cloudProviderAckMessage = "Acknowledge provider endpoint data sharing before saving.";
 
 const timeControlPresets = {
   untimed: { initial_ms: 0, increment_ms: 0 },
@@ -1990,7 +1991,7 @@ async function saveSettings() {
       settings.privacy.cloud_provider_warning_acknowledged = cloudAck.checked;
       if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
         markFieldInvalid(cloudAck);
-        showError("Acknowledge provider endpoint data sharing before saving.", "#settingsOutput");
+        showError(cloudProviderAckMessage, "#settingsOutput");
         cloudAck.focus();
         return;
       }
@@ -2045,7 +2046,19 @@ function syncProviderDisclosure() {
   const warning = document.querySelector("#cloudProviderWarning");
   const isCloud = providerRequiresAck(document.querySelector("#settingProvider").value);
   warning.classList.toggle("hidden", !isCloud);
-  if (!isCloud) clearFieldInvalid(document.querySelector("#settingCloudAck"));
+  if (!isCloud) clearCloudProviderAckWarning();
+}
+
+function clearCloudProviderAckWarning() {
+  clearFieldInvalid(document.querySelector("#settingCloudAck"));
+  const output = document.querySelector("#settingsOutput");
+  if (output?.textContent === cloudProviderAckMessage) {
+    output.textContent = "";
+    output.title = "";
+  }
+  if (document.querySelector("#appActivityMessage")?.textContent === cloudProviderAckMessage) {
+    setAppActivity("Ready", "Noema64 is ready.", "ready", false);
+  }
 }
 
 function providerRequiresAck(provider) {
@@ -2985,6 +2998,9 @@ document.querySelector("#settingProvider").addEventListener("change", () => {
   markProviderProfileCustom();
   syncProviderDisclosure();
   renderWorkflowPanel();
+});
+document.querySelector("#settingCloudAck").addEventListener("change", () => {
+  if (document.querySelector("#settingCloudAck").checked) clearCloudProviderAckWarning();
 });
 ["#settingEndpoint", "#settingModel", "#settingTemperature", "#settingMaxTokens", "#settingTimeout", "#settingRetries", "#settingKey", "#settingKeyRef"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", () => {
