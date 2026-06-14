@@ -111,20 +111,21 @@ func (a *Application) engineOptions() engine.Options {
 		timeout = 12 * time.Second
 	}
 	return engine.Options{
-		Mode:               a.settings.Engine.DefaultMode,
-		Personality:        a.settings.Engine.Personality,
-		PersonalityProfile: selectedCustomPersonality(a.settings),
-		Provider:           provider,
-		Verifier:           verify,
-		Model:              a.settings.LLM.Model,
-		Temperature:        a.settings.LLM.Temperature,
-		MaxTokens:          a.settings.LLM.MaxTokens,
-		ProviderRetries:    a.settings.LLM.Retries,
-		MaxCandidates:      a.settings.Engine.MaxCandidates,
-		MoveTimeout:        timeout,
-		LogRawPrompts:      a.settings.Privacy.LogRawPrompts,
-		LogRawResponse:     a.settings.Privacy.LogRawLLMResponses,
-		Progress:           a.emitDecisionProgress,
+		Mode:                a.settings.Engine.DefaultMode,
+		Personality:         a.settings.Engine.Personality,
+		PersonalityProfile:  selectedCustomPersonality(a.settings),
+		Provider:            provider,
+		Verifier:            verify,
+		Model:               a.settings.LLM.Model,
+		Temperature:         a.settings.LLM.Temperature,
+		MaxTokens:           a.settings.LLM.MaxTokens,
+		ProviderRetries:     a.settings.LLM.Retries,
+		MaxCandidates:       a.settings.Engine.MaxCandidates,
+		MoveTimeout:         timeout,
+		RequireProviderMove: a.settings.LLM.Provider != "" && a.settings.LLM.Provider != "mock",
+		LogRawPrompts:       a.settings.Privacy.LogRawPrompts,
+		LogRawResponse:      a.settings.Privacy.LogRawLLMResponses,
+		Progress:            a.emitDecisionProgress,
 	}
 }
 

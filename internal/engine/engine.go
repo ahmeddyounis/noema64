@@ -15,20 +15,21 @@ import (
 )
 
 type Options struct {
-	Mode               strategy.EngineMode
-	Personality        strategy.Personality
-	PersonalityProfile *strategy.PersonalityProfile
-	Provider           providers.Provider
-	Verifier           verifier.Verifier
-	Model              string
-	Temperature        float64
-	MaxTokens          int
-	ProviderRetries    int
-	MaxCandidates      int
-	MoveTimeout        time.Duration
-	LogRawPrompts      bool
-	LogRawResponse     bool
-	Progress           decision.ProgressFunc
+	Mode                strategy.EngineMode
+	Personality         strategy.Personality
+	PersonalityProfile  *strategy.PersonalityProfile
+	Provider            providers.Provider
+	Verifier            verifier.Verifier
+	Model               string
+	Temperature         float64
+	MaxTokens           int
+	ProviderRetries     int
+	MaxCandidates       int
+	MoveTimeout         time.Duration
+	RequireProviderMove bool
+	LogRawPrompts       bool
+	LogRawResponse      bool
+	Progress            decision.ProgressFunc
 }
 
 type NewGameOptions struct {
@@ -251,6 +252,9 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	if dec == nil {
 		return nil, nil, fmt.Errorf("no move decision")
 	}
+	if e.opts.RequireProviderMove && dec.FallbackUsed {
+		return dec, e.stateLocked(), providerFallbackError(dec)
+	}
 	if !e.game.IsLegalUCI(dec.SelectedMove.UCI) {
 		return nil, nil, fmt.Errorf("selector returned illegal move %s", dec.SelectedMove.UCI)
 	}
@@ -267,6 +271,21 @@ func (e *Engine) ChooseMove(ctx context.Context) (*decision.MoveDecision, *GameS
 	e.memory = dec.StrategyAfter
 	e.lastDecision = dec
 	return dec, e.stateLocked(), nil
+}
+
+func providerFallbackError(dec *decision.MoveDecision) error {
+	providerName := strings.TrimSpace(dec.Provider.Name)
+	if providerName == "" {
+		providerName = "provider"
+	}
+	reason := strings.TrimSpace(dec.FallbackReason)
+	if reason == "" {
+		reason = "fallback"
+	}
+	if detail := strings.TrimSpace(dec.Provider.Error); detail != "" {
+		return fmt.Errorf("%s did not return a usable move (%s): %s", providerName, reason, detail)
+	}
+	return fmt.Errorf("%s did not return a usable move (%s)", providerName, reason)
 }
 
 func (e *Engine) AnalyzePosition(ctx context.Context) (*decision.MoveDecision, error) {

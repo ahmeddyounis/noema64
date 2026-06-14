@@ -56,6 +56,27 @@ func TestEngineFallbackOnProviderFaults(t *testing.T) {
 	}
 }
 
+func TestEngineRequireProviderMoveRejectsFallbackMove(t *testing.T) {
+	e := New(Options{
+		Mode:                strategy.ModePure,
+		Provider:            providers.MockProvider{Behavior: "error"},
+		RequireProviderMove: true,
+	})
+	dec, state, err := e.ChooseMove(context.Background())
+	if err == nil {
+		t.Fatal("expected provider fallback to fail when provider move is required")
+	}
+	if dec == nil || !dec.FallbackUsed || dec.FallbackReason != "provider_error" {
+		t.Fatalf("decision = %+v, want provider_error fallback", dec)
+	}
+	if state == nil || state.Snapshot.Ply != 0 {
+		t.Fatalf("state = %+v, want unchanged ply 0", state)
+	}
+	if !strings.Contains(err.Error(), "mock-error did not return a usable move") {
+		t.Fatalf("error = %v, want provider fallback error", err)
+	}
+}
+
 func TestEngineRejectsIllegalUserMove(t *testing.T) {
 	e := New(Options{})
 	if _, err := e.ApplyUserMove(context.Background(), "e2e5"); err == nil {

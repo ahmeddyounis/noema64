@@ -2,6 +2,8 @@ package appsvc
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -391,6 +393,50 @@ func TestHealthCheckProviderReportsKeychainUnavailableWithoutMockFallback(t *tes
 	}
 	if health["provider"] != "openai" || health["status"] != "keychain_unavailable" || health["healthy"] != false {
 		t.Fatalf("health check = %+v, want openai keychain_unavailable unhealthy", health)
+	}
+}
+
+func TestRequestEngineMoveStopsWhenConfiguredProviderFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "provider unavailable", http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	app, _ := newTestApplication(t)
+	settings := app.settings
+	settings.Privacy.CloudProviderWarningAcknowledged = true
+	settings.LLM.Provider = "openai_compatible"
+	settings.LLM.Endpoint = server.URL
+	settings.LLM.Model = "test-model"
+	settings.LLM.TimeoutMS = 1000
+	if err := app.SaveSettings(settings); err != nil {
+		t.Fatalf("save provider settings: %v", err)
+	}
+	result, err := app.RequestEngineMove()
+	if err == nil {
+		t.Fatal("expected configured provider failure to stop engine move")
+	}
+	if !strings.Contains(err.Error(), "openai_compatible did not return a usable move") {
+		t.Fatalf("error = %v, want provider failure", err)
+	}
+	payload, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("result = %T, want payload map", result)
+	}
+	dec, ok := payload["decision"].(*decision.MoveDecision)
+	if !ok || dec == nil || !dec.FallbackUsed {
+		t.Fatalf("decision payload = %+v, want fallback decision", payload["decision"])
+	}
+	state, ok := payload["state"].(*engine.GameState)
+	if !ok || state == nil || state.Snapshot.Ply != 0 {
+		t.Fatalf("state payload = %+v, want unchanged ply 0", payload["state"])
+	}
+	current, getErr := app.GetGame()
+	if getErr != nil {
+		t.Fatalf("get game: %v", getErr)
+	}
+	if current.Snapshot.Ply != 0 {
+		t.Fatalf("current ply = %d, want unchanged ply 0", current.Snapshot.Ply)
 	}
 }
 
