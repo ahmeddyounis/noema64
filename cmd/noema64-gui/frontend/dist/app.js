@@ -2137,12 +2137,16 @@ function renderBackupManifest(manifest) {
 function renderFineTuneWorkflow(workflow) {
   if (!workflow) return "No fine-tune workflow.";
   const spec = workflow.workflow || {};
+  const nextSteps = asArray(spec.next_steps);
   return [
     `Fine tune · ${spec.example_count || 0} examples`,
     spec.intended_use || "",
     "",
     "SAFETY",
     ...asArray(spec.safety_notes),
+    "",
+    "NEXT STEPS",
+    ...(nextSteps.length ? nextSteps : ["Run an engine move or analysis with trace logging enabled before exporting."]),
     "",
     "JSONL",
     workflow.dataset_jsonl || ""
@@ -3046,7 +3050,7 @@ async function refreshExport() {
   }
   if (type === "fine_tune") {
     const workflow = await call("ExportFineTuneDataset");
-    finishExport(workflow?.dataset_jsonl, "Fine-tune export ready.");
+    finishFineTuneExport(workflow);
     return true;
   }
   finishExport(await call("ExportPGN"), "PGN export ready.");
@@ -3067,6 +3071,17 @@ function setExportStatus(message) {
 function finishExport(value, message) {
   setExportText(value);
   showSuccess(message, "#exportOutput");
+}
+
+function finishFineTuneExport(workflow) {
+  const datasetJSONL = workflow?.dataset_jsonl || "";
+  if (String(datasetJSONL).trim()) {
+    finishExport(datasetJSONL, "Fine-tune export ready.");
+    return;
+  }
+  setExportText(renderFineTuneWorkflow(workflow));
+  showError("No fine-tune examples available yet.", "#exportOutput");
+  focusDialogInitialControl("#refreshExportBtn");
 }
 
 function showExportError(err) {
