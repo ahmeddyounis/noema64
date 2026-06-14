@@ -689,6 +689,8 @@ test("bundle wires core actions and renders trace metadata", () => {
   assert.match(appJS, /bindBusyButton\("#runImportBtn"/);
   assert.match(appJS, /showExportError\(err\)/);
   assert.doesNotMatch(appJS, /\.at\(/);
+  assert.match(appJS, /async function squareClicked\(sq, fromKeyboard = false\) \{[\s\S]*state\.snapshot\.outcome\?\.status !== "ongoing"[\s\S]*selected = null;[\s\S]*focusBoardSquare\(sq\);[\s\S]*return;/);
+  assert.match(appJS, /async function playFromTo\(from, to\) \{[\s\S]*state\.snapshot\.outcome\?\.status !== "ongoing"[\s\S]*selected = null;[\s\S]*focusBoardSquare\(to\);[\s\S]*return;/);
   assert.match(appJS, /async function whyNotMove\(\)[\s\S]*call\("WhyNotMove", move\)[\s\S]*catch \(err\) \{\n      markFieldInvalid\(moveInput\);\n      showError\(err\);\n      focusMoveInput\(true\);/);
   assert.match(appJS, /target\.closest\("dialog\[open\]"\)/);
   assert.match(appJS, /input, textarea, select, button, a, \[role='button'\]/);

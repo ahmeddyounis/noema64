@@ -1222,6 +1222,12 @@ function focusBoardSquare(square = focusedSquare) {
 async function squareClicked(sq, fromKeyboard = false) {
   if (!state?.snapshot) return;
   boardKeyboardMode = !!fromKeyboard;
+  if (state.snapshot.outcome?.status !== "ongoing") {
+    selected = null;
+    renderBoard();
+    focusBoardSquare(sq);
+    return;
+  }
   if (!selected) {
     if (state.snapshot.board[sq]) selected = sq;
     renderBoard();
@@ -1232,6 +1238,12 @@ async function squareClicked(sq, fromKeyboard = false) {
 }
 
 async function playFromTo(from, to) {
+  if (!state?.snapshot || state.snapshot.outcome?.status !== "ongoing") {
+    selected = null;
+    renderBoard();
+    focusBoardSquare(to);
+    return;
+  }
   const matches = asArray(state?.snapshot?.legal_moves).filter((m) => m?.from === from && m?.to === to);
   if (!matches.length) {
     selected = state?.snapshot?.board?.[to] ? to : null;
