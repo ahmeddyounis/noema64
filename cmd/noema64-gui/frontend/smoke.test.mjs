@@ -454,6 +454,8 @@ test("bundle wires core actions and renders trace metadata", () => {
     "Provider health check complete.",
     "Random benchmark complete.",
     "Mode benchmark complete.",
+    "summary.games_per_mode !== undefined || results.some((result) => result?.summary || result?.mode)",
+    "const s = result?.summary || result || {};",
     "setAppActivity(\"Needs attention\"",
     "setAppActivity(\"Thinking\"",
     "document.body.dataset.appBusy = \"true\"",

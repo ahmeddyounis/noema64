@@ -2097,12 +2097,12 @@ function gameRecordFields(record) {
 function renderBenchmarkSummary(summary) {
   if (!summary) return "No benchmark result.";
   const results = asArray(summary.results);
-  if (results.length && results[0]?.summary) {
+  if (summary.games_per_mode !== undefined || results.some((result) => result?.summary || result?.mode)) {
     const rows = results.map((result) => {
-      const s = result?.summary || {};
+      const s = result?.summary || result || {};
       return `${result?.mode || "mode"}: ${countRatioText(s.games_completed, s.games_requested || summary.games_per_mode, "game")} · ${plyCountText(s.total_plies)} · ${countText(s.fallbacks_used, "fallback")} · ${countText(s.engine_errors, "error")}`;
     });
-    return `Mode benchmark · ${countText(summary.games_per_mode, "game")}/mode · seed ${summary.seed || 64}\n${rows.join("\n")}`;
+    return `Mode benchmark · ${countText(summary.games_per_mode, "game")}/mode · seed ${summary.seed || 64}\n${rows.join("\n") || "No mode results returned."}`;
   }
   return `Random benchmark · ${countRatioText(summary.games_completed, summary.games_requested, "game")} · ${plyCountText(summary.total_plies)} · ${countText(summary.fallbacks_used, "fallback")} · ${countText(summary.engine_errors, "error")}`;
 }
