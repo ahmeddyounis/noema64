@@ -888,6 +888,10 @@ dialog header button {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+#customBoardDefinition {
+  min-height: 280px;
+}
+
 .lab-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
