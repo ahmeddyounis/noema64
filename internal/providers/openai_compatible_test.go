@@ -79,6 +79,46 @@ func TestOpenAICompatibleCompleteJSONRequestShape(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleUsesMaxCompletionTokensForGPT5Models(t *testing.T) {
+	var seen map[string]any
+	server := openAITestServer(t, `{"move":"e2e4"}`, &seen)
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, APIKey: "secret"}
+	if _, err := provider.CompleteJSON(context.Background(), CompletionRequest{
+		Model:       "gpt-5.5",
+		System:      "system",
+		User:        "user",
+		Temperature: 0.25,
+		MaxTokens:   64,
+	}); err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
+	if _, ok := seen["max_tokens"]; ok {
+		t.Fatalf("request included max_tokens for GPT-5 model: %+v", seen)
+	}
+	if got := seen["max_completion_tokens"]; got != float64(64) {
+		t.Fatalf("max_completion_tokens = %#v, want 64", got)
+	}
+}
+
+func TestOpenAIProviderHealthCheckUsesMaxCompletionTokensForGPT5Models(t *testing.T) {
+	var seen map[string]any
+	server := openAITestServer(t, `{"ok":true}`, &seen)
+	defer server.Close()
+
+	provider := OpenAIProvider{BaseURL: server.URL, Model: "gpt-5.5"}
+	if err := provider.HealthCheck(context.Background()); err != nil {
+		t.Fatalf("health check: %v", err)
+	}
+	if _, ok := seen["max_tokens"]; ok {
+		t.Fatalf("health check request included max_tokens for GPT-5 model: %+v", seen)
+	}
+	if got := seen["max_completion_tokens"]; got != float64(16) {
+		t.Fatalf("max_completion_tokens = %#v, want 16", got)
+	}
+}
+
 func TestOpenAIProviderWrapsCompatibleEndpointWithOpenAIName(t *testing.T) {
 	server := openAITestServer(t, `{"move":"e2e4"}`, nil)
 	defer server.Close()

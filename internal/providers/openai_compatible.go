@@ -90,11 +90,11 @@ func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRe
 			{"role": "user", "content": req.User},
 		},
 		"temperature": req.Temperature,
-		"max_tokens":  req.MaxTokens,
 		"response_format": map[string]string{
 			"type": "json_object",
 		},
 	}
+	body[openAITokenLimitParameter(model)] = req.MaxTokens
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -140,4 +140,14 @@ func (p OpenAICompatible) completeJSONOnce(ctx context.Context, req CompletionRe
 		Latency:      time.Since(start),
 		RawAvailable: true,
 	}, nil
+}
+
+func openAITokenLimitParameter(model string) string {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	for _, prefix := range []string{"gpt-5", "o1", "o3", "o4"} {
+		if strings.HasPrefix(normalized, prefix) {
+			return "max_completion_tokens"
+		}
+	}
+	return "max_tokens"
 }

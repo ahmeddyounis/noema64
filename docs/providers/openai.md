@@ -14,8 +14,10 @@ The request uses:
 
 - `Authorization: Bearer <api key>`;
 - the configured `model`;
-- the configured `temperature` and `max_tokens`;
+- the configured `temperature` and output token limit;
 - `response_format: { "type": "json_object" }`.
+
+Noema64 keeps the user-facing setting name `max_tokens` in YAML and the GUI. For GPT-5 and OpenAI reasoning-model Chat Completions requests, the adapter sends that value as `max_completion_tokens` because those models reject the legacy `max_tokens` request field.
 
 OpenAI's current API docs still document JSON object response format for Chat Completions, while recommending `json_schema` for models that support it. Noema64 currently uses JSON object mode because the same provider pipeline also supports OpenAI-compatible endpoints.
 
@@ -106,6 +108,7 @@ Then keep `api_key_ref: provider/openai-cloud` in the config.
 | OpenAI still looks like mock | Settings were not saved, provider health failed, or the decision fell back. Check Decision Trace -> Provider and Fallback. |
 | `provider returned HTTP 401` | API key is missing, wrong, or not resolved from `api_key_ref`. |
 | `provider returned HTTP 429` | OpenAI rate limit, quota, billing, or access issue. Wait, reduce requests, or switch models. |
+| `Unsupported parameter: 'max_tokens'` | Upgrade to a build that includes the GPT-5 token-limit mapping, then save settings and retry Health. |
 | `provider model is empty` | Fill the Model field. |
 | Invalid JSON health response | Use a JSON-capable Chat Completions model, lower temperature, and avoid setting OpenAI as `openai_compatible` unless you intentionally need a custom endpoint. |
 
