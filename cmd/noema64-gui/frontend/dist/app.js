@@ -22,7 +22,7 @@ let lastStageEvent = null;
 let promptPack = null;
 let reopenSettingsAfterProfiles = false;
 let settingsScrollBeforeProfiles = 0;
-let activeSettingsPage = "play";
+let activeSettingsPage = "overview";
 let savedSettingsFingerprint = "";
 let lastProviderHealthText = "Health not checked in this session.";
 const busyControls = new Set();
@@ -111,6 +111,7 @@ const operationLabels = {
   "#saveMemoryBtn": "Strategy memory save",
   "#savePromptBtn": "Prompt save",
   "#saveSettingsBtn": "Settings save",
+  "#settingsOverviewHealthBtn": "Provider health",
   "#settingsBtn": "Settings",
   "#studyBtn": "Study tools",
   "#trainPolicyPriorBtn": "Policy training",
@@ -1982,6 +1983,7 @@ async function loadSettings() {
   syncTimeControlInputsFromPreset(false);
   syncProviderDisclosure();
   updateProviderSettingsSummary();
+  updateSettingsOverview();
   markSettingsClean();
   renderWorkflowPanel();
 }
@@ -2003,7 +2005,7 @@ function populateProviderProfiles(profiles) {
 }
 
 function setSettingsPage(page, focus = false) {
-  const targetPage = document.querySelector(`[data-settings-page="${page}"]`) ? page : "play";
+  const targetPage = document.querySelector(`[data-settings-page="${page}"]`) ? page : "overview";
   activeSettingsPage = targetPage;
   document.querySelectorAll("#settingsNav button[data-settings-target]").forEach((button) => {
     const selected = button.dataset.settingsTarget === targetPage;
@@ -2067,7 +2069,7 @@ function bindSettingsNavigation() {
       }
       if (event.key === "Home") {
         event.preventDefault();
-        setSettingsPage("play", true);
+        setSettingsPage("overview", true);
       }
       if (event.key === "End") {
         event.preventDefault();
@@ -2078,8 +2080,20 @@ function bindSettingsNavigation() {
 }
 
 function bindSettingsDirtyTracking() {
-  document.querySelector("#settingsDialog").addEventListener("input", refreshSettingsDirtyState);
-  document.querySelector("#settingsDialog").addEventListener("change", refreshSettingsDirtyState);
+  document.querySelector("#settingsDialog").addEventListener("input", () => {
+    updateSettingsOverview();
+    refreshSettingsDirtyState();
+  });
+  document.querySelector("#settingsDialog").addEventListener("change", () => {
+    updateSettingsOverview();
+    refreshSettingsDirtyState();
+  });
+}
+
+function bindSettingsOverviewActions() {
+  document.querySelectorAll("[data-settings-jump]").forEach((button) => {
+    button.addEventListener("click", () => setSettingsPage(button.dataset.settingsJump, true));
+  });
 }
 
 function populateProviderSettingsControls() {
@@ -2110,6 +2124,29 @@ function updateProviderSettingsSummary() {
   setText("#activeProviderDetail", `${profile || "custom"}${endpoint ? ` · ${endpoint}` : provider === "openai" ? ` · ${openAIEndpoint}` : ""}`);
   setText("#providerKeyStatus", providerKeyStatusText(provider, key, keyRef));
   setText("#providerHealthSummary", lastProviderHealthText);
+  updateSettingsOverview();
+}
+
+function updateSettingsOverview() {
+  const provider = document.querySelector("#settingProvider")?.value || settings?.llm?.provider || "mock";
+  const model = document.querySelector("#settingModel")?.value || settings?.llm?.model || "mock-balanced";
+  const key = document.querySelector("#settingKey")?.value || "";
+  const keyRef = document.querySelector("#settingKeyRef")?.value || "";
+  const mode = normalizeEngineMode(document.querySelector("#settingMode")?.value || settings?.engine?.default_mode || "blunderguard");
+  const personality = document.querySelector("#settingPersonality")?.value || settings?.engine?.personality || "balanced";
+  const side = document.querySelector("#settingSide")?.value || playerSide || "white";
+  const timeControl = document.querySelector("#settingTimeControl")?.value || settings?.gui?.time_control || "untimed";
+  const verifierEnabled = document.querySelector("#settingVerifier")?.checked || false;
+  const tablebaseEnabled = document.querySelector("#settingTablebase")?.checked || false;
+  const traceEnabled = document.querySelector("#settingTraceEnabled")?.checked || false;
+  const rawPrompts = document.querySelector("#settingRaw")?.checked || false;
+  const rawResponses = document.querySelector("#settingRawResponses")?.checked || false;
+  const logDir = document.querySelector("#settingLogDir")?.value || settings?.logging?.output_dir || "logs";
+  setText("#overviewPlaySummary", `${engineModeLabel(mode)} · ${humanizeToken(personality)} · ${humanizeToken(side)} · ${humanizeToken(timeControl)}`);
+  setText("#overviewProviderSummary", `${humanizeToken(provider)} · ${model || "model not set"} · ${providerKeyStatusText(provider, key, keyRef)}`);
+  setText("#overviewProviderHealth", lastProviderHealthText);
+  setText("#overviewSafetySummary", `${verifierEnabled ? "Verifier on" : "Verifier off"} · ${tablebaseEnabled ? "tablebase on" : "tablebase off"}`);
+  setText("#overviewPrivacySummary", `${traceEnabled ? "Trace logging on" : "Trace logging off"} · ${rawPrompts || rawResponses ? "raw logs on" : "raw logs off"} · ${logDir}`);
 }
 
 function providerKeyStatusText(provider, key, keyRef) {
@@ -3481,8 +3518,9 @@ document.querySelector("#whyBtn").addEventListener("click", whyNotMove);
 bindBusyButton("#settingsBtn", async () => {
   try {
     await loadSettings();
+    setSettingsPage("overview");
     document.querySelector("#settingsDialog").showModal();
-    focusDialogInitialControl("#settingMode");
+    focusDialogInitialControl("#settingsOverviewHealthBtn");
   } catch (err) {
     showError(err);
   }
@@ -3535,6 +3573,7 @@ document.querySelector("#discardSettingsBtn").addEventListener("click", (event) 
 bindBusyButton("#profilesBtn", openProfilesEditor);
 bindBusyButton("#keychainBtn", saveProviderKeyToKeychain);
 bindBusyButton("#healthBtn", testProviderHealth);
+bindBusyButton("#settingsOverviewHealthBtn", testProviderHealth);
 bindBusyButton("#benchBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = "Running benchmark...";
@@ -3744,6 +3783,7 @@ function isElementVisible(element) {
 async function init() {
   bindWorkspaceNavigation();
   bindSettingsNavigation();
+  bindSettingsOverviewActions();
   bindSettingsDirtyTracking();
   bindWorkflowCommands();
   setWorkspaceView(document.body.dataset.workspaceView || activeWorkspaceView);

@@ -218,7 +218,8 @@
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <nav id="settingsNav" class="settings-nav" role="tablist" aria-label="Settings sections">
-            <button id="settingsPlayTab" type="button" class="active" role="tab" aria-selected="true" aria-controls="settingsPlayPage" tabindex="0" data-settings-target="play">Play</button>
+            <button id="settingsOverviewTab" type="button" class="active" role="tab" aria-selected="true" aria-controls="settingsOverviewPage" tabindex="0" data-settings-target="overview">Overview</button>
+            <button id="settingsPlayTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPlayPage" tabindex="-1" data-settings-target="play">Play</button>
             <button id="settingsProviderTab" type="button" role="tab" aria-selected="false" aria-controls="settingsProviderPage" tabindex="-1" data-settings-target="provider">AI Provider</button>
             <button id="settingsSafetyTab" type="button" role="tab" aria-selected="false" aria-controls="settingsSafetyPage" tabindex="-1" data-settings-target="safety">Safety</button>
             <button id="settingsPrivacyTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPrivacyPage" tabindex="-1" data-settings-target="privacy">Privacy</button>
@@ -227,7 +228,38 @@
 
           <div id="settingsDirtyStatus" class="settings-dirty" role="status" aria-live="polite">Saved settings are loaded.</div>
 
-          <section id="settingsPlayPage" class="settings-page active" role="tabpanel" aria-labelledby="settingsPlayTab" data-settings-page="play">
+          <section id="settingsOverviewPage" class="settings-page active" role="tabpanel" aria-labelledby="settingsOverviewTab" data-settings-page="overview">
+            <h3 class="settings-section">Overview</h3>
+            <div class="settings-overview-grid" aria-label="Settings summary">
+              <section class="settings-overview-card" aria-labelledby="overviewPlayTitle">
+                <strong id="overviewPlayTitle">Play</strong>
+                <span id="overviewPlaySummary">Play settings not loaded.</span>
+                <button type="button" data-settings-jump="play">Change Play</button>
+              </section>
+              <section class="settings-overview-card" aria-labelledby="overviewProviderTitle">
+                <strong id="overviewProviderTitle">AI Provider</strong>
+                <span id="overviewProviderSummary">Provider not loaded.</span>
+                <span id="overviewProviderHealth">Health not checked in this session.</span>
+                <button type="button" data-settings-jump="provider">Change Provider</button>
+              </section>
+              <section class="settings-overview-card" aria-labelledby="overviewSafetyTitle">
+                <strong id="overviewSafetyTitle">Safety</strong>
+                <span id="overviewSafetySummary">Safety settings not loaded.</span>
+                <button type="button" data-settings-jump="safety">Review Safety</button>
+              </section>
+              <section class="settings-overview-card" aria-labelledby="overviewPrivacyTitle">
+                <strong id="overviewPrivacyTitle">Privacy</strong>
+                <span id="overviewPrivacySummary">Privacy settings not loaded.</span>
+                <button type="button" data-settings-jump="privacy">Review Privacy</button>
+              </section>
+            </div>
+            <menu class="settings-overview-actions">
+              <button id="settingsOverviewHealthBtn" value="none" type="button">Test Provider</button>
+              <button type="button" data-settings-jump="advanced">Advanced Settings</button>
+            </menu>
+          </section>
+
+          <section id="settingsPlayPage" class="settings-page" role="tabpanel" aria-labelledby="settingsPlayTab" data-settings-page="play" hidden>
             <h3 class="settings-section">Play</h3>
             <div class="settings-grid">
               <label>Mode

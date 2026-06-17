@@ -166,12 +166,20 @@ test("primary toolbar and dialogs expose expected controls", () => {
 test("settings surface covers provider and profile controls", () => {
   for (const id of [
     "settingsNav",
+    "settingsOverviewTab",
     "settingsPlayTab",
     "settingsProviderTab",
     "settingsSafetyTab",
     "settingsPrivacyTab",
     "settingsAdvancedTab",
     "settingsDirtyStatus",
+    "settingsOverviewPage",
+    "overviewPlaySummary",
+    "overviewProviderSummary",
+    "overviewProviderHealth",
+    "overviewSafetySummary",
+    "overviewPrivacySummary",
+    "settingsOverviewHealthBtn",
     "settingsPlayPage",
     "settingsProviderPage",
     "settingsSafetyPage",
@@ -244,12 +252,14 @@ test("settings surface covers provider and profile controls", () => {
   assert.match(indexHTML, /high_contrast/);
   assert.match(stylesCSS, /body\[data-theme="high_contrast"\] \.dark \.coord \{[\s\S]*color: rgba\(255, 255, 255, 0\.88\);/);
   assert.match(indexHTML, /id="settingsNav" class="settings-nav" role="tablist" aria-label="Settings sections"/);
-  assert.match(indexHTML, /id="settingsPlayTab"[\s\S]*aria-selected="true"[\s\S]*tabindex="0"[\s\S]*data-settings-target="play"/);
+  assert.match(indexHTML, /id="settingsOverviewTab"[\s\S]*aria-selected="true"[\s\S]*tabindex="0"[\s\S]*data-settings-target="overview"/);
+  assert.match(indexHTML, /id="settingsPlayTab"[\s\S]*aria-selected="false"[\s\S]*tabindex="-1"[\s\S]*data-settings-target="play"/);
   assert.match(indexHTML, /id="settingsProviderTab"[\s\S]*aria-selected="false"[\s\S]*tabindex="-1"[\s\S]*data-settings-target="provider"/);
   assert.match(indexHTML, /id="settingsSafetyTab"[\s\S]*data-settings-target="safety"/);
   assert.match(indexHTML, /id="settingsPrivacyTab"[\s\S]*data-settings-target="privacy"/);
   assert.match(indexHTML, /id="settingsAdvancedTab"[\s\S]*data-settings-target="advanced"/);
   assert.match(indexHTML, /id="settingsDirtyStatus" class="settings-dirty" role="status" aria-live="polite"/);
+  assert.match(indexHTML, /id="settingsOverviewPage"[\s\S]*data-settings-page="overview"/);
   assert.match(indexHTML, /id="settingsPlayPage"[\s\S]*data-settings-page="play"/);
   assert.match(indexHTML, /id="settingsProviderPage"[\s\S]*data-settings-page="provider"/);
   assert.match(indexHTML, /id="settingsSafetyPage"[\s\S]*data-settings-page="safety"/);
@@ -259,6 +269,9 @@ test("settings surface covers provider and profile controls", () => {
   assert.match(indexHTML, /id="activeProviderDetail">Open Settings to load provider details\.</);
   assert.match(indexHTML, /id="providerKeyStatus">Key status unknown</);
   assert.match(indexHTML, /id="providerHealthSummary">Health not checked in this session\.</);
+  assert.match(indexHTML, /class="settings-overview-grid" aria-label="Settings summary"/);
+  assert.match(indexHTML, /id="settingsOverviewHealthBtn" value="none" type="button">Test Provider/);
+  assert.match(indexHTML, /data-settings-jump="provider"/);
   assert.match(indexHTML, /data-provider-field="endpoint"/);
   assert.match(indexHTML, /data-provider-field="model"/);
   assert.match(indexHTML, /data-provider-field="api-key"/);
@@ -270,7 +283,7 @@ test("settings surface covers provider and profile controls", () => {
   assert.match(indexHTML, /id="settingTimeout" type="number" min="100" max="120000"/);
   assert.match(indexHTML, /id="settingVerifierMoveTime" type="number" min="10" max="5000"/);
   assert.match(indexHTML, /id="settingVerifierMaxLoss" type="number" min="0" max="2000"/);
-  for (const section of ["Play", "AI Provider", "Safety", "Privacy & Logs", "Advanced"]) {
+  for (const section of ["Overview", "Play", "AI Provider", "Safety", "Privacy & Logs", "Advanced"]) {
     assert.match(indexHTML, new RegExp(`<h3 class="settings-section">${section}</h3>`), `missing settings section ${section}`);
   }
   assert.match(indexHTML, /id="settingMode"[\s\S]*<option value="current">Best now<\/option>/);
@@ -527,11 +540,13 @@ test("bundle wires core actions and renders trace metadata", () => {
     "dialog?.id === \"profilesDialog\" && reopenSettingsAfterProfiles",
     "setSettingsPage",
     "bindSettingsNavigation",
+    "bindSettingsOverviewActions",
     "moveSettingsPageFocus",
     "settingsFingerprint",
     "markSettingsClean",
     "refreshSettingsDirtyState",
     "updateProviderSettingsSummary",
+    "updateSettingsOverview",
     "providerKeyStatusText",
     "syncProviderFieldVisibility",
     "const supportsEndpoint = [\"openai_compatible\", \"anthropic\", \"gemini\", \"ollama\"].includes(provider)",
@@ -548,6 +563,10 @@ test("bundle wires core actions and renders trace metadata", () => {
     "revealSettingsField(field)",
     "data-settings-target",
     "data-settings-page",
+    "data-settings-jump",
+    "setSettingsPage(\"overview\")",
+    "focusDialogInitialControl(\"#settingsOverviewHealthBtn\")",
+    "bindBusyButton(\"#settingsOverviewHealthBtn\", testProviderHealth)",
     "document.querySelector(\"#saveAndTestSettingsBtn\").addEventListener",
     "document.querySelector(\"#discardSettingsBtn\").addEventListener",
     "bindBusyButton(\"#healthBtn\", testProviderHealth)",
@@ -648,7 +667,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "restoreDialogFocus",
     "focusVisibleElement",
     "focusDialogInitialControl",
-    "focusDialogInitialControl(\"#settingMode\")",
+    "focusDialogInitialControl(\"#settingsOverviewHealthBtn\")",
     "focusDialogInitialControl(\"#importText\")",
     "focusDialogInitialControl(\"#exportType\")",
     "focusDialogInitialControl(\"#refreshExportBtn\")",
@@ -884,8 +903,9 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /\.tabs \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /dialog > form/);
   assert.match(stylesCSS, /position: sticky/);
+  assert.match(stylesCSS, /\.settings-overview-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(stylesCSS, /\.settings-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
-  assert.match(stylesCSS, /\.settings-inline-actions,\n\.settings-footer \{[\s\S]*flex-wrap: wrap;/);
+  assert.match(stylesCSS, /\.settings-overview-actions,\n\.settings-inline-actions,\n\.settings-footer \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /calc\(\(74vh - 154px\) \* var\(--board-files, 8\) \/ var\(--board-ranks, 8\)\)/);
   assert.match(stylesCSS, /\.board-area\s*\{[\s\S]*grid-template-rows: auto minmax\(360px, auto\) auto minmax\(120px, auto\);[\s\S]*align-self: start;/);
   assert.match(stylesCSS, /\.board\s*\{[\s\S]*align-self: start;/);
@@ -906,6 +926,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.activity-row \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto;/);
   assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.app-activity \{[\s\S]*grid-template-columns: auto minmax\(0, 1fr\);/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.board-area \{[\s\S]*grid-template-rows: auto auto auto minmax\(96px, auto\);[\s\S]*min-height: 0;/);
+  assert.match(stylesCSS, /@media \(max-width: 1240px\) \{[\s\S]*\.settings-overview-grid,\n  \.settings-grid,\n  \.time-control-grid \{[\s\S]*grid-template-columns: 1fr;/);
   assert.match(stylesCSS, /\.board \{[\s\S]*width: min\(100%, calc\(100vw - 44px\)\);[\s\S]*max-height: none;/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.square \{[\s\S]*min\(calc\(37vh \/ var\(--board-ranks, 8\)\), calc\(52vh \/ var\(--board-files, 8\)\), 9vw\)/);
   assert.match(stylesCSS, /\.move-entry input \{[\s\S]*font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;/);
