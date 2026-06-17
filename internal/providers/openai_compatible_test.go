@@ -79,7 +79,7 @@ func TestOpenAICompatibleCompleteJSONRequestShape(t *testing.T) {
 	}
 }
 
-func TestOpenAICompatibleUsesMaxCompletionTokensForGPT5Models(t *testing.T) {
+func TestOpenAICompatibleKeepsGenericGPT5CompatibleRequestShape(t *testing.T) {
 	var seen map[string]any
 	server := openAITestServer(t, `{"move":"e2e4"}`, &seen)
 	defer server.Close()
@@ -94,11 +94,41 @@ func TestOpenAICompatibleUsesMaxCompletionTokensForGPT5Models(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("complete json: %v", err)
 	}
+	if got := seen["max_tokens"]; got != float64(64) {
+		t.Fatalf("max_tokens = %#v, want 64", got)
+	}
+	if _, ok := seen["max_completion_tokens"]; ok {
+		t.Fatalf("generic compatible request included max_completion_tokens: %+v", seen)
+	}
+	messages := seenMessages(t, seen)
+	if messages[0]["role"] != "system" {
+		t.Fatalf("first message role = %q, want system", messages[0]["role"])
+	}
+}
+
+func TestOpenAIProviderUsesGPT5ChatCompletionShape(t *testing.T) {
+	var seen map[string]any
+	server := openAITestServer(t, `{"move":"e2e4"}`, &seen)
+	defer server.Close()
+
+	provider := OpenAIProvider{BaseURL: server.URL, Model: "gpt-5.5", APIKey: "secret"}
+	if _, err := provider.CompleteJSON(context.Background(), CompletionRequest{
+		System:      "system",
+		User:        "user",
+		Temperature: 0.25,
+		MaxTokens:   64,
+	}); err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
 	if _, ok := seen["max_tokens"]; ok {
-		t.Fatalf("request included max_tokens for GPT-5 model: %+v", seen)
+		t.Fatalf("OpenAI request included max_tokens for GPT-5 model: %+v", seen)
 	}
 	if got := seen["max_completion_tokens"]; got != float64(64) {
 		t.Fatalf("max_completion_tokens = %#v, want 64", got)
+	}
+	messages := seenMessages(t, seen)
+	if messages[0]["role"] != "developer" || messages[0]["content"] != "system" {
+		t.Fatalf("first message = %+v, want developer system prompt", messages[0])
 	}
 }
 
@@ -116,6 +146,151 @@ func TestOpenAIProviderHealthCheckUsesMaxCompletionTokensForGPT5Models(t *testin
 	}
 	if got := seen["max_completion_tokens"]; got != float64(16) {
 		t.Fatalf("max_completion_tokens = %#v, want 16", got)
+	}
+	messages := seenMessages(t, seen)
+	if messages[0]["role"] != "developer" {
+		t.Fatalf("health check first message role = %q, want developer", messages[0]["role"])
+	}
+}
+
+func TestOpenAICompatibleAdaptsWhenProviderRejectsMaxTokens(t *testing.T) {
+	attempts := 0
+	var second map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if attempts == 1 {
+			if _, ok := body["max_tokens"]; !ok {
+				t.Fatalf("first request = %+v, want max_tokens", body)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.","code":"unsupported_parameter","param":"max_tokens"}}`))
+			return
+		}
+		second = body
+		writeOpenAIChatResponse(w, `{"move":"e2e4"}`)
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "future-model"}
+	if _, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 32}); err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+	if _, ok := second["max_tokens"]; ok {
+		t.Fatalf("second request included rejected max_tokens: %+v", second)
+	}
+	if got := second["max_completion_tokens"]; got != float64(32) {
+		t.Fatalf("max_completion_tokens = %#v, want 32", got)
+	}
+}
+
+func TestOpenAICompatibleAdaptsWhenProviderRejectsTemperature(t *testing.T) {
+	attempts := 0
+	var second map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if attempts == 1 {
+			if _, ok := body["temperature"]; !ok {
+				t.Fatalf("first request = %+v, want temperature", body)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"Unsupported parameter: 'temperature' is not supported with this model.","code":"unsupported_parameter","param":"temperature"}}`))
+			return
+		}
+		second = body
+		writeOpenAIChatResponse(w, `{"move":"e2e4"}`)
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "model-a"}
+	if _, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 32, Temperature: 0.2}); err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+	if _, ok := second["temperature"]; ok {
+		t.Fatalf("second request included rejected temperature: %+v", second)
+	}
+}
+
+func TestOpenAICompatibleAdaptsWhenProviderRejectsResponseFormat(t *testing.T) {
+	attempts := 0
+	var second map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if attempts == 1 {
+			if _, ok := body["response_format"]; !ok {
+				t.Fatalf("first request = %+v, want response_format", body)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"Unsupported parameter: 'response_format' is not supported with this model.","code":"unsupported_parameter","param":"response_format"}}`))
+			return
+		}
+		second = body
+		writeOpenAIChatResponse(w, `{"move":"e2e4"}`)
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "model-a"}
+	if _, err := provider.CompleteJSON(context.Background(), CompletionRequest{MaxTokens: 32}); err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+	if _, ok := second["response_format"]; ok {
+		t.Fatalf("second request included rejected response_format: %+v", second)
+	}
+}
+
+func TestOpenAICompatibleAdaptsWhenProviderRequiresDeveloperRole(t *testing.T) {
+	attempts := 0
+	var second map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		messages := seenMessages(t, body)
+		if attempts == 1 {
+			if messages[0]["role"] != "system" {
+				t.Fatalf("first request first message = %+v, want system role", messages[0])
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":{"message":"Unsupported value: messages[0].role does not support 'system' with this model. Use 'developer' instead.","code":"unsupported_value","param":"messages[0].role"}}`))
+			return
+		}
+		second = body
+		writeOpenAIChatResponse(w, `{"move":"e2e4"}`)
+	}))
+	defer server.Close()
+
+	provider := OpenAICompatible{BaseURL: server.URL, Model: "model-a"}
+	if _, err := provider.CompleteJSON(context.Background(), CompletionRequest{System: "system", User: "user", MaxTokens: 32}); err != nil {
+		t.Fatalf("complete json: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want 2", attempts)
+	}
+	messages := seenMessages(t, second)
+	if messages[0]["role"] != "developer" || messages[0]["content"] != "system" {
+		t.Fatalf("second request first message = %+v, want developer system prompt", messages[0])
 	}
 }
 
@@ -264,10 +439,39 @@ func openAITestServer(t *testing.T, content string, seen any) *httptest.Server {
 				target.Authorization = r.Header.Get("Authorization")
 			}
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"choices": []map[string]any{{
-				"message": map[string]string{"content": content},
-			}},
-		})
+		writeOpenAIChatResponse(w, content)
 	}))
+}
+
+func writeOpenAIChatResponse(w http.ResponseWriter, content string) {
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"choices": []map[string]any{{
+			"message": map[string]string{"content": content},
+		}},
+	})
+}
+
+func seenMessages(t *testing.T, seen map[string]any) []map[string]string {
+	t.Helper()
+	rawMessages, ok := seen["messages"].([]any)
+	if !ok {
+		t.Fatalf("messages = %#v, want array", seen["messages"])
+	}
+	messages := make([]map[string]string, 0, len(rawMessages))
+	for _, rawMessage := range rawMessages {
+		values, ok := rawMessage.(map[string]any)
+		if !ok {
+			t.Fatalf("message = %#v, want object", rawMessage)
+		}
+		message := make(map[string]string, len(values))
+		for key, value := range values {
+			text, ok := value.(string)
+			if !ok {
+				t.Fatalf("message field %q = %#v, want string", key, value)
+			}
+			message[key] = text
+		}
+		messages = append(messages, message)
+	}
+	return messages
 }

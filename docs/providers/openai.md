@@ -19,6 +19,8 @@ The request uses:
 
 Noema64 keeps the user-facing setting name `max_tokens` in YAML and the GUI. For GPT-5 and OpenAI reasoning-model Chat Completions requests, the adapter sends that value as `max_completion_tokens` because those models reject the legacy `max_tokens` request field.
 
+For those same models, Noema64 sends the instruction prompt as a `developer` message instead of a legacy `system` message. If OpenAI or an OpenAI-compatible endpoint returns a narrow `unsupported_parameter` or `unsupported_value` error for `max_tokens`, `max_completion_tokens`, `temperature`, `response_format`, or the first message role, Noema64 retries with an adjusted request shape instead of immediately falling back.
+
 OpenAI's current API docs still document JSON object response format for Chat Completions, while recommending `json_schema` for models that support it. Noema64 currently uses JSON object mode because the same provider pipeline also supports OpenAI-compatible endpoints.
 
 ## Prerequisites

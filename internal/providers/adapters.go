@@ -339,16 +339,28 @@ func decodeProviderResponse(body io.Reader, target any) error {
 }
 
 func providerHTTPError(statusCode int, body io.Reader) error {
-	data, err := io.ReadAll(io.LimitReader(body, maxProviderErrorBytes+1))
+	data, truncated, err := readProviderErrorBody(body)
 	if err != nil {
 		return fmt.Errorf("provider returned HTTP %d; failed to read error body: %w", statusCode, err)
 	}
-	if len(data) == 0 {
-		return fmt.Errorf("provider returned HTTP %d", statusCode)
+	return providerHTTPErrorFromBytes(statusCode, data, truncated)
+}
+
+func readProviderErrorBody(body io.Reader) ([]byte, bool, error) {
+	data, err := io.ReadAll(io.LimitReader(body, maxProviderErrorBytes+1))
+	if err != nil {
+		return nil, false, err
 	}
 	truncated := len(data) > maxProviderErrorBytes
 	if truncated {
 		data = data[:maxProviderErrorBytes]
+	}
+	return data, truncated, nil
+}
+
+func providerHTTPErrorFromBytes(statusCode int, data []byte, truncated bool) error {
+	if len(data) == 0 {
+		return fmt.Errorf("provider returned HTTP %d", statusCode)
 	}
 	detail := security.RedactSecrets(strings.Join(strings.Fields(string(data)), " "))
 	if detail == "" {

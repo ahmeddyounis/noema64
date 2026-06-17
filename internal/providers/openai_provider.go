@@ -42,10 +42,11 @@ func (p OpenAIProvider) compatible() OpenAICompatible {
 		baseURL = OpenAIBaseURL
 	}
 	return OpenAICompatible{
-		BaseURL: baseURL,
-		APIKey:  p.APIKey,
-		Model:   p.Model,
-		Retries: p.Retries,
-		Client:  p.Client,
+		BaseURL:             baseURL,
+		APIKey:              p.APIKey,
+		Model:               p.Model,
+		Retries:             p.Retries,
+		Client:              p.Client,
+		OpenAICompatibility: true,
 	}
 }
