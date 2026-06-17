@@ -973,10 +973,21 @@ dialog header button {
   min-width: 0;
 }
 
+.field-help {
+  color: #607083;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .settings .check-label {
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 8px;
+}
+
+.settings .check-label .field-help {
+  grid-column: 2;
 }
 
 .settings .check-label input {

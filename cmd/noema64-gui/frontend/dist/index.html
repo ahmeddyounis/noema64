@@ -360,10 +360,10 @@
                 </select>
               </label>
               <label id="cloudProviderWarning" class="provider-warning hidden"><input id="settingCloudAck" type="checkbox" /> I understand this provider may receive FEN, legal moves, move history, strategy memory, and selected settings.</label>
-              <label data-provider-field="endpoint">Endpoint <input id="settingEndpoint" placeholder="http://localhost:11434/v1" /></label>
-              <label data-provider-field="model">Model <input id="settingModel" placeholder="mock-balanced" /></label>
+              <label data-provider-field="endpoint">Endpoint <input id="settingEndpoint" placeholder="http://localhost:11434/v1" /><span class="field-help">Required for OpenAI-compatible servers; optional for Anthropic, Gemini, and Ollama defaults.</span></label>
+              <label data-provider-field="model">Model <input id="settingModel" placeholder="mock-balanced" /><span class="field-help">Use the exact model name accepted by the selected provider.</span></label>
               <label data-provider-field="api-key">API key <input id="settingKey" type="password" autocomplete="off" /></label>
-              <label data-provider-field="key-ref">API key ref <input id="settingKeyRef" placeholder="provider/cloud" /></label>
+              <label data-provider-field="key-ref">API key ref <input id="settingKeyRef" placeholder="provider/cloud" /><span class="field-help">A saved keychain reference created by Save Key.</span></label>
             </div>
             <menu class="settings-inline-actions">
               <button id="healthBtn" value="none" type="button">Test Provider</button>
@@ -377,8 +377,8 @@
             <div class="settings-grid">
               <label class="check-label"><input id="settingVerifier" type="checkbox" /> Verifier enabled</label>
               <label>Verifier path <input id="settingVerifierPath" placeholder="stockfish" /></label>
-              <label>Verifier movetime ms <input id="settingVerifierMoveTime" type="number" min="10" max="5000" step="10" /></label>
-              <label>Max centipawn loss <input id="settingVerifierMaxLoss" type="number" min="0" max="2000" step="10" /></label>
+              <label>Verifier movetime ms <input id="settingVerifierMoveTime" type="number" min="10" max="5000" step="10" /><span class="field-help">Higher values improve safety checks but slow engine moves.</span></label>
+              <label>Max centipawn loss <input id="settingVerifierMaxLoss" type="number" min="0" max="2000" step="10" /><span class="field-help">Lower values reject more risky candidate moves.</span></label>
               <label class="check-label"><input id="settingTablebase" type="checkbox" /> External tablebase enabled</label>
               <label>Tablebase probe path <input id="settingTablebasePath" placeholder="/usr/local/bin/noema64-tablebase" /></label>
               <label>Tablebase timeout ms <input id="settingTablebaseTimeout" type="number" min="50" max="10000" step="50" /></label>
@@ -390,17 +390,17 @@
             <div class="settings-grid">
               <label class="check-label"><input id="settingTraceEnabled" type="checkbox" /> Decision trace logging</label>
               <label>Log output directory <input id="settingLogDir" placeholder="logs" /></label>
-              <label class="check-label"><input id="settingRaw" type="checkbox" /> Raw prompt logging</label>
-              <label class="check-label"><input id="settingRawResponses" type="checkbox" /> Raw LLM response logging</label>
+              <label class="check-label"><input id="settingRaw" type="checkbox" /> Raw prompt logging <span class="field-help">Stores full prompts locally and may include game context.</span></label>
+              <label class="check-label"><input id="settingRawResponses" type="checkbox" /> Raw LLM response logging <span class="field-help">Stores provider responses locally for debugging.</span></label>
             </div>
           </section>
 
           <section id="settingsAdvancedPage" class="settings-page" role="tabpanel" aria-labelledby="settingsAdvancedTab" data-settings-page="advanced" hidden>
             <h3 class="settings-section">Advanced</h3>
             <div class="settings-grid">
-              <label>Temperature <input id="settingTemperature" type="number" min="0" max="2" step="0.05" /></label>
-              <label>Max tokens <input id="settingMaxTokens" type="number" min="1" step="100" /></label>
-              <label>LLM timeout ms <input id="settingTimeout" type="number" min="100" max="120000" step="100" /></label>
+              <label>Temperature <input id="settingTemperature" type="number" min="0" max="2" step="0.05" /><span class="field-help">Lower is more stable; higher is more varied.</span></label>
+              <label>Max tokens <input id="settingMaxTokens" type="number" min="1" step="100" /><span class="field-help">Response budget for the provider, not chess search depth.</span></label>
+              <label>LLM timeout ms <input id="settingTimeout" type="number" min="100" max="120000" step="100" /><span class="field-help">Maximum wait for a provider response before recovery.</span></label>
               <label>Retries <input id="settingRetries" type="number" min="0" max="5" step="1" /></label>
             </div>
             <menu class="settings-inline-actions">

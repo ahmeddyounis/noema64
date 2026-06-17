@@ -577,16 +577,26 @@ function bindBusyButton(selector, action) {
 function bindDialogCloseButtons() {
   document.querySelectorAll("dialog").forEach((dialog) => {
     dialog.addEventListener("close", () => restoreDialogFocus(dialog));
+    dialog.addEventListener("cancel", (event) => {
+      if (dialog.id === "settingsDialog" && !shouldCloseSettingsDialog()) {
+        event.preventDefault();
+      }
+    });
   });
   document.querySelectorAll("dialog button[value='cancel']").forEach((button) => {
     button.type = "button";
     button.addEventListener("click", () => {
       const dialog = button.closest("dialog");
+      if (dialog?.id === "settingsDialog" && !shouldCloseSettingsDialog()) return;
       const restoreSettings = dialog?.id === "profilesDialog" && reopenSettingsAfterProfiles;
       closeDialogAndRestoreFocus(dialog, "cancel");
       if (restoreSettings) restoreSettingsAfterProfiles();
     });
   });
+}
+
+function shouldCloseSettingsDialog() {
+  return !refreshSettingsDirtyState() || window.confirm("Discard unsaved settings changes?");
 }
 
 function closeDialogAndRestoreFocus(dialog, returnValue = undefined) {

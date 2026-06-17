@@ -287,6 +287,10 @@ test("settings surface covers provider and profile controls", () => {
   assert.match(indexHTML, /id="settingTimeout" type="number" min="100" max="120000"/);
   assert.match(indexHTML, /id="settingVerifierMoveTime" type="number" min="10" max="5000"/);
   assert.match(indexHTML, /id="settingVerifierMaxLoss" type="number" min="0" max="2000"/);
+  assert.match(indexHTML, /class="field-help">A saved keychain reference created by Save Key\.</);
+  assert.match(indexHTML, /class="field-help">Lower is more stable; higher is more varied\.</);
+  assert.match(indexHTML, /class="field-help">Response budget for the provider, not chess search depth\.</);
+  assert.match(indexHTML, /class="field-help">Stores full prompts locally and may include game context\.</);
   for (const section of ["Overview", "Play", "AI Provider", "Safety", "Privacy & Logs", "Advanced"]) {
     assert.match(indexHTML, new RegExp(`<h3 class="settings-section">${section}</h3>`), `missing settings section ${section}`);
   }
@@ -542,6 +546,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "if (settingsDialog && !settingsDialog.open) settingsDialog.showModal();",
     "settingsForm.scrollTop = settingsScrollBeforeProfiles",
     "dialog?.id === \"profilesDialog\" && reopenSettingsAfterProfiles",
+    "shouldCloseSettingsDialog",
+    "Discard unsaved settings changes?",
+    "dialog.addEventListener(\"cancel\"",
     "setSettingsPage",
     "bindSettingsNavigation",
     "bindSettingsOverviewActions",
@@ -908,6 +915,8 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /\.trace-panel \{[\s\S]*grid-template-rows:/);
   assert.match(stylesCSS, /\.top-candidate/);
   assert.match(stylesCSS, /\.settings \.check-label/);
+  assert.match(stylesCSS, /\.field-help \{[\s\S]*font-size: 12px;/);
+  assert.match(stylesCSS, /\.settings \.check-label \.field-help \{[\s\S]*grid-column: 2;/);
   assert.match(stylesCSS, /\.import-controls select,\n\.export-controls select \{[\s\S]*min-height: 34px;/);
   assert.match(stylesCSS, /\.lab-grid label,\n\.lab-tools > label \{[\s\S]*display: grid;[\s\S]*gap: 4px;/);
   assert.match(stylesCSS, /\.settings-section/);
