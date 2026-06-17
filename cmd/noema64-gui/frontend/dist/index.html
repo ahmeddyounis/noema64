@@ -336,8 +336,8 @@
             <div class="settings-grid">
               <label class="check-label"><input id="settingVerifier" type="checkbox" /> Verifier enabled</label>
               <label>Verifier path <input id="settingVerifierPath" placeholder="stockfish" /></label>
-              <label>Verifier movetime ms <input id="settingVerifierMoveTime" type="number" min="10" step="10" /></label>
-              <label>Max centipawn loss <input id="settingVerifierMaxLoss" type="number" min="0" step="10" /></label>
+              <label>Verifier movetime ms <input id="settingVerifierMoveTime" type="number" min="10" max="5000" step="10" /></label>
+              <label>Max centipawn loss <input id="settingVerifierMaxLoss" type="number" min="0" max="2000" step="10" /></label>
               <label class="check-label"><input id="settingTablebase" type="checkbox" /> External tablebase enabled</label>
               <label>Tablebase probe path <input id="settingTablebasePath" placeholder="/usr/local/bin/noema64-tablebase" /></label>
               <label>Tablebase timeout ms <input id="settingTablebaseTimeout" type="number" min="50" max="10000" step="50" /></label>
@@ -359,7 +359,7 @@
             <div class="settings-grid">
               <label>Temperature <input id="settingTemperature" type="number" min="0" max="2" step="0.05" /></label>
               <label>Max tokens <input id="settingMaxTokens" type="number" min="1" step="100" /></label>
-              <label>LLM timeout ms <input id="settingTimeout" type="number" min="100" step="100" /></label>
+              <label>LLM timeout ms <input id="settingTimeout" type="number" min="100" max="120000" step="100" /></label>
               <label>Retries <input id="settingRetries" type="number" min="0" max="5" step="1" /></label>
             </div>
             <menu class="settings-inline-actions">

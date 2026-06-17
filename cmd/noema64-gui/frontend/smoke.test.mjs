@@ -267,6 +267,9 @@ test("settings surface covers provider and profile controls", () => {
   assert.match(indexHTML, /id="keychainBtn" value="none" type="button">Save Key/);
   assert.match(indexHTML, /id="saveAndTestSettingsBtn" value="none" type="button">Save and Test/);
   assert.match(indexHTML, /id="discardSettingsBtn" value="none" type="button">Discard Changes/);
+  assert.match(indexHTML, /id="settingTimeout" type="number" min="100" max="120000"/);
+  assert.match(indexHTML, /id="settingVerifierMoveTime" type="number" min="10" max="5000"/);
+  assert.match(indexHTML, /id="settingVerifierMaxLoss" type="number" min="0" max="2000"/);
   for (const section of ["Play", "AI Provider", "Safety", "Privacy & Logs", "Advanced"]) {
     assert.match(indexHTML, new RegExp(`<h3 class="settings-section">${section}</h3>`), `missing settings section ${section}`);
   }
@@ -346,9 +349,12 @@ test("bundle wires core actions and renders trace metadata", () => {
     "parseJSONField(\"#promptSchema\", \"Prompt output schema\")",
     "requireNumberField(\"#settingTemperature\", \"Temperature\", 0, 2)",
     "requireIntegerMinField(\"#settingMaxTokens\", \"Max tokens\", 1)",
-    "requireIntegerMinField(\"#settingTimeout\", \"LLM timeout ms\", 100)",
-    "requireIntegerMinField(\"#settingVerifierMoveTime\", \"Verifier movetime ms\", 10)",
-    "requireIntegerMinField(\"#settingVerifierMaxLoss\", \"Max centipawn loss\", 0)",
+    "requireField(\"#settingEndpoint\", \"Endpoint is required for OpenAI-compatible providers.\")",
+    "requireField(\"#settingModel\", \"Policy prior model path is required.\")",
+    "requireIntegerField(\"#settingTimeout\", \"LLM timeout ms\", 100, 120000)",
+    "requireIntegerField(\"#settingVerifierMoveTime\", \"Verifier movetime ms\", 10, 5000)",
+    "requireIntegerField(\"#settingVerifierMaxLoss\", \"Max centipawn loss\", 0, 2000)",
+    "requireField(\"#settingTablebasePath\", \"Tablebase probe path is required when external tablebase is enabled.\")",
     "requireIntegerField(\"#settingTablebaseTimeout\", \"Tablebase timeout ms\", 50, 10000)",
     "requireIntegerField(\"#settingMaxCandidates\", \"Max candidates\", 1, 10)",
     "requireIntegerField(\"#settingRetries\", \"Retries\", 0, 5)",
@@ -528,7 +534,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "updateProviderSettingsSummary",
     "providerKeyStatusText",
     "syncProviderFieldVisibility",
-    "toggleProviderField(\"endpoint\", requiresEndpoint)",
+    "const supportsEndpoint = [\"openai_compatible\", \"anthropic\", \"gemini\", \"ollama\"].includes(provider)",
+    "toggleProviderField(\"endpoint\", supportsEndpoint)",
+    "document.querySelector(\"#settingEndpoint\")?.toggleAttribute(\"required\", requiresEndpoint)",
     "toggleProviderField",
     "testProviderHealth",
     "providerHealthSummaryText",

@@ -2122,10 +2122,11 @@ function providerKeyStatusText(provider, key, keyRef) {
 
 function syncProviderFieldVisibility() {
   const provider = document.querySelector("#settingProvider")?.value || "mock";
-  const requiresEndpoint = provider === "openai_compatible" || provider === "ollama";
+  const supportsEndpoint = ["openai_compatible", "anthropic", "gemini", "ollama"].includes(provider);
+  const requiresEndpoint = provider === "openai_compatible";
   const usesModel = provider !== "mock";
   const usesCloudKey = ["openai", "openai_compatible", "anthropic", "gemini"].includes(provider);
-  toggleProviderField("endpoint", requiresEndpoint);
+  toggleProviderField("endpoint", supportsEndpoint);
   toggleProviderField("model", usesModel);
   toggleProviderField("api-key", usesCloudKey);
   toggleProviderField("key-ref", usesCloudKey);
@@ -2269,16 +2270,23 @@ async function persistSettings(focusSelector = "#saveSettingsBtn") {
     settings.llm.profile_id = document.querySelector("#settingProfile").value || "custom";
     settings.llm.provider = document.querySelector("#settingProvider").value;
     settings.llm.endpoint = settings.llm.provider === "openai" ? "" : document.querySelector("#settingEndpoint").value;
+    if (settings.llm.provider === "openai_compatible") {
+      settings.llm.endpoint = requireField("#settingEndpoint", "Endpoint is required for OpenAI-compatible providers.");
+    }
     settings.llm.model = document.querySelector("#settingModel").value;
+    if (settings.llm.provider === "policy_prior") {
+      settings.llm.model = requireField("#settingModel", "Policy prior model path is required.");
+    }
     settings.llm.temperature = requireNumberField("#settingTemperature", "Temperature", 0, 2);
     settings.llm.max_tokens = requireIntegerMinField("#settingMaxTokens", "Max tokens", 1);
-    settings.llm.timeout_ms = requireIntegerMinField("#settingTimeout", "LLM timeout ms", 100);
+    settings.llm.timeout_ms = requireIntegerField("#settingTimeout", "LLM timeout ms", 100, 120000);
     settings.llm.retries = requireIntegerField("#settingRetries", "Retries", 0, 5);
     settings.llm.api_key = document.querySelector("#settingKey").value;
     settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
     const cloudAck = document.querySelector("#settingCloudAck");
     settings.privacy.cloud_provider_warning_acknowledged = cloudAck.checked;
     if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
+      revealSettingsField(cloudAck);
       markFieldInvalid(cloudAck);
       showError(cloudProviderAckMessage, "#settingsOutput");
       cloudAck.focus();
@@ -2287,10 +2295,13 @@ async function persistSettings(focusSelector = "#saveSettingsBtn") {
     clearFieldInvalid(cloudAck);
     settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
     settings.verifier.path = document.querySelector("#settingVerifierPath").value;
-    settings.verifier.movetime_ms = requireIntegerMinField("#settingVerifierMoveTime", "Verifier movetime ms", 10);
-    settings.verifier.max_centipawn_loss = requireIntegerMinField("#settingVerifierMaxLoss", "Max centipawn loss", 0);
+    settings.verifier.movetime_ms = requireIntegerField("#settingVerifierMoveTime", "Verifier movetime ms", 10, 5000);
+    settings.verifier.max_centipawn_loss = requireIntegerField("#settingVerifierMaxLoss", "Max centipawn loss", 0, 2000);
     settings.verifier.tablebase_enabled = document.querySelector("#settingTablebase").checked;
     settings.verifier.tablebase_path = document.querySelector("#settingTablebasePath").value;
+    if (settings.verifier.tablebase_enabled) {
+      settings.verifier.tablebase_path = requireField("#settingTablebasePath", "Tablebase probe path is required when external tablebase is enabled.");
+    }
     settings.verifier.tablebase_timeout_ms = requireIntegerField("#settingTablebaseTimeout", "Tablebase timeout ms", 50, 10000);
     settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
     settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
