@@ -244,8 +244,8 @@ test("settings surface covers provider and profile controls", () => {
   assert.match(indexHTML, /high_contrast/);
   assert.match(stylesCSS, /body\[data-theme="high_contrast"\] \.dark \.coord \{[\s\S]*color: rgba\(255, 255, 255, 0\.88\);/);
   assert.match(indexHTML, /id="settingsNav" class="settings-nav" role="tablist" aria-label="Settings sections"/);
-  assert.match(indexHTML, /id="settingsPlayTab"[\s\S]*aria-selected="true"[\s\S]*data-settings-target="play"/);
-  assert.match(indexHTML, /id="settingsProviderTab"[\s\S]*data-settings-target="provider"/);
+  assert.match(indexHTML, /id="settingsPlayTab"[\s\S]*aria-selected="true"[\s\S]*tabindex="0"[\s\S]*data-settings-target="play"/);
+  assert.match(indexHTML, /id="settingsProviderTab"[\s\S]*aria-selected="false"[\s\S]*tabindex="-1"[\s\S]*data-settings-target="provider"/);
   assert.match(indexHTML, /id="settingsSafetyTab"[\s\S]*data-settings-target="safety"/);
   assert.match(indexHTML, /id="settingsPrivacyTab"[\s\S]*data-settings-target="privacy"/);
   assert.match(indexHTML, /id="settingsAdvancedTab"[\s\S]*data-settings-target="advanced"/);
@@ -538,6 +538,7 @@ test("bundle wires core actions and renders trace metadata", () => {
     "toggleProviderField(\"endpoint\", supportsEndpoint)",
     "document.querySelector(\"#settingEndpoint\")?.toggleAttribute(\"required\", requiresEndpoint)",
     "toggleProviderField",
+    "if (!visible) clearFieldInvalid(field.querySelector(\"input, select, textarea\"))",
     "testProviderHealth",
     "providerHealthSummaryText",
     "persistSettings",

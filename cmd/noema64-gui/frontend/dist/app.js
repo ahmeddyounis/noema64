@@ -2137,6 +2137,7 @@ function syncProviderFieldVisibility() {
 function toggleProviderField(name, visible) {
   document.querySelectorAll(`[data-provider-field="${name}"]`).forEach((field) => {
     field.hidden = !visible;
+    if (!visible) clearFieldInvalid(field.querySelector("input, select, textarea"));
   });
 }
 

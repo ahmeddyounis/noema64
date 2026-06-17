@@ -218,11 +218,11 @@
             <button value="cancel" title="Close" aria-label="Close dialog">×</button>
           </header>
           <nav id="settingsNav" class="settings-nav" role="tablist" aria-label="Settings sections">
-            <button id="settingsPlayTab" type="button" class="active" role="tab" aria-selected="true" aria-controls="settingsPlayPage" data-settings-target="play">Play</button>
-            <button id="settingsProviderTab" type="button" role="tab" aria-selected="false" aria-controls="settingsProviderPage" data-settings-target="provider">AI Provider</button>
-            <button id="settingsSafetyTab" type="button" role="tab" aria-selected="false" aria-controls="settingsSafetyPage" data-settings-target="safety">Safety</button>
-            <button id="settingsPrivacyTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPrivacyPage" data-settings-target="privacy">Privacy</button>
-            <button id="settingsAdvancedTab" type="button" role="tab" aria-selected="false" aria-controls="settingsAdvancedPage" data-settings-target="advanced">Advanced</button>
+            <button id="settingsPlayTab" type="button" class="active" role="tab" aria-selected="true" aria-controls="settingsPlayPage" tabindex="0" data-settings-target="play">Play</button>
+            <button id="settingsProviderTab" type="button" role="tab" aria-selected="false" aria-controls="settingsProviderPage" tabindex="-1" data-settings-target="provider">AI Provider</button>
+            <button id="settingsSafetyTab" type="button" role="tab" aria-selected="false" aria-controls="settingsSafetyPage" tabindex="-1" data-settings-target="safety">Safety</button>
+            <button id="settingsPrivacyTab" type="button" role="tab" aria-selected="false" aria-controls="settingsPrivacyPage" tabindex="-1" data-settings-target="privacy">Privacy</button>
+            <button id="settingsAdvancedTab" type="button" role="tab" aria-selected="false" aria-controls="settingsAdvancedPage" tabindex="-1" data-settings-target="advanced">Advanced</button>
           </nav>
 
           <div id="settingsDirtyStatus" class="settings-dirty" role="status" aria-live="polite">Saved settings are loaded.</div>
