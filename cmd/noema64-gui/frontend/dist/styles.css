@@ -926,6 +926,17 @@ dialog header button {
   justify-self: start;
 }
 
+.settings-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-presets button {
+  min-width: 0;
+  white-space: normal;
+}
+
 .settings-summary-card {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
@@ -1310,6 +1321,7 @@ textarea {
 
   .settings-overview-grid,
   .settings-grid,
+  .settings-presets,
   .time-control-grid {
     grid-template-columns: 1fr;
   }

@@ -2094,6 +2094,9 @@ function bindSettingsOverviewActions() {
   document.querySelectorAll("[data-settings-jump]").forEach((button) => {
     button.addEventListener("click", () => setSettingsPage(button.dataset.settingsJump, true));
   });
+  document.querySelectorAll("[data-settings-preset]").forEach((button) => {
+    button.addEventListener("click", () => applySettingsPreset(button.dataset.settingsPreset));
+  });
 }
 
 function populateProviderSettingsControls() {
@@ -2176,6 +2179,93 @@ function toggleProviderField(name, visible) {
     field.hidden = !visible;
     if (!visible) clearFieldInvalid(field.querySelector("input, select, textarea"));
   });
+}
+
+function setControlValue(selector, value) {
+  const control = document.querySelector(selector);
+  if (!control) return;
+  control.value = value;
+  clearFieldInvalid(control);
+}
+
+function setControlChecked(selector, checked) {
+  const control = document.querySelector(selector);
+  if (!control) return;
+  control.checked = !!checked;
+  clearFieldInvalid(control);
+}
+
+function applySettingsPreset(preset) {
+  const labels = {
+    offline: "Offline demo",
+    openai: "OpenAI cloud",
+    ollama: "Local Ollama",
+    safe: "Safe play",
+    fast: "Fast play",
+    study: "Study mode"
+  };
+  const label = labels[preset];
+  if (!label) return;
+  setControlValue("#settingProfile", "custom");
+  if (preset === "offline") {
+    setControlValue("#settingProvider", "mock");
+    setControlValue("#settingEndpoint", "");
+    setControlValue("#settingModel", "mock-balanced");
+    setControlValue("#settingKey", "");
+    setControlValue("#settingKeyRef", "");
+    setControlChecked("#settingCloudAck", false);
+    setControlChecked("#settingVerifier", false);
+    setControlChecked("#settingTraceEnabled", true);
+    setControlChecked("#settingRaw", false);
+    setControlChecked("#settingRawResponses", false);
+  }
+  if (preset === "openai") {
+    setControlValue("#settingProvider", "openai");
+    setControlValue("#settingEndpoint", "");
+    setControlValue("#settingModel", "gpt-5.5");
+    setControlValue("#settingKeyRef", "provider/openai");
+    setControlChecked("#settingCloudAck", true);
+  }
+  if (preset === "ollama") {
+    setControlValue("#settingProvider", "ollama");
+    setControlValue("#settingEndpoint", "http://localhost:11434");
+    setControlValue("#settingModel", "llama3.1");
+    setControlValue("#settingKey", "");
+    setControlValue("#settingKeyRef", "");
+    setControlChecked("#settingCloudAck", true);
+  }
+  if (preset === "safe") {
+    setControlValue("#settingMode", "blunderguard");
+    setControlValue("#settingMaxCandidates", "5");
+    setControlChecked("#settingVerifier", true);
+    setControlValue("#settingVerifierMoveTime", "250");
+    setControlValue("#settingVerifierMaxLoss", "120");
+  }
+  if (preset === "fast") {
+    setControlValue("#settingMode", "current");
+    setControlValue("#settingMaxCandidates", "3");
+    setControlChecked("#settingVerifier", false);
+    setControlValue("#settingTimeout", "8000");
+    setControlValue("#settingRetries", "0");
+  }
+  if (preset === "study") {
+    setControlValue("#settingMode", "coach");
+    setControlValue("#settingPersonality", "beginner_coach");
+    setControlValue("#settingMaxCandidates", "6");
+    setControlChecked("#settingVerifier", true);
+    setControlValue("#settingVerifierMoveTime", "200");
+    setControlValue("#settingVerifierMaxLoss", "160");
+    setControlChecked("#settingTraceEnabled", true);
+    setControlChecked("#settingRaw", false);
+    setControlChecked("#settingRawResponses", false);
+  }
+  syncProviderDisclosure();
+  syncEngineModeControls(document.querySelector("#settingMode")?.value || "blunderguard");
+  updateProviderSettingsSummary();
+  updateSettingsOverview();
+  refreshSettingsDirtyState();
+  renderWorkflowPanel();
+  showSuccess(`${label} preset applied. Review and save.`, "#settingsOutput");
 }
 
 function populateCustomPersonalities(profiles) {

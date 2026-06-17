@@ -270,8 +270,12 @@ test("settings surface covers provider and profile controls", () => {
   assert.match(indexHTML, /id="providerKeyStatus">Key status unknown</);
   assert.match(indexHTML, /id="providerHealthSummary">Health not checked in this session\.</);
   assert.match(indexHTML, /class="settings-overview-grid" aria-label="Settings summary"/);
+  assert.match(indexHTML, /class="settings-presets" aria-label="Settings presets"/);
   assert.match(indexHTML, /id="settingsOverviewHealthBtn" value="none" type="button">Test Provider/);
   assert.match(indexHTML, /data-settings-jump="provider"/);
+  for (const preset of ["offline", "openai", "ollama", "safe", "fast", "study"]) {
+    assert.match(indexHTML, new RegExp(`data-settings-preset="${preset}"`), `missing settings preset ${preset}`);
+  }
   assert.match(indexHTML, /data-provider-field="endpoint"/);
   assert.match(indexHTML, /data-provider-field="model"/);
   assert.match(indexHTML, /data-provider-field="api-key"/);
@@ -541,6 +545,9 @@ test("bundle wires core actions and renders trace metadata", () => {
     "setSettingsPage",
     "bindSettingsNavigation",
     "bindSettingsOverviewActions",
+    "applySettingsPreset",
+    "setControlValue",
+    "setControlChecked",
     "moveSettingsPageFocus",
     "settingsFingerprint",
     "markSettingsClean",
@@ -564,7 +571,13 @@ test("bundle wires core actions and renders trace metadata", () => {
     "data-settings-target",
     "data-settings-page",
     "data-settings-jump",
+    "data-settings-preset",
     "setSettingsPage(\"overview\")",
+    "setControlValue(\"#settingProvider\", \"openai\")",
+    "setControlValue(\"#settingModel\", \"gpt-5.5\")",
+    "setControlValue(\"#settingProvider\", \"ollama\")",
+    "setControlValue(\"#settingMode\", \"coach\")",
+    "preset applied. Review and save.",
     "focusDialogInitialControl(\"#settingsOverviewHealthBtn\")",
     "bindBusyButton(\"#settingsOverviewHealthBtn\", testProviderHealth)",
     "document.querySelector(\"#saveAndTestSettingsBtn\").addEventListener",
@@ -904,6 +917,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /dialog > form/);
   assert.match(stylesCSS, /position: sticky/);
   assert.match(stylesCSS, /\.settings-overview-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(stylesCSS, /\.settings-presets \{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
   assert.match(stylesCSS, /\.settings-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(stylesCSS, /\.settings-overview-actions,\n\.settings-inline-actions,\n\.settings-footer \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /calc\(\(74vh - 154px\) \* var\(--board-files, 8\) \/ var\(--board-ranks, 8\)\)/);
@@ -926,7 +940,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.activity-row \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) auto;/);
   assert.match(stylesCSS, /@media \(max-width: 520px\) \{[\s\S]*\.app-activity \{[\s\S]*grid-template-columns: auto minmax\(0, 1fr\);/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.board-area \{[\s\S]*grid-template-rows: auto auto auto minmax\(96px, auto\);[\s\S]*min-height: 0;/);
-  assert.match(stylesCSS, /@media \(max-width: 1240px\) \{[\s\S]*\.settings-overview-grid,\n  \.settings-grid,\n  \.time-control-grid \{[\s\S]*grid-template-columns: 1fr;/);
+  assert.match(stylesCSS, /@media \(max-width: 1240px\) \{[\s\S]*\.settings-overview-grid,\n  \.settings-grid,\n  \.settings-presets,\n  \.time-control-grid \{[\s\S]*grid-template-columns: 1fr;/);
   assert.match(stylesCSS, /\.board \{[\s\S]*width: min\(100%, calc\(100vw - 44px\)\);[\s\S]*max-height: none;/);
   assert.match(stylesCSS, /@media \(max-width: 760px\) \{[\s\S]*\.square \{[\s\S]*min\(calc\(37vh \/ var\(--board-ranks, 8\)\), calc\(52vh \/ var\(--board-files, 8\)\), 9vw\)/);
   assert.match(stylesCSS, /\.move-entry input \{[\s\S]*font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;/);
