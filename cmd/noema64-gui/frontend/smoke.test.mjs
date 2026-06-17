@@ -165,17 +165,36 @@ test("primary toolbar and dialogs expose expected controls", () => {
 
 test("settings surface covers provider and profile controls", () => {
   for (const id of [
+    "settingsNav",
+    "settingsPlayTab",
+    "settingsProviderTab",
+    "settingsSafetyTab",
+    "settingsPrivacyTab",
+    "settingsAdvancedTab",
+    "settingsDirtyStatus",
+    "settingsPlayPage",
+    "settingsProviderPage",
+    "settingsSafetyPage",
+    "settingsPrivacyPage",
+    "settingsAdvancedPage",
+    "activeProviderSummary",
+    "activeProviderDetail",
+    "providerKeyStatus",
+    "providerHealthSummary",
     "settingMode",
     "playModeSelect",
     "settingPersonality",
     "settingCustomPersonality",
+    "settingSide",
     "settingVariant",
     "settingVariantSeed",
     "settingTheme",
     "settingTimeControl",
+    "settingClockIncrement",
     "settingMaxCandidates",
     "settingProfile",
     "settingProvider",
+    "settingCloudAck",
     "settingEndpoint",
     "settingModel",
     "settingTemperature",
@@ -185,10 +204,14 @@ test("settings surface covers provider and profile controls", () => {
     "settingKey",
     "settingKeyRef",
     "settingVerifier",
+    "settingVerifierPath",
+    "settingVerifierMoveTime",
+    "settingVerifierMaxLoss",
     "settingTablebase",
     "settingTablebasePath",
     "settingTablebaseTimeout",
     "settingTraceEnabled",
+    "settingLogDir",
     "settingRaw",
     "settingRawResponses",
     "healthBtn",
@@ -197,6 +220,9 @@ test("settings surface covers provider and profile controls", () => {
     "profilesBtn",
     "keychainBtn",
     "accessibilityAuditBtn",
+    "discardSettingsBtn",
+    "saveAndTestSettingsBtn",
+    "saveSettingsBtn",
     "backupDir",
     "restoreArchive",
     "restoreTarget",
@@ -217,7 +243,31 @@ test("settings surface covers provider and profile controls", () => {
   }
   assert.match(indexHTML, /high_contrast/);
   assert.match(stylesCSS, /body\[data-theme="high_contrast"\] \.dark \.coord \{[\s\S]*color: rgba\(255, 255, 255, 0\.88\);/);
-  for (const section of ["Game", "Provider", "Verifier", "Logging"]) {
+  assert.match(indexHTML, /id="settingsNav" class="settings-nav" role="tablist" aria-label="Settings sections"/);
+  assert.match(indexHTML, /id="settingsPlayTab"[\s\S]*aria-selected="true"[\s\S]*data-settings-target="play"/);
+  assert.match(indexHTML, /id="settingsProviderTab"[\s\S]*data-settings-target="provider"/);
+  assert.match(indexHTML, /id="settingsSafetyTab"[\s\S]*data-settings-target="safety"/);
+  assert.match(indexHTML, /id="settingsPrivacyTab"[\s\S]*data-settings-target="privacy"/);
+  assert.match(indexHTML, /id="settingsAdvancedTab"[\s\S]*data-settings-target="advanced"/);
+  assert.match(indexHTML, /id="settingsDirtyStatus" class="settings-dirty" role="status" aria-live="polite"/);
+  assert.match(indexHTML, /id="settingsPlayPage"[\s\S]*data-settings-page="play"/);
+  assert.match(indexHTML, /id="settingsProviderPage"[\s\S]*data-settings-page="provider"/);
+  assert.match(indexHTML, /id="settingsSafetyPage"[\s\S]*data-settings-page="safety"/);
+  assert.match(indexHTML, /id="settingsPrivacyPage"[\s\S]*data-settings-page="privacy"/);
+  assert.match(indexHTML, /id="settingsAdvancedPage"[\s\S]*data-settings-page="advanced"/);
+  assert.match(indexHTML, /id="activeProviderSummary">Provider not loaded</);
+  assert.match(indexHTML, /id="activeProviderDetail">Open Settings to load provider details\.</);
+  assert.match(indexHTML, /id="providerKeyStatus">Key status unknown</);
+  assert.match(indexHTML, /id="providerHealthSummary">Health not checked in this session\.</);
+  assert.match(indexHTML, /data-provider-field="endpoint"/);
+  assert.match(indexHTML, /data-provider-field="model"/);
+  assert.match(indexHTML, /data-provider-field="api-key"/);
+  assert.match(indexHTML, /data-provider-field="key-ref"/);
+  assert.match(indexHTML, /id="healthBtn" value="none" type="button">Test Provider/);
+  assert.match(indexHTML, /id="keychainBtn" value="none" type="button">Save Key/);
+  assert.match(indexHTML, /id="saveAndTestSettingsBtn" value="none" type="button">Save and Test/);
+  assert.match(indexHTML, /id="discardSettingsBtn" value="none" type="button">Discard Changes/);
+  for (const section of ["Play", "AI Provider", "Safety", "Privacy & Logs", "Advanced"]) {
     assert.match(indexHTML, new RegExp(`<h3 class="settings-section">${section}</h3>`), `missing settings section ${section}`);
   }
   assert.match(indexHTML, /id="settingMode"[\s\S]*<option value="current">Best now<\/option>/);
@@ -469,6 +519,29 @@ test("bundle wires core actions and renders trace metadata", () => {
     "if (settingsDialog && !settingsDialog.open) settingsDialog.showModal();",
     "settingsForm.scrollTop = settingsScrollBeforeProfiles",
     "dialog?.id === \"profilesDialog\" && reopenSettingsAfterProfiles",
+    "setSettingsPage",
+    "bindSettingsNavigation",
+    "moveSettingsPageFocus",
+    "settingsFingerprint",
+    "markSettingsClean",
+    "refreshSettingsDirtyState",
+    "updateProviderSettingsSummary",
+    "providerKeyStatusText",
+    "syncProviderFieldVisibility",
+    "toggleProviderField(\"endpoint\", requiresEndpoint)",
+    "toggleProviderField",
+    "testProviderHealth",
+    "providerHealthSummaryText",
+    "persistSettings",
+    "saveAndTestSettings",
+    "withBusyControl(\"#saveAndTestSettingsBtn\"",
+    "discardSettingsChanges",
+    "revealSettingsField(field)",
+    "data-settings-target",
+    "data-settings-page",
+    "document.querySelector(\"#saveAndTestSettingsBtn\").addEventListener",
+    "document.querySelector(\"#discardSettingsBtn\").addEventListener",
+    "bindBusyButton(\"#healthBtn\", testProviderHealth)",
     "beginAppOperation",
     "setAppActivity(\"Working\", `${label}...`, \"busy\", false)",
     "finishAppOperation",
@@ -802,8 +875,8 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /\.tabs \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /dialog > form/);
   assert.match(stylesCSS, /position: sticky/);
-  assert.match(stylesCSS, /\.settings \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
-  assert.match(stylesCSS, /\.settings menu \{[\s\S]*flex-wrap: wrap;/);
+  assert.match(stylesCSS, /\.settings-grid \{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(stylesCSS, /\.settings-inline-actions,\n\.settings-footer \{[\s\S]*flex-wrap: wrap;/);
   assert.match(stylesCSS, /calc\(\(74vh - 154px\) \* var\(--board-files, 8\) \/ var\(--board-ranks, 8\)\)/);
   assert.match(stylesCSS, /\.board-area\s*\{[\s\S]*grid-template-rows: auto minmax\(360px, auto\) auto minmax\(120px, auto\);[\s\S]*align-self: start;/);
   assert.match(stylesCSS, /\.board\s*\{[\s\S]*align-self: start;/);
@@ -830,7 +903,7 @@ test("dialog and control styles stay usable on narrow screens", () => {
   assert.match(stylesCSS, /\.move-list \{[\s\S]*max-height: 160px;/);
   assert.match(stylesCSS, /pre,\ntextarea \{[\s\S]*font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;/);
   assert.match(stylesCSS, /pre,\n  textarea \{[\s\S]*min-height: 160px;/);
-  assert.match(stylesCSS, /\.settings menu button,\n  \.dialog-actions button \{[\s\S]*flex: 1 1 128px;/);
+  assert.match(stylesCSS, /\.settings-inline-actions button,\n  \.settings-footer button,\n  \.dialog-actions button \{[\s\S]*flex: 1 1 128px;/);
   assert.match(stylesCSS, /\.candidate \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) max-content;/);
   assert.match(stylesCSS, /\.candidate strong \{[\s\S]*grid-column: 1;/);
   assert.match(stylesCSS, /\.candidate span \{[\s\S]*grid-column: 1 \/ -1;/);

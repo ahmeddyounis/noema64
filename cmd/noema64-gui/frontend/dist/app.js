@@ -22,6 +22,9 @@ let lastStageEvent = null;
 let promptPack = null;
 let reopenSettingsAfterProfiles = false;
 let settingsScrollBeforeProfiles = 0;
+let activeSettingsPage = "play";
+let savedSettingsFingerprint = "";
+let lastProviderHealthText = "Health not checked in this session.";
 const busyControls = new Set();
 const busyDisabledState = new WeakMap();
 let activeOperationCount = 0;
@@ -1978,6 +1981,8 @@ async function loadSettings() {
   clearFieldInvalid(document.querySelector("#settingCloudAck"));
   syncTimeControlInputsFromPreset(false);
   syncProviderDisclosure();
+  updateProviderSettingsSummary();
+  markSettingsClean();
   renderWorkflowPanel();
 }
 
@@ -1997,6 +2002,86 @@ function populateProviderProfiles(profiles) {
   }
 }
 
+function setSettingsPage(page, focus = false) {
+  const targetPage = document.querySelector(`[data-settings-page="${page}"]`) ? page : "play";
+  activeSettingsPage = targetPage;
+  document.querySelectorAll("#settingsNav button[data-settings-target]").forEach((button) => {
+    const selected = button.dataset.settingsTarget === targetPage;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = selected ? 0 : -1;
+    if (selected && focus) button.focus();
+  });
+  document.querySelectorAll("[data-settings-page]").forEach((panel) => {
+    panel.hidden = panel.dataset.settingsPage !== targetPage;
+  });
+}
+
+function moveSettingsPageFocus(current, delta) {
+  const buttons = [...document.querySelectorAll("#settingsNav button[data-settings-target]")];
+  const index = buttons.indexOf(current);
+  if (index < 0) return;
+  const next = buttons[(index + delta + buttons.length) % buttons.length];
+  setSettingsPage(next.dataset.settingsTarget, true);
+}
+
+function revealSettingsField(field) {
+  const page = field?.closest?.("[data-settings-page]")?.dataset?.settingsPage;
+  if (page) setSettingsPage(page);
+}
+
+function settingsFingerprint() {
+  const controls = [...document.querySelectorAll("#settingsDialog input[id], #settingsDialog select[id], #settingsDialog textarea[id]")];
+  return JSON.stringify(controls.map((control) => [
+    control.id,
+    control.type === "checkbox" ? control.checked : control.value
+  ]));
+}
+
+function markSettingsClean() {
+  savedSettingsFingerprint = settingsFingerprint();
+  refreshSettingsDirtyState();
+}
+
+function refreshSettingsDirtyState() {
+  const dirty = savedSettingsFingerprint !== "" && settingsFingerprint() !== savedSettingsFingerprint;
+  const status = document.querySelector("#settingsDirtyStatus");
+  if (!status) return dirty;
+  status.dataset.dirty = dirty ? "true" : "false";
+  status.textContent = dirty ? "You have unsaved settings." : "Saved settings are loaded.";
+  document.querySelector("#discardSettingsBtn").disabled = !dirty;
+  return dirty;
+}
+
+function bindSettingsNavigation() {
+  document.querySelectorAll("#settingsNav button[data-settings-target]").forEach((button) => {
+    button.addEventListener("click", () => setSettingsPage(button.dataset.settingsTarget));
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        event.preventDefault();
+        moveSettingsPageFocus(button, 1);
+      }
+      if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        event.preventDefault();
+        moveSettingsPageFocus(button, -1);
+      }
+      if (event.key === "Home") {
+        event.preventDefault();
+        setSettingsPage("play", true);
+      }
+      if (event.key === "End") {
+        event.preventDefault();
+        setSettingsPage("advanced", true);
+      }
+    });
+  });
+}
+
+function bindSettingsDirtyTracking() {
+  document.querySelector("#settingsDialog").addEventListener("input", refreshSettingsDirtyState);
+  document.querySelector("#settingsDialog").addEventListener("change", refreshSettingsDirtyState);
+}
+
 function populateProviderSettingsControls() {
   populateProviderProfiles(settings.llm?.profiles || []);
   document.querySelector("#settingProfile").value = providerProfileValue(settings.llm?.profile_id);
@@ -2010,6 +2095,48 @@ function populateProviderSettingsControls() {
   document.querySelector("#settingKey").value = settings.llm.api_key || "";
   document.querySelector("#settingKeyRef").value = settings.llm.api_key_ref || "";
   document.querySelector("#settingCloudAck").checked = !!settings.privacy.cloud_provider_warning_acknowledged;
+  updateProviderSettingsSummary();
+}
+
+function updateProviderSettingsSummary() {
+  const provider = document.querySelector("#settingProvider")?.value || settings?.llm?.provider || "mock";
+  const profile = document.querySelector("#settingProfile")?.value || settings?.llm?.profile_id || "custom";
+  const model = document.querySelector("#settingModel")?.value || settings?.llm?.model || "mock-balanced";
+  const endpoint = document.querySelector("#settingEndpoint")?.value || "";
+  const key = document.querySelector("#settingKey")?.value || "";
+  const keyRef = document.querySelector("#settingKeyRef")?.value || "";
+  const providerText = `${humanizeToken(provider)} · ${model || "model not set"}`;
+  setText("#activeProviderSummary", providerText);
+  setText("#activeProviderDetail", `${profile || "custom"}${endpoint ? ` · ${endpoint}` : provider === "openai" ? ` · ${openAIEndpoint}` : ""}`);
+  setText("#providerKeyStatus", providerKeyStatusText(provider, key, keyRef));
+  setText("#providerHealthSummary", lastProviderHealthText);
+}
+
+function providerKeyStatusText(provider, key, keyRef) {
+  if (provider === "mock" || provider === "ollama" || provider === "policy_prior") return "No cloud API key required.";
+  if (key && keyRef) return "API key and key ref are both set.";
+  if (key && key !== "[REDACTED]") return "API key entered.";
+  if (keyRef) return `API key ref: ${keyRef}`;
+  return "No API key configured.";
+}
+
+function syncProviderFieldVisibility() {
+  const provider = document.querySelector("#settingProvider")?.value || "mock";
+  const requiresEndpoint = provider === "openai_compatible" || provider === "ollama";
+  const usesModel = provider !== "mock";
+  const usesCloudKey = ["openai", "openai_compatible", "anthropic", "gemini"].includes(provider);
+  toggleProviderField("endpoint", requiresEndpoint);
+  toggleProviderField("model", usesModel);
+  toggleProviderField("api-key", usesCloudKey);
+  toggleProviderField("key-ref", usesCloudKey);
+  document.querySelector("#settingEndpoint")?.toggleAttribute("required", requiresEndpoint);
+  document.querySelector("#settingModel")?.toggleAttribute("required", usesModel);
+}
+
+function toggleProviderField(name, visible) {
+  document.querySelectorAll(`[data-provider-field="${name}"]`).forEach((field) => {
+    field.hidden = !visible;
+  });
 }
 
 function populateCustomPersonalities(profiles) {
@@ -2053,6 +2180,8 @@ function applySelectedProviderProfile() {
   document.querySelector("#settingKeyRef").value = profile.api_key_ref || "";
   applyingProviderProfile = false;
   syncProviderDisclosure();
+  updateProviderSettingsSummary();
+  refreshSettingsDirtyState();
   renderWorkflowPanel();
 }
 
@@ -2100,6 +2229,7 @@ function focusSettingsSaveError(err) {
     focusDialogInitialControl("#saveSettingsBtn");
     return;
   }
+  revealSettingsField(field);
   markFieldInvalid(field);
   field.focus();
   field.select?.();
@@ -2119,66 +2249,72 @@ function focusGameSetupError(err) {
   return true;
 }
 
-async function saveSettings() {
-  return withBusyControl("#saveSettingsBtn", async () => {
-    try {
-      settings = normalizeSettingsShape(settings);
-      playerSide = document.querySelector("#settingSide").value;
-      if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
-      autoReply = document.querySelector("#settingAutoReply").checked;
-      gameVariant = document.querySelector("#settingVariant").value || "standard";
-      chess960Seed = requireIntegerField("#settingVariantSeed", "Chess960 seed", 0, 959);
-      const timeControl = timeControlForNewGame();
-      settings.engine.default_mode = normalizeEngineMode(document.querySelector("#settingMode").value);
-      settings.engine.personality = document.querySelector("#settingPersonality").value;
-      settings.engine.custom_personality_id = document.querySelector("#settingCustomPersonality").value;
-      settings.engine.max_candidates = requireIntegerField("#settingMaxCandidates", "Max candidates", 1, 10);
-      settings.gui.theme = document.querySelector("#settingTheme").value || "system";
-      settings.gui.time_control = document.querySelector("#settingTimeControl").value;
-      settings.gui.clock_initial_ms = timeControl.initial_ms;
-      settings.gui.clock_increment_ms = timeControl.increment_ms;
-      settings.llm.profile_id = document.querySelector("#settingProfile").value || "custom";
-      settings.llm.provider = document.querySelector("#settingProvider").value;
-      settings.llm.endpoint = settings.llm.provider === "openai" ? "" : document.querySelector("#settingEndpoint").value;
-      settings.llm.model = document.querySelector("#settingModel").value;
-      settings.llm.temperature = requireNumberField("#settingTemperature", "Temperature", 0, 2);
-      settings.llm.max_tokens = requireIntegerMinField("#settingMaxTokens", "Max tokens", 1);
-      settings.llm.timeout_ms = requireIntegerMinField("#settingTimeout", "LLM timeout ms", 100);
-      settings.llm.retries = requireIntegerField("#settingRetries", "Retries", 0, 5);
-      settings.llm.api_key = document.querySelector("#settingKey").value;
-      settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
-      const cloudAck = document.querySelector("#settingCloudAck");
-      settings.privacy.cloud_provider_warning_acknowledged = cloudAck.checked;
-      if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
-        markFieldInvalid(cloudAck);
-        showError(cloudProviderAckMessage, "#settingsOutput");
-        cloudAck.focus();
-        return;
-      }
-      clearFieldInvalid(cloudAck);
-      settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
-      settings.verifier.path = document.querySelector("#settingVerifierPath").value;
-      settings.verifier.movetime_ms = requireIntegerMinField("#settingVerifierMoveTime", "Verifier movetime ms", 10);
-      settings.verifier.max_centipawn_loss = requireIntegerMinField("#settingVerifierMaxLoss", "Max centipawn loss", 0);
-      settings.verifier.tablebase_enabled = document.querySelector("#settingTablebase").checked;
-      settings.verifier.tablebase_path = document.querySelector("#settingTablebasePath").value;
-      settings.verifier.tablebase_timeout_ms = requireIntegerField("#settingTablebaseTimeout", "Tablebase timeout ms", 50, 10000);
-      settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
-      settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
-      settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
-      settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
-      await call("SaveSettings", settings);
-      applyTheme(settings.gui.theme);
-      syncEngineModeControls(settings.engine.default_mode);
-      clearSettingsSaveErrorFields();
-      showSuccess("Settings saved.", "#settingsOutput");
-      renderWorkflowPanel();
-      focusDialogInitialControl("#saveSettingsBtn");
-    } catch (err) {
-      showError(err, "#settingsOutput");
-      focusSettingsSaveError(err);
+async function persistSettings(focusSelector = "#saveSettingsBtn") {
+  try {
+    settings = normalizeSettingsShape(settings);
+    playerSide = document.querySelector("#settingSide").value;
+    if (playerSide === "random") playerSide = Math.random() < 0.5 ? "white" : "black";
+    autoReply = document.querySelector("#settingAutoReply").checked;
+    gameVariant = document.querySelector("#settingVariant").value || "standard";
+    chess960Seed = requireIntegerField("#settingVariantSeed", "Chess960 seed", 0, 959);
+    const timeControl = timeControlForNewGame();
+    settings.engine.default_mode = normalizeEngineMode(document.querySelector("#settingMode").value);
+    settings.engine.personality = document.querySelector("#settingPersonality").value;
+    settings.engine.custom_personality_id = document.querySelector("#settingCustomPersonality").value;
+    settings.engine.max_candidates = requireIntegerField("#settingMaxCandidates", "Max candidates", 1, 10);
+    settings.gui.theme = document.querySelector("#settingTheme").value || "system";
+    settings.gui.time_control = document.querySelector("#settingTimeControl").value;
+    settings.gui.clock_initial_ms = timeControl.initial_ms;
+    settings.gui.clock_increment_ms = timeControl.increment_ms;
+    settings.llm.profile_id = document.querySelector("#settingProfile").value || "custom";
+    settings.llm.provider = document.querySelector("#settingProvider").value;
+    settings.llm.endpoint = settings.llm.provider === "openai" ? "" : document.querySelector("#settingEndpoint").value;
+    settings.llm.model = document.querySelector("#settingModel").value;
+    settings.llm.temperature = requireNumberField("#settingTemperature", "Temperature", 0, 2);
+    settings.llm.max_tokens = requireIntegerMinField("#settingMaxTokens", "Max tokens", 1);
+    settings.llm.timeout_ms = requireIntegerMinField("#settingTimeout", "LLM timeout ms", 100);
+    settings.llm.retries = requireIntegerField("#settingRetries", "Retries", 0, 5);
+    settings.llm.api_key = document.querySelector("#settingKey").value;
+    settings.llm.api_key_ref = document.querySelector("#settingKeyRef").value;
+    const cloudAck = document.querySelector("#settingCloudAck");
+    settings.privacy.cloud_provider_warning_acknowledged = cloudAck.checked;
+    if (providerRequiresAck(settings.llm.provider) && !settings.privacy.cloud_provider_warning_acknowledged) {
+      markFieldInvalid(cloudAck);
+      showError(cloudProviderAckMessage, "#settingsOutput");
+      cloudAck.focus();
+      return false;
     }
-  });
+    clearFieldInvalid(cloudAck);
+    settings.verifier.enabled = document.querySelector("#settingVerifier").checked;
+    settings.verifier.path = document.querySelector("#settingVerifierPath").value;
+    settings.verifier.movetime_ms = requireIntegerMinField("#settingVerifierMoveTime", "Verifier movetime ms", 10);
+    settings.verifier.max_centipawn_loss = requireIntegerMinField("#settingVerifierMaxLoss", "Max centipawn loss", 0);
+    settings.verifier.tablebase_enabled = document.querySelector("#settingTablebase").checked;
+    settings.verifier.tablebase_path = document.querySelector("#settingTablebasePath").value;
+    settings.verifier.tablebase_timeout_ms = requireIntegerField("#settingTablebaseTimeout", "Tablebase timeout ms", 50, 10000);
+    settings.engine.trace_enabled = document.querySelector("#settingTraceEnabled").checked;
+    settings.logging.output_dir = document.querySelector("#settingLogDir").value || settings.logging.output_dir;
+    settings.privacy.log_raw_prompts = document.querySelector("#settingRaw").checked;
+    settings.privacy.log_raw_llm_responses = document.querySelector("#settingRawResponses").checked;
+    await call("SaveSettings", settings);
+    applyTheme(settings.gui.theme);
+    syncEngineModeControls(settings.engine.default_mode);
+    clearSettingsSaveErrorFields();
+    markSettingsClean();
+    updateProviderSettingsSummary();
+    showSuccess("Settings saved.", "#settingsOutput");
+    renderWorkflowPanel();
+    focusDialogInitialControl(focusSelector);
+    return true;
+  } catch (err) {
+    showError(err, "#settingsOutput");
+    focusSettingsSaveError(err);
+    return false;
+  }
+}
+
+async function saveSettings() {
+  return withBusyControl("#saveSettingsBtn", () => persistSettings("#saveSettingsBtn"));
 }
 
 async function savePlayMode() {
@@ -2219,12 +2355,58 @@ async function saveProviderKeyToKeychain() {
     clearFieldInvalid(keyField);
     settings = await call("SaveProviderAPIKeyToKeychain", document.querySelector("#settingProfile").value, apiKey);
     await loadSettings();
+    markSettingsClean();
     showSuccess("API key saved to keychain reference.", "#settingsOutput");
   } catch (err) {
     markFieldInvalid(keyField);
     showError(err, "#settingsOutput");
     keyField.focus();
     keyField.select?.();
+  }
+}
+
+async function testProviderHealth() {
+  try {
+    document.querySelector("#settingsOutput").textContent = "Testing provider...";
+    const health = await call("HealthCheckProvider");
+    lastProviderHealthText = providerHealthSummaryText(health);
+    updateProviderSettingsSummary();
+    document.querySelector("#settingsOutput").textContent = JSON.stringify(health, null, 2);
+    showSuccess("Provider health check complete.");
+    return true;
+  } catch (err) {
+    lastProviderHealthText = providerHealthSummaryText(null, err);
+    updateProviderSettingsSummary();
+    showError(err, "#settingsOutput");
+    return false;
+  }
+}
+
+function providerHealthSummaryText(health, err = null) {
+  if (err) return `Health failed: ${appErrorMessage(err)}`;
+  const data = asObject(health);
+  const provider = humanizeToken(data.provider || document.querySelector("#settingProvider")?.value || "provider");
+  const status = data.healthy === true || data.status === "healthy" ? "healthy" : data.status || "checked";
+  return `${provider} ${status}`;
+}
+
+async function saveAndTestSettings() {
+  return withBusyControl("#saveAndTestSettingsBtn", async () => {
+    const saved = await persistSettings("#saveAndTestSettingsBtn");
+    if (!saved) return false;
+    return testProviderHealth();
+  });
+}
+
+async function discardSettingsChanges() {
+  try {
+    await loadSettings();
+    showSuccess("Unsaved settings discarded.", "#settingsOutput");
+    refreshSettingsDirtyState();
+    return true;
+  } catch (err) {
+    showError(err, "#settingsOutput");
+    return false;
   }
 }
 
@@ -2238,11 +2420,13 @@ function syncProviderDisclosure() {
   endpoint.disabled = managedOpenAIEndpoint;
   endpoint.placeholder = managedOpenAIEndpoint ? `${openAIEndpoint} (default)` : "http://localhost:11434/v1";
   endpoint.title = managedOpenAIEndpoint ? "OpenAI uses the default API endpoint automatically." : "";
+  syncProviderFieldVisibility();
   if (managedOpenAIEndpoint) {
     endpoint.value = "";
     clearFieldInvalid(endpoint);
   }
   if (!isCloud) clearCloudProviderAckWarning();
+  updateProviderSettingsSummary();
 }
 
 function clearCloudProviderAckWarning() {
@@ -3221,14 +3405,17 @@ document.querySelector("#settingProfile").addEventListener("change", applySelect
 document.querySelector("#settingProvider").addEventListener("change", () => {
   markProviderProfileCustom();
   syncProviderDisclosure();
+  updateProviderSettingsSummary();
   renderWorkflowPanel();
 });
 document.querySelector("#settingCloudAck").addEventListener("change", () => {
   if (document.querySelector("#settingCloudAck").checked) clearCloudProviderAckWarning();
+  updateProviderSettingsSummary();
 });
 ["#settingEndpoint", "#settingModel", "#settingTemperature", "#settingMaxTokens", "#settingTimeout", "#settingRetries", "#settingKey", "#settingKeyRef"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", () => {
     markProviderProfileCustom();
+    updateProviderSettingsSummary();
     renderWorkflowPanel();
   });
 });
@@ -3328,16 +3515,14 @@ document.querySelector("#promotionDialog").addEventListener("close", () => {
   resolve(null);
 });
 document.querySelector("#saveSettingsBtn").addEventListener("click", saveSettings);
+document.querySelector("#saveAndTestSettingsBtn").addEventListener("click", saveAndTestSettings);
+document.querySelector("#discardSettingsBtn").addEventListener("click", (event) => {
+  event.preventDefault();
+  discardSettingsChanges();
+});
 bindBusyButton("#profilesBtn", openProfilesEditor);
 bindBusyButton("#keychainBtn", saveProviderKeyToKeychain);
-bindBusyButton("#healthBtn", async () => {
-  try {
-    document.querySelector("#settingsOutput").textContent = JSON.stringify(await call("HealthCheckProvider"), null, 2);
-    showSuccess("Provider health check complete.");
-  } catch (err) {
-    showError(err, "#settingsOutput");
-  }
-});
+bindBusyButton("#healthBtn", testProviderHealth);
 bindBusyButton("#benchBtn", async () => {
   try {
     document.querySelector("#settingsOutput").textContent = "Running benchmark...";
@@ -3546,6 +3731,8 @@ function isElementVisible(element) {
 
 async function init() {
   bindWorkspaceNavigation();
+  bindSettingsNavigation();
+  bindSettingsDirtyTracking();
   bindWorkflowCommands();
   setWorkspaceView(document.body.dataset.workspaceView || activeWorkspaceView);
   bindDialogCloseButtons();
